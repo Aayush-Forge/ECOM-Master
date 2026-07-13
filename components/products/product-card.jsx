@@ -108,7 +108,7 @@ export default function ProductCard({ product, compact = false }) {
           </div>
 
           {/* Action Buttons Block */}
-          <div className="flex items-center gap-2 z-20 relative w-full">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 z-20 relative w-full">
             {/* Quantity Selector */}
             {!isVariable && inStock && (
               <div className="flex items-center justify-between border border-stone-200 rounded-sm bg-stone-50 h-9 px-2 gap-2 flex-grow">
