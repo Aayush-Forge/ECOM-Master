@@ -18,6 +18,7 @@ export default function ProductCard({ product, compact = false }) {
 
   const onAdd = (e) => {
     e.preventDefault()
+    e.stopPropagation()
     if (isVariable) {
       // Send user to product page to choose variation
       window.location.href = `/products/${product.slug}`
@@ -89,56 +90,63 @@ export default function ProductCard({ product, compact = false }) {
           </p>
         </div>
 
-        <div className="flex items-center justify-between mt-auto pt-2 gap-1.5 flex-wrap sm:flex-nowrap">
-          <div className="flex flex-col">
+        {/* Pricing & Actions Row */}
+        <div className="mt-auto pt-2 border-t border-stone-100 space-y-3">
+          {/* Price Block */}
+          <div className="flex items-baseline justify-between flex-wrap gap-1.5">
             <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-lg text-saffron-600">₹{price.toFixed(0)}</span>
+              <span className="font-display text-lg text-saffron-600 font-bold">₹{price.toFixed(0)}</span>
               {onSale && (
                 <span className="text-xs text-muted-foreground line-through">₹{regular.toFixed(0)}</span>
               )}
             </div>
             {onSale && (
-              <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.5 rounded-sm self-start mt-0.5">
+              <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-sm">
                 Save ₹{(regular - price).toFixed(0)} ({Math.round(((regular - price) / regular) * 100)}%)
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 z-20 relative">
+          {/* Action Buttons Block */}
+          <div className="flex items-center gap-2 z-20 relative w-full">
             {/* Quantity Selector */}
             {!isVariable && inStock && (
-              <div className="flex items-center border border-stone-200 rounded-sm bg-stone-50 text-[10px] sm:text-xs h-7 sm:h-8 px-1.5 sm:px-2 gap-1.5">
+              <div className="flex items-center justify-between border border-stone-200 rounded-sm bg-stone-50 h-9 px-2 gap-2 flex-grow">
                 <button 
                   onClick={(e) => { 
                     e.preventDefault()
                     e.stopPropagation()
                     setCardQty(q => Math.max(1, q - 1)) 
                   }} 
-                  className="p-0.5 hover:bg-stone-200 rounded-full text-stone-600 transition"
+                  className="p-1 hover:bg-stone-200 rounded-full text-stone-600 transition"
                 >
-                  <Minus className="w-2.5 h-2.5 sm:w-3 h-3" />
+                  <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="font-bold min-w-[14px] sm:min-w-[16px] text-center text-midnight">{cardQty}</span>
+                <span className="font-bold text-center text-midnight text-xs sm:text-sm">{cardQty}</span>
                 <button 
                   onClick={(e) => { 
                     e.preventDefault()
                     e.stopPropagation()
                     setCardQty(q => q + 1) 
                   }} 
-                  className="p-0.5 hover:bg-stone-200 rounded-full text-stone-600 transition"
+                  className="p-1 hover:bg-stone-200 rounded-full text-stone-600 transition"
                 >
-                  <Plus className="w-2.5 h-2.5 sm:w-3 h-3" />
+                  <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
 
             <button
               onClick={onAdd}
-              className="p-1.5 sm:p-2 rounded-full bg-saffron-500 hover:bg-saffron-600 text-white transition-all hover:scale-110 shadow-md disabled:opacity-50 flex-shrink-0"
+              className={cn(
+                "h-9 px-3 rounded-sm bg-saffron-500 hover:bg-saffron-600 text-white font-bold text-xs uppercase tracking-wider transition-all hover:scale-102 flex items-center justify-center gap-1.5",
+                isVariable || !inStock ? "w-full" : "flex-grow-[2]"
+              )}
               aria-label={isVariable ? 'View options' : 'Add to cart'}
               disabled={!inStock}
             >
-              <Plus className="w-3.5 h-3.5 sm:w-4 h-4" />
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">{isVariable ? 'Select' : 'Add'}</span>
             </button>
           </div>
         </div>

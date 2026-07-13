@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-cormorant text-xl md:text-2xl text-[#D7A65B] border-b border-stone-200 pb-2 mt-8 mb-4 font-semibold tracking-wider uppercase">1. Contact Information</h2>
             <p className="text-stone-700 leading-relaxed font-light">
               If you have any questions, concerns, or requests regarding this Privacy Policy, you may reach us at:<br />
-              <strong>Email:</strong> support.sridattam@gmail.com<br />
+              <strong>Email:</strong> care@sridattam.in<br />
               <strong>Phone:</strong> +91 7975600729
             </p>
 
@@ -111,7 +111,7 @@ export default function PrivacyPolicyPage() {
               <li>Request deletion of your personal data (where applicable by law)</li>
             </ul>
             <p className="text-stone-700 leading-relaxed font-light">
-              To exercise these rights, contact us at support.sridattam@gmail.com.
+              To exercise these rights, contact us at care@sridattam.in.
             </p>
 
             <h2 className="font-cormorant text-xl md:text-2xl text-[#D7A65B] border-b border-stone-200 pb-2 mt-8 mb-4 font-semibold tracking-wider uppercase">7. Policy Updates</h2>
@@ -122,7 +122,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-cormorant text-xl md:text-2xl text-[#D7A65B] border-b border-stone-200 pb-2 mt-8 mb-4 font-semibold tracking-wider uppercase">8. Contact Us</h2>
             <p className="text-stone-700 leading-relaxed font-light">
               If you have any questions about this Privacy Policy, please contact us at:<br />
-              Email: support.sridattam@gmail.com<br />
+              Email: care@sridattam.in<br />
               Phone: +91 7975600729
             </p>
           </div>

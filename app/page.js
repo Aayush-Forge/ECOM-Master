@@ -164,10 +164,10 @@ function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart })
 
       {/* Actions panel */}
       <div className="pt-3 sm:pt-4 mt-3 sm:mt-4 border-t border-stone-100 z-20 relative">
-        <div className="flex flex-col md:flex-row md:items-center gap-2">
+        <div className="flex flex-col gap-2">
           {/* Quantity Selector Row */}
           {!isVariable && inStock && (
-            <div className="flex items-center justify-center border border-stone-200 rounded-sm bg-stone-50/55 py-1.5 px-3 h-10 gap-2 flex-shrink-0">
+            <div className="flex items-center justify-center border border-stone-200 rounded-sm bg-stone-50/55 py-1.5 px-3 h-10 gap-2 w-full">
               <div className="flex items-center gap-1.5">
                 <button 
                   onClick={(e) => { 
@@ -461,7 +461,7 @@ export default function Home() {
 
       {/* SECTION 1 — HERO SLIDER */}
       <section 
-        className="relative h-[65vh] md:h-[75vh] w-full overflow-hidden bg-[#130306]"
+        className="relative aspect-[1086/1448] md:aspect-[1536/450] w-full overflow-hidden bg-[#130306]"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}

@@ -33,7 +33,7 @@ export default function Footer() {
               <li><Link href="/refund-policy" className="hover:text-[#D7A65B]">Refund Policy</Link></li>
               <li><Link href="/privacy-policy" className="hover:text-[#D7A65B]">Privacy Policy</Link></li>
               <li><Link href="/terms-conditions" className="hover:text-[#D7A65B]">Terms &amp; Conditions</Link></li>
-              <li><Link href="#" className="hover:text-[#D7A65B]">Contact</Link></li>
+              <li><Link href="/contact" className="hover:text-[#D7A65B]">Contact</Link></li>
             </ul>
           </div>
           <div>
@@ -42,7 +42,7 @@ export default function Footer() {
             <div className="flex gap-3 mt-4">
               <a href="#" aria-label="Instagram" className="p-2 rounded-full bg-stone-100 hover:bg-[#6B1024] hover:text-[#F7E9D1] transition-colors"><Instagram className="w-4 h-4" /></a>
               <a href="#" aria-label="Facebook" className="p-2 rounded-full bg-stone-100 hover:bg-[#6B1024] hover:text-[#F7E9D1] transition-colors"><Facebook className="w-4 h-4" /></a>
-              <a href="mailto:contact@sridattam.com" aria-label="Email" className="p-2 rounded-full bg-stone-100 hover:bg-[#6B1024] hover:text-[#F7E9D1] transition-colors"><Mail className="w-4 h-4" /></a>
+              <a href="mailto:care@sridattam.in" aria-label="Email" className="p-2 rounded-full bg-stone-100 hover:bg-[#6B1024] hover:text-[#F7E9D1] transition-colors"><Mail className="w-4 h-4" /></a>
             </div>
           </div>
         </div>
