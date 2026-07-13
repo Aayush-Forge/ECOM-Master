@@ -41,7 +41,23 @@ export default function ProductDetailClient({ initialProduct }) {
     fetch(`/api/products/reviews?product=${productId}`)
       .then(r => r.json())
       .then(data => {
-        setReviews(Array.isArray(data) ? data : [])
+        const reviewsArray = Array.isArray(data) ? data : []
+        setReviews(reviewsArray)
+        if (reviewsArray.length > 0) {
+          const sum = reviewsArray.reduce((s, r) => s + r.rating, 0)
+          const newAvg = (sum / reviewsArray.length).toFixed(2)
+          setProduct(prev => ({
+            ...prev,
+            average_rating: String(newAvg),
+            rating_count: reviewsArray.length
+          }))
+        } else {
+          setProduct(prev => ({
+            ...prev,
+            average_rating: '0.00',
+            rating_count: 0
+          }))
+        }
         setReviewsLoading(false)
       })
       .catch(() => setReviewsLoading(false))

@@ -31,6 +31,33 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${yatra.variable} ${lora.variable} ${notoDev.variable} ${cormorant.variable} ${inter.variable}`}>
       <body className="min-h-screen bg-white text-midnight font-inter relative">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for (var registration of registrations) {
+                    registration.unregister().then(function() {
+                      console.log('Unregistered service worker successfully');
+                    });
+                  }
+                });
+              }
+              if ('caches' in window) {
+                caches.keys().then(function(names) {
+                  for (var name of names) {
+                    caches.delete(name);
+                  }
+                });
+              }
+              window.addEventListener('error', function(e) {
+                if (e.message && (e.message.indexOf('Loading chunk') !== -1 || e.message.indexOf('CSS chunk') !== -1)) {
+                  window.location.reload();
+                }
+              });
+            `
+          }}
+        />
         <MandalaBackground />
         <Suspense fallback={null}>
           <PageLoader />
