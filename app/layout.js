@@ -5,6 +5,8 @@ import CartProvider from '@/lib/cart-context'
 import MandalaBackground from '@/components/layout/mandala-background'
 import { Suspense } from 'react'
 import PageLoader from '@/components/layout/page-loader'
+import WhatsAppButton from '@/components/layout/whatsapp-button'
+
 
 const yatra = Yatra_One({ subsets: ['latin'], weight: '400', variable: '--font-yatra', display: 'swap' })
 const lora = Lora({ subsets: ['latin'], weight: ['400','500','600','700'], variable: '--font-lora', display: 'swap' })
@@ -64,6 +66,7 @@ export default function RootLayout({ children }) {
         </Suspense>
         <CartProvider>
           {children}
+          <WhatsAppButton />
           <Toaster position="top-center" richColors duration={2000} />
         </CartProvider>
       </body>
