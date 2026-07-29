@@ -69,6 +69,32 @@ export default function Header() {
   return (
     <>
       <header className="sticky top-0 inset-x-0 z-40 bg-white border-b border-stone-200/60 backdrop-blur-md transition-all shadow-sm">
+        {/* Dark Maroon Red Marquee Top Bar */}
+        <div className="w-full overflow-hidden bg-[#4D0013] text-white py-2 text-[10px] sm:text-xs uppercase tracking-[0.2em] font-semibold border-b border-white/5 select-none relative z-50">
+          <div className="flex w-max animate-marquee whitespace-nowrap">
+            <div className="flex items-center gap-16 px-8">
+              <span>FREE DELIVERY ABOVE RS. 499/-</span>
+              <span className="text-[#D7A65B]">✦</span>
+              <span>BUY INDIA'S PREMIUM SAMBRANI CUP KIT</span>
+              <span className="text-[#D7A65B]">✦</span>
+              <span>BUY PREMIUM DHOOP STICKS</span>
+              <span className="text-[#D7A65B]">✦</span>
+              <span>BUY INDIA'S PREMIUM CORPORATE GIFTS</span>
+              <span className="text-[#D7A65B]">✦</span>
+            </div>
+            <div className="flex items-center gap-16 px-8" aria-hidden="true">
+              <span>FREE DELIVERY ABOVE RS. 499/-</span>
+              <span className="text-[#D7A65B]">✦</span>
+              <span>BUY INDIA'S PREMIUM SAMBRANI CUP KIT</span>
+              <span className="text-[#D7A65B]">✦</span>
+              <span>BUY PREMIUM DHOOP STICKS</span>
+              <span className="text-[#D7A65B]">✦</span>
+              <span>BUY INDIA'S PREMIUM CORPORATE GIFTS</span>
+              <span className="text-[#D7A65B]">✦</span>
+            </div>
+          </div>
+        </div>
+
         <div className="container mx-auto px-4 md:px-8 relative">
           
           {/* Row 1: Logo & Actions Grid */}

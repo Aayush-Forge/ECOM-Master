@@ -1,5 +1,7 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
-import { wcConfigured, wcRequest, safeProduct, safeVariation, safeCategory, safeOrder, resolveProductAcf } from '@/lib/wc'
+import { wcConfigured, wcRequest, safeProduct, safeVariation, safeCategory, safeOrder, resolveProductAcf, clearWcCache } from '@/lib/wc'
 
 const CORS_ORIGINS = process.env.CORS_ORIGINS || '*'
 
@@ -10,8 +12,12 @@ function cors(response) {
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('X-Frame-Options', 'SAMEORIGIN')
   response.headers.set('Referrer-Policy', 'no-referrer-when-downgrade')
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  response.headers.set('Pragma', 'no-cache')
+  response.headers.set('Expires', '0')
   return response
 }
+
 
 function json(data, status = 200) { return cors(NextResponse.json(data, { status })) }
 function err(message, status = 400, code) { return json({ error: message, code }, status) }
@@ -172,12 +178,12 @@ async function handleRoute(request, { params }) {
         } catch { q.category = undefined }
       }
 
-      const products = await wcRequest('/products', { query: q })
-      let reviews = []
-      try {
-        reviews = await wcRequest('/products/reviews', { query: { per_page: 100 } })
-      } catch {}
+      const [products, reviews] = await Promise.all([
+        wcRequest('/products', { query: q }),
+        wcRequest('/products/reviews', { query: { per_page: 100 } }).catch(() => [])
+      ])
       const reviewMap = {}
+
       if (Array.isArray(reviews)) {
         for (const r of reviews) {
           const pid = r.product_id
@@ -225,6 +231,7 @@ async function handleRoute(request, { params }) {
           status: 'approved'
         }
         const result = await wcRequest('/products/reviews', { method: 'POST', body: payload })
+        clearWcCache()
         return json(result)
       }
     }
@@ -238,36 +245,30 @@ async function handleRoute(request, { params }) {
       const product = list?.[0]
       if (!product) return err('Product not found', 404)
 
-      // Resolve ACF properties and attachment IDs asynchronously
-      product.acf = await resolveProductAcf(product)
+      // Fetch ACF, reviews, variations, and related products in parallel
+      const [acf, reviews, variationsData, relatedData] = await Promise.all([
+        resolveProductAcf(product),
+        wcRequest('/products/reviews', { query: { product: product.id } }).catch(() => []),
+        (product.type === 'variable' && Array.isArray(product.variations) && product.variations.length)
+          ? wcRequest(`/products/${product.id}/variations`, { query: { per_page: 100 } }).catch(() => [])
+          : Promise.resolve([]),
+        (Array.isArray(product.related_ids) && product.related_ids.length)
+          ? wcRequest('/products', { query: { include: product.related_ids.slice(0, 6).join(','), per_page: 6 } }).catch(() => [])
+          : Promise.resolve([])
+      ])
 
-      // Fetch reviews to calculate actual ratings
-      let reviews = []
-      try {
-        reviews = await wcRequest('/products/reviews', { query: { product: product.id } })
-      } catch {}
+      product.acf = acf
       if (Array.isArray(reviews) && reviews.length > 0) {
         const sum = reviews.reduce((s, r) => s + r.rating, 0)
         product.average_rating = String((sum / reviews.length).toFixed(2))
         product.rating_count = reviews.length
+      } else {
+        product.average_rating = '0.00'
+        product.rating_count = 0
       }
 
-      let variations = []
-      if (product.type === 'variable' && Array.isArray(product.variations) && product.variations.length) {
-        try {
-          const vs = await wcRequest(`/products/${product.id}/variations`, { query: { per_page: 100 } })
-          variations = (vs || []).map(safeVariation)
-        } catch (e) { /* non-fatal */ }
-      }
-
-      // Related products
-      let related = []
-      if (Array.isArray(product.related_ids) && product.related_ids.length) {
-        try {
-          const r = await wcRequest('/products', { query: { include: product.related_ids.slice(0, 6).join(','), per_page: 6 } })
-          related = (r || []).map(safeProduct)
-        } catch {}
-      }
+      const variations = (variationsData || []).map(safeVariation)
+      const related = (relatedData || []).map(safeProduct)
 
       return json({ ...safeProduct(product), variationsData: variations, related })
     }

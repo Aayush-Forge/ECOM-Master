@@ -346,10 +346,43 @@ export default function Home() {
       headline: 'SRIDATTAM Agarbatti',
       subheadline: 'Premium botanical incense sticks crafted for daily rituals, peace, and reflection.',
       cta: 'Explore Collection',
-      link: '/products',
-      desktopImage: '/S1D.png',
-      mobileImage: '/S1M.png',
-      image: '/S1D.png',
+      link: '/products?category=incense-sticks',
+      desktopImage: '/HD1.png',
+      mobileImage: '/HM1.png',
+      image: '/HD1.png',
+      layoutType: 'right'
+    },
+    {
+      id: 2,
+      headline: 'Devotional Fragrances',
+      subheadline: 'Hand-rolled sticks prepared with sun-dried petals and pure botanical oils.',
+      cta: 'Explore Collection',
+      link: '/products?category=incense-sticks',
+      desktopImage: '/HD2.png',
+      mobileImage: '/HM2.png',
+      image: '/HD2.png',
+      layoutType: 'right'
+    },
+    {
+      id: 3,
+      headline: 'Natural Dhoop Sticks',
+      subheadline: 'Charcoal-free bamboo-free dhoop sticks for a clean and pure atmosphere.',
+      cta: 'Explore Collection',
+      link: '/products?category=bamboo-free-dhoop-sticks',
+      desktopImage: '/HD3.png',
+      mobileImage: '/HM3.png',
+      image: '/HD3.png',
+      layoutType: 'right'
+    },
+    {
+      id: 4,
+      headline: 'Sambrani Kits',
+      subheadline: 'Complete traditional sambrani cups and accessories for positive energy.',
+      cta: 'Explore Collection',
+      link: '/products?category=sambrani-kits-2',
+      desktopImage: '/HD4.png',
+      mobileImage: '/HM4.png',
+      image: '/HD4.png',
       layoutType: 'right'
     }
   ]
@@ -590,66 +623,106 @@ export default function Home() {
       </section>
 
       {/* SECTION 4 — COMPLETE RITUAL KITS */}
-      <section className="py-16 md:py-20 bg-transparent text-[#6B1024] border-y border-stone-150 relative z-10">
+      <section className="py-16 md:py-24 bg-gradient-to-b from-stone-50/40 via-white to-stone-50/40 text-[#6B1024] border-y border-stone-150 relative z-10">
         <div className="container max-w-6xl mx-auto px-4">
-          <div className="text-center max-w-xl mx-auto mb-12 space-y-2">
-            <span className="text-xs tracking-[0.25em] text-[#D7A65B] uppercase block font-semibold">CURATED RITUAL BUNDLES</span>
-            <h2 className="font-cormorant text-3xl md:text-4xl text-[#6B1024] tracking-widest uppercase font-light">Complete Ritual Kits</h2>
-            <p className="text-xs text-[#6B1024]/75 font-light">Curated combinations designed for meaningful rituals.</p>
-            <div className="w-12 h-px bg-[#D7A65B] mx-auto mt-3" />
+          <div className="text-center max-w-xl mx-auto mb-16 space-y-2">
+            <span className="text-xs tracking-[0.3em] text-[#D7A65B] uppercase block font-semibold">FLAGSHIP GIFT HAMPER</span>
+            <h2 className="font-cormorant text-4xl md:text-5xl text-[#6B1024] tracking-widest uppercase font-light">SANKALPA</h2>
+            <p className="text-xs text-[#6B1024]/75 font-light italic">"Meaning 'Sacred Intention' - A curated journey of pure botanical aromas."</p>
+            <div className="w-16 h-px bg-[#D7A65B] mx-auto mt-4" />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            {/* Left: Image with golden border */}
-            <div className="relative aspect-square w-full max-w-lg mx-auto overflow-hidden bg-stone-50 border border-[#D7A65B]/35 shadow-xl group">
-              <Image 
-                src="/ritual-kit.png" 
-                alt="SRIDATTAM Premium Ritual Box" 
-                fill 
-                className="object-cover transition-transform duration-700 ease-out group-hover:scale-105" 
-                unoptimized 
-              />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            {/* Left: Image with double golden frames */}
+            <div className="lg:col-span-5 relative aspect-square w-full max-w-md mx-auto bg-white p-2 border border-[#D7A65B]/20 shadow-2xl group">
+              <div className="relative w-full h-full overflow-hidden border border-[#D7A65B]/30">
+                <Image 
+                  src="/ritual-kit.png" 
+                  alt="Sankalpa Premium Spiritual Gift Hamper" 
+                  fill 
+                  className="object-cover transition-transform duration-1000 ease-out group-hover:scale-105" 
+                  unoptimized 
+                />
+              </div>
+              {/* Subtle gold corner decorations */}
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#D7A65B]/60" />
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#D7A65B]/60" />
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#D7A65B]/60" />
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#D7A65B]/60" />
             </div>
 
-            {/* Right: Copywriting and Bullet details */}
-            <div className="space-y-6 text-left max-w-xl mx-auto lg:mx-0">
-              <div className="space-y-3">
-                <span className="text-xs font-semibold tracking-[0.25em] text-[#D7A65B] uppercase block">
-                  THE RITUAL BUNDLE
-                </span>
-                <h3 className="font-cormorant text-3xl md:text-4xl text-[#6B1024] uppercase tracking-wider font-light leading-tight">
-                  SRIDATTAM Premium Ritual Box
+            {/* Right: Premium copy and detailed grid */}
+            <div className="lg:col-span-7 space-y-8 text-left max-w-2xl mx-auto lg:mx-0">
+              <div className="space-y-4">
+                <h3 className="font-cormorant text-2xl md:text-3xl text-[#D7A65B] uppercase tracking-wider font-light">
+                  Sridattam's Flagship Hamper
                 </h3>
-                <p className="text-sm text-[#6B1024]/85 leading-relaxed font-light">
-                  Thoughtfully created with absolute devotion, purity, and respect for centuries-old Indian wellness traditions. This complete collection features our signature pure sandalwood sticks, charcoal-free dhoop cups, camphor crystals, and cotton wicks to manifest a serene temple atmosphere in your home.
+                <p className="text-sm md:text-base text-[#6B1024]/95 leading-relaxed font-light font-body">
+                  Built for the moments that deserve more than a single product. <strong>Sankalpa</strong> brings together our entire fragrance universe in one premium box: every signature mood, our mixed dhoop sticks and cones, and the interactive Sannidya sambrani kit.
                 </p>
               </div>
 
-              {/* Kit inclusion items checklist */}
-              <div className="space-y-2.5 pt-2">
-                <span className="text-[10px] tracking-[0.2em] text-[#D7A65B] font-bold block uppercase">
-                  Products Included:
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    'Chandan Agarbatti & Cones',
-                    'Natural Resins & Dhoop Cups',
-                    'Pure Bhimseni Camphor',
-                    'Brass Burner Plate & Accessories'
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex gap-2 items-center text-xs text-[#6B1024]/90 font-light">
-                      <div className="w-5 h-5 border border-[#D7A65B]/30 rounded-full flex items-center justify-center text-[#D7A65B] bg-[#240A0F] shrink-0">
-                        <Check className="w-3 h-3 stroke-[2]" />
-                      </div>
-                      <span>{item}</span>
-                    </div>
-                  ))}
+              {/* Inside the Box & Why Gift Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* Inside the Hamper */}
+                <div className="space-y-4 bg-white/70 border border-stone-250/60 p-5 rounded-sm hover:border-[#D7A65B]/30 transition-all duration-300 shadow-sm">
+                  <h4 className="text-xs font-bold tracking-[0.2em] text-[#D7A65B] uppercase border-b border-stone-150 pb-2">
+                    What's Inside
+                  </h4>
+                  <ul className="space-y-3">
+                    {[
+                      { text: 'All 4 Signature Moods', desc: 'Rajahmasa, Kalyani, Chandanavana & Nandanam (30 sticks each)' },
+                      { text: 'Trishakthi Bambooless Dhoop Sticks', desc: 'Mixed mood combo' },
+                      { text: 'Trishakthi Dhoop Cones', desc: 'Mixed mood combo' },
+                      { text: 'Sannidya DIY Sambrani Cup Kit', desc: 'Cowdung cups, 2 powders & steel holder' }
+                    ].map((item, idx) => (
+                      <li key={idx} className="flex gap-2.5 items-start text-xs text-[#6B1024]/90 font-light">
+                        <div className="w-4 h-4 border border-[#D7A65B]/35 rounded-full flex items-center justify-center text-[#D7A65B] bg-[#4D0013]/5 shrink-0 mt-0.5">
+                          <Check className="w-2.5 h-2.5 stroke-[2]" />
+                        </div>
+                        <div>
+                          <strong className="font-semibold block text-[#6B1024]">{item.text}</strong>
+                          <span className="text-[10px] text-[#6B1024]/75 leading-relaxed">{item.desc}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Why Perfect Gift */}
+                <div className="space-y-4 bg-white/70 border border-stone-250/60 p-5 rounded-sm hover:border-[#D7A65B]/30 transition-all duration-300 shadow-sm">
+                  <h4 className="text-xs font-bold tracking-[0.2em] text-[#D7A65B] uppercase border-b border-stone-150 pb-2">
+                    Why Gift It
+                  </h4>
+                  <ul className="space-y-3">
+                    {[
+                      { text: 'A Complete Fragrance Journey', desc: 'Not just a single product, but a full olfactory ritual.' },
+                      { text: 'Ideal for Occasions', desc: 'Ideal for Diwali, weddings, housewarmings, corporate and return gifts.' },
+                      { text: 'Premium Presentation', desc: 'Exquisite presentation, ready to gift as-is.' },
+                      { text: 'Full Range Introduction', desc: 'Introduces the receiver to the entire Sridattam range in one box.' }
+                    ].map((item, idx) => (
+                      <li key={idx} className="flex gap-2.5 items-start text-xs text-[#6B1024]/90 font-light">
+                        <div className="w-4 h-4 border border-[#D7A65B]/35 rounded-full flex items-center justify-center text-[#D7A65B] bg-[#4D0013]/5 shrink-0 mt-0.5">
+                          <Check className="w-2.5 h-2.5 stroke-[2]" />
+                        </div>
+                        <div>
+                          <strong className="font-semibold block text-[#6B1024]">{item.text}</strong>
+                          <span className="text-[10px] text-[#6B1024]/75 leading-relaxed">{item.desc}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-stone-150">
+              {/* Blockquote banner statement */}
+              <div className="relative bg-[#4D0013]/5 border-l-2 border-[#D7A65B] p-4 text-xs italic font-cormorant text-[#6B1024]/90 leading-relaxed tracking-wide">
+                "Sankalpa is more than a hamper - it is an invitation to bring intention, ritual and fragrance into someone's home. True to Sridattam's promise - spiritually rooted in tradition."
+              </div>
+
+              <div className="pt-2">
                 <Button asChild size="lg" className="bg-[#6B1024] hover:bg-[#4D0013] text-white font-semibold tracking-widest rounded-none px-8 py-5 text-xs uppercase transition-colors duration-300">
-                  <Link href="/products?category=combos">Shop Ritual Kit</Link>
+                  <Link href="/products/sankalpa-premium-spiritual-gift-hamper-4-signature-moods-dhoop-sambrani-kit">Shop Sankalpa Hamper</Link>
                 </Button>
               </div>
             </div>

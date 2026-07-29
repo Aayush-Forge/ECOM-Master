@@ -1,49 +1,49 @@
+import { cache } from 'react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import ProductDetailClient from '@/components/products/product-detail-client'
 import { wcConfigured, wcRequest, safeProduct, safeVariation, safeCategory, resolveProductAcf } from '@/lib/wc'
 
-async function getProduct(slug) {
+export const dynamic = 'force-dynamic'
+
+const getProduct = cache(async (slug) => {
   if (!wcConfigured()) return null
   try {
     const list = await wcRequest('/products', { query: { slug, status: 'publish' } })
     const product = list?.[0]
     if (!product) return null
 
-    product.acf = await resolveProductAcf(product)
+    // Fetch ACF, reviews, variations, and related products in parallel
+    const [acf, reviews, variationsData, relatedData] = await Promise.all([
+      resolveProductAcf(product),
+      wcRequest('/products/reviews', { query: { product: product.id } }).catch(() => []),
+      (product.type === 'variable' && Array.isArray(product.variations) && product.variations.length)
+        ? wcRequest(`/products/${product.id}/variations`, { query: { per_page: 100 } }).catch(() => [])
+        : Promise.resolve([]),
+      (Array.isArray(product.related_ids) && product.related_ids.length)
+        ? wcRequest('/products', { query: { include: product.related_ids.slice(0, 6).join(','), per_page: 6 } }).catch(() => [])
+        : Promise.resolve([])
+    ])
 
-    let reviews = []
-    try {
-      reviews = await wcRequest('/products/reviews', { query: { product: product.id } })
-    } catch {}
+    product.acf = acf
     if (Array.isArray(reviews) && reviews.length > 0) {
       const sum = reviews.reduce((s, r) => s + r.rating, 0)
       product.average_rating = String((sum / reviews.length).toFixed(2))
       product.rating_count = reviews.length
+    } else {
+      product.average_rating = '0.00'
+      product.rating_count = 0
     }
 
-    let variations = []
-    if (product.type === 'variable' && Array.isArray(product.variations) && product.variations.length) {
-      try {
-        const vs = await wcRequest(`/products/${product.id}/variations`, { query: { per_page: 100 } })
-        variations = (vs || []).map(safeVariation)
-      } catch (e) {}
-    }
-
-    let related = []
-    if (Array.isArray(product.related_ids) && product.related_ids.length) {
-      try {
-        const r = await wcRequest('/products', { query: { include: product.related_ids.slice(0, 6).join(','), per_page: 6 } })
-        related = (r || []).map(safeProduct)
-      } catch {}
-    }
+    const variations = (variationsData || []).map(safeVariation)
+    const related = (relatedData || []).map(safeProduct)
 
     return { ...safeProduct(product), variationsData: variations, related }
   } catch (e) {
     console.error('Error fetching product in SSR:', e)
     return null
   }
-}
+})
 
 export async function generateMetadata({ params }) {
   const product = await getProduct(params.slug)

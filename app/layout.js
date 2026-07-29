@@ -5,6 +5,8 @@ import CartProvider from '@/lib/cart-context'
 import MandalaBackground from '@/components/layout/mandala-background'
 import { Suspense } from 'react'
 import PageLoader from '@/components/layout/page-loader'
+import WhatsAppButton from '@/components/layout/whatsapp-button'
+
 
 const yatra = Yatra_One({ subsets: ['latin'], weight: '400', variable: '--font-yatra', display: 'swap' })
 const lora = Lora({ subsets: ['latin'], weight: ['400','500','600','700'], variable: '--font-lora', display: 'swap' })
@@ -31,12 +33,40 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${yatra.variable} ${lora.variable} ${notoDev.variable} ${cormorant.variable} ${inter.variable}`}>
       <body className="min-h-screen bg-white text-midnight font-inter relative">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for (var registration of registrations) {
+                    registration.unregister().then(function() {
+                      console.log('Unregistered service worker successfully');
+                    });
+                  }
+                });
+              }
+              if ('caches' in window) {
+                caches.keys().then(function(names) {
+                  for (var name of names) {
+                    caches.delete(name);
+                  }
+                });
+              }
+              window.addEventListener('error', function(e) {
+                if (e.message && (e.message.indexOf('Loading chunk') !== -1 || e.message.indexOf('CSS chunk') !== -1)) {
+                  window.location.reload();
+                }
+              });
+            `
+          }}
+        />
         <MandalaBackground />
         <Suspense fallback={null}>
           <PageLoader />
         </Suspense>
         <CartProvider>
           {children}
+          <WhatsAppButton />
           <Toaster position="top-center" richColors duration={2000} />
         </CartProvider>
       </body>
