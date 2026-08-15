@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: sridattam_backend_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - POSTGRES_USER=sridattam_admin
+      - POSTGRES_PASSWORD=sridattam_secure_pass_2026
+      - POSTGRES_DB=sridattam_dev_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sridattam_internal_network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: sridattam_postgres_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: sridattam_admin
+      POSTGRES_PASSWORD: sridattam_secure_pass_2026
+      POSTGRES_DB: sridattam_dev_db
+    volumes:
+      - postgres_data_volume:/var/lib/postgresql/data
+    networks:
+      - sridattam_internal_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: sridattam_redis_cache
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_volume:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sridattam_internal_network
+
+volumes:
+  postgres_data_volume:
+    driver: local
+  redis_data_volume:
+    driver: local
+
+networks:
+  sridattam_internal_network:
+    driver: bridge
