@@ -5,9 +5,338 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum ProductStatus {
+  draft
+  active
+  archived
+}
+
+enum ClubbingRuleType {
+  fixed_price_bundle
+  percentage_off_bundle
+}
+
+enum CartStatus {
+  active
+  converted
+  abandoned
+}
+
+enum OrderStatus {
+  cart
+  payment_pending
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+enum OrderAddressType {
+  billing
+  shipping
+}
+
+enum PaymentStatus {
+  created
+  authorized
+  captured
+  failed
+  refunded
+}
+
+enum PaymentWebhookStatus {
+  received
+  processed
+  failed
+}
+
+enum UserRole {
+  admin
+  employee
+  customer
+}
+
+enum NotificationStatus {
+  sent
+  failed
+}
+
+model Product {
+  id               String        @id @default(uuid()) @db.Uuid
+  sku              String        @unique
+  title            String
+  slug             String        @unique
+  description      String
+  shortDescription String        @map("short_description")
+  basePrice        Decimal       @map("base_price")
+  compareAtPrice   Decimal?      @map("compare_at_price")
+  salePrice        Decimal?      @map("sale_price")
+  weight           Decimal?
+  length           Decimal?
+  width            Decimal?
+  height           Decimal?
+  categoryId       String        @map("category_id") @db.Uuid
+  status           ProductStatus
+  images           String[]
+  customFields     Json          @map("custom_fields")
+  stockQuantity    Int           @map("stock_quantity")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  category   Category    @relation(fields: [categoryId], references: [id])
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("products")
+}
+
+model Category {
+  id       String  @id @default(uuid()) @db.Uuid
+  parentId String? @map("parent_id") @db.Uuid
+  name     String
+  slug     String  @unique
+
+  parent        Category?      @relation("CategoryTree", fields: [parentId], references: [id])
+  children      Category[]     @relation("CategoryTree")
+  products      Product[]
+  clubbingRules ClubbingRule[]
+
+  @@map("categories")
+}
+
+model ClubbingRule {
+  id                   String           @id @default(uuid()) @db.Uuid
+  name                 String
+  type                 ClubbingRuleType
+  requiredQuantity     Int              @map("required_quantity")
+  fixedPrice           Decimal?         @map("fixed_price")
+  percentageOff        Decimal?         @map("percentage_off")
+  applicableCategoryId String?          @map("applicable_category_id") @db.Uuid
+  applicableProductIds String[]         @map("applicable_product_ids") @db.Uuid
+  startsAt             DateTime?        @map("starts_at")
+  endsAt               DateTime?        @map("ends_at")
+  isActive             Boolean          @map("is_active")
+
+  applicableCategory Category? @relation(fields: [applicableCategoryId], references: [id])
+
+  @@index([applicableCategoryId])
+  @@map("clubbing_rules")
+}
+
+model Cart {
+  id           String     @id @default(uuid()) @db.Uuid
+  customerId   String?    @map("customer_id") @db.Uuid
+  sessionToken String     @unique @map("session_token")
+  status       CartStatus
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  customer User?      @relation(fields: [customerId], references: [id])
+  items    CartItem[]
+
+  @@index([customerId])
+  @@map("carts")
+}
+
+model CartItem {
+  id                String  @id @default(uuid()) @db.Uuid
+  cartId            String  @map("cart_id") @db.Uuid
+  productId         String  @map("product_id") @db.Uuid
+  quantity          Int
+  unitPriceSnapshot Decimal @map("unit_price_snapshot")
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([cartId])
+  @@index([productId])
+  @@map("cart_items")
+}
+
+model Order {
+  id            String      @id @default(uuid()) @db.Uuid
+  orderNumber   String      @unique @map("order_number")
+  customerId    String?     @map("customer_id") @db.Uuid
+  status        OrderStatus
+  subtotal      Decimal
+  discountTotal Decimal     @map("discount_total")
+  taxTotal      Decimal     @map("tax_total")
+  shippingTotal Decimal     @map("shipping_total")
+  grandTotal    Decimal     @map("grand_total")
+  currency      String      @default("INR")
+  placedAt      DateTime?   @map("placed_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  customer      User?                @relation(fields: [customerId], references: [id])
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  addresses     OrderAddress[]
+  payments      Payment[]
+  notifications NotificationLog[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                String  @id @default(uuid()) @db.Uuid
+  orderId           String  @map("order_id") @db.Uuid
+  productId         String  @map("product_id") @db.Uuid
+  titleSnapshot     String  @map("title_snapshot")
+  skuSnapshot       String  @map("sku_snapshot")
+  unitPriceSnapshot Decimal @map("unit_price_snapshot")
+  quantity          Int
+  lineTotal         Decimal @map("line_total")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  status    String
+  changedBy String   @map("changed_by")
+  changedAt DateTime @default(now()) @map("changed_at")
+  note      String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+model OrderAddress {
+  id           String           @id @default(uuid()) @db.Uuid
+  orderId      String           @map("order_id") @db.Uuid
+  type         OrderAddressType
+  fullName     String           @map("full_name")
+  phone        String
+  addressLine1 String           @map("address_line1")
+  addressLine2 String?          @map("address_line2")
+  city         String
+  state        String
+  postalCode   String           @map("postal_code")
+  country      String
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_addresses")
+}
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderId           String        @map("order_id") @db.Uuid
+  razorpayOrderId   String        @map("razorpay_order_id")
+  razorpayPaymentId String?       @map("razorpay_payment_id")
+  razorpaySignature String?       @map("razorpay_signature")
+  status            PaymentStatus
+  amount            Decimal
+  currency          String
+  method            String?
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  order         Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  webhookEvents PaymentWebhookEvent[]
+
+  @@index([orderId])
+  @@index([razorpayOrderId])
+  @@map("payments")
+}
+
+model PaymentWebhookEvent {
+  id              String               @id @default(uuid()) @db.Uuid
+  razorpayEventId String               @unique @map("razorpay_event_id")
+  eventType       String               @map("event_type")
+  payload         Json
+  processedAt     DateTime?            @map("processed_at")
+  status          PaymentWebhookStatus
+  payment         Payment?             @relation(fields: [paymentId], references: [id])
+  paymentId       String?              @db.Uuid
+
+  @@map("payment_webhook_events")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  phone        String?
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  isActive     Boolean  @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  carts         Cart[]
+  orders        Order[]
+  addresses     Address[]
+  notifications NotificationLog[]
+
+  @@map("users")
+}
+
+model Address {
+  id           String  @id @default(uuid()) @db.Uuid
+  userId       String  @map("user_id") @db.Uuid
+  label        String
+  fullName     String  @map("full_name")
+  phone        String
+  addressLine1 String  @map("address_line1")
+  addressLine2 String? @map("address_line2")
+  city         String
+  state        String
+  postalCode   String  @map("postal_code")
+  country      String
+  isDefault    Boolean @map("is_default")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model EmailTemplate {
+  id              String @id @default(uuid()) @db.Uuid
+  key             String @unique
+  subject         String
+  htmlBody        String @map("html_body")
+  variablesSchema Json   @map("variables_schema")
+
+  @@map("email_templates")
+}
+
+model NotificationLog {
+  id          String             @id @default(uuid()) @db.Uuid
+  orderId     String?            @map("order_id") @db.Uuid
+  userId      String?            @map("user_id") @db.Uuid
+  templateKey String             @map("template_key")
+  sentAt      DateTime           @default(now()) @map("sent_at")
+  status      NotificationStatus
+
+  order Order? @relation(fields: [orderId], references: [id])
+  user  User?  @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("notification_log")
 }
