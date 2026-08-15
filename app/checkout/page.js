@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
 
+import { isValidPhoneNumber } from 'libphonenumber-js'
+
 const INDIAN_STATES = [
   'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat',
   'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
@@ -210,7 +212,7 @@ function CheckoutPage() {
   const validate = () => {
     const required = ['first_name', 'last_name', 'email', 'phone', 'address_1', 'city', 'state', 'postcode']
     for (const f of required) if (!form[f]?.trim()) { toast.error(`${f.replace('_', ' ')} is required`); return false }
-    if (!/^\d{10}$/.test(form.phone)) { toast.error('Enter valid 10-digit phone'); return false }
+    if (!isValidPhoneNumber(form.phone || '', 'IN')) { toast.error('Enter a valid phone number'); return false }
     if (!/^\d{6}$/.test(form.postcode)) { toast.error('Enter valid 6-digit pincode'); return false }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) { toast.error('Enter valid email'); return false }
     return true
@@ -394,7 +396,7 @@ function CheckoutPage() {
                 </div>
                 <div>
                   <Label>Phone *</Label>
-                  <Input type="tel" inputMode="numeric" maxLength={10} value={form.phone} onChange={e => setF('phone', e.target.value.replace(/\D/g,''))} placeholder="10-digit mobile" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
+                  <Input type="tel" maxLength={20} value={form.phone} onChange={e => setF('phone', e.target.value)} placeholder="e.g. +91 98765 43210" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
                 </div>
                 <div className="md:col-span-2">
                   <Label>Address Line 1 *</Label>
