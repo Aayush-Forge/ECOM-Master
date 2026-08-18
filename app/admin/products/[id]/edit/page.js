@@ -8,7 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { getAdminProductById, updateProduct, getProductCategories } from '@/lib/api/products-api'
 import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Lock } from 'lucide-react'
+import { currentUser } from '@/lib/mock-user'
+import { hasRole } from '@/lib/roles'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -119,7 +121,13 @@ export default function EditProductPage() {
     }
   }, [productId, form])
 
+  const canManage = hasRole(currentUser, 'editor')
+
   async function onSubmit(values) {
+    if (!canManage) {
+      toast.error('Viewer Employees do not have permission to edit products')
+      return
+    }
     setSubmitting(true)
     try {
       await updateProduct(productId, values)
@@ -165,6 +173,13 @@ export default function EditProductPage() {
         <h2 className="text-2xl font-display font-bold tracking-tight">Edit Product</h2>
       </div>
 
+      {!canManage && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2 font-inter">
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>You are logged in with a <strong>Viewer Employee</strong> role (read-only). Editing products is disabled.</span>
+        </div>
+      )}
+
       <Card>
         <CardContent className="pt-6">
           <Form {...form}>
@@ -176,7 +191,7 @@ export default function EditProductPage() {
                   <FormItem>
                     <FormLabel>Title</FormLabel>
                     <FormControl>
-                      <Input placeholder="E.g. Vintage Brass Lamp" {...field} />
+                      <Input placeholder="E.g. Vintage Brass Lamp" disabled={!canManage} {...field} />
                     </FormControl>
                     <FormMessage className="text-xs text-red-600 font-medium" />
                   </FormItem>
@@ -191,7 +206,7 @@ export default function EditProductPage() {
                     <FormItem>
                       <FormLabel>SKU</FormLabel>
                       <FormControl>
-                        <Input placeholder="E.g. LMP-BRS-001" {...field} />
+                        <Input placeholder="E.g. LMP-BRS-001" disabled={!canManage} {...field} />
                       </FormControl>
                       <FormMessage className="text-xs text-red-600 font-medium" />
                     </FormItem>
@@ -204,7 +219,7 @@ export default function EditProductPage() {
                     <FormItem>
                       <FormLabel>Price (₹)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Input type="number" step="0.01" placeholder="0.00" disabled={!canManage} {...field} />
                       </FormControl>
                       <FormMessage className="text-xs text-red-600 font-medium" />
                     </FormItem>
@@ -218,7 +233,7 @@ export default function EditProductPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={!canManage}>
                       <FormControl>
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder="Select a category" />
@@ -244,7 +259,7 @@ export default function EditProductPage() {
                   <FormItem>
                     <FormLabel>Image URL (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://example.com/image.jpg" {...field} />
+                      <Input placeholder="https://example.com/image.jpg" disabled={!canManage} {...field} />
                     </FormControl>
                     <FormMessage className="text-xs text-red-600 font-medium" />
                   </FormItem>
@@ -261,6 +276,7 @@ export default function EditProductPage() {
                       <Textarea 
                         placeholder="Detailed description of the product..." 
                         className="min-h-[120px]"
+                        disabled={!canManage}
                         {...field} 
                       />
                     </FormControl>
@@ -275,7 +291,7 @@ export default function EditProductPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!isValid || submitting}
+                  disabled={!canManage || !isValid || submitting}
                   className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-100 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Saving...' : 'Save Changes'}

@@ -5,6 +5,7 @@ import { useParams, useRouter, usePathname } from 'next/navigation'
 import { getOrderById, updateOrderStatus, getValidTransitions, initiateRefund } from '@/lib/api/orders'
 import { getPaymentByOrderId } from '@/lib/api/payments'
 import { currentUser } from '@/lib/mock-user'
+import { hasRole } from '@/lib/roles'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -282,8 +283,8 @@ export default function OrderDetailView() {
             </CardContent>
           </Card>
 
-          {/* ADMIN REFUND SECTION */}
-          {currentUser.role === 'admin' && order.paymentStatus === 'paid' && (
+          {/* REFUND SECTION (Editor / Admin only) */}
+          {hasRole(currentUser, 'editor') && order.paymentStatus === 'paid' && (
             <Card className="border-red-200 shadow-sm bg-red-50/50">
               <CardHeader className="pb-3 border-b border-red-100">
                 <CardTitle className="text-red-700 text-lg flex items-center gap-2">

@@ -20,9 +20,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Search, FilterX, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, FilterX, RefreshCw, AlertTriangle, Lock } from 'lucide-react'
+import { currentUser } from '@/lib/mock-user'
+import { hasRole } from '@/lib/roles'
 
 export default function AdminProductsPage() {
+  const canManage = hasRole(currentUser, 'editor')
   const [products, setProducts] = useState(() => getAdminProductsSync())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -49,7 +52,7 @@ export default function AdminProductsPage() {
   }, [])
 
   const handleDelete = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget || !canManage) return
     try {
       await deleteProduct(deleteTarget.id)
       toast.success(`Product "${deleteTarget.title}" deleted successfully`)
@@ -78,11 +81,13 @@ export default function AdminProductsPage() {
           <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Products</h2>
           <p className="text-sm text-stone-500 font-inter">Manage storefront inventory and product details</p>
         </div>
-        <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs self-start sm:self-center">
-          <Link href="/admin/products/new">
-            <Plus className="h-4 w-4 mr-2" /> Add Product
-          </Link>
-        </Button>
+        {canManage && (
+          <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs self-start sm:self-center">
+            <Link href="/admin/products/new">
+              <Plus className="h-4 w-4 mr-2" /> Add Product
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Search and Category Filter Bar */}
@@ -142,7 +147,7 @@ export default function AdminProductsPage() {
                 <TableHead className="font-semibold text-stone-700">Category</TableHead>
                 <TableHead className="font-semibold text-stone-700">Stock Status</TableHead>
                 <TableHead className="text-right font-semibold text-stone-700">Price</TableHead>
-                <TableHead className="text-right font-semibold text-stone-700">Actions</TableHead>
+                <TableHead className="text-right font-semibold text-stone-700">{canManage ? 'Actions' : 'Permissions'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-stone-100">
@@ -222,21 +227,25 @@ export default function AdminProductsPage() {
                         ₹{product.price?.toLocaleString('en-IN')}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-stone-600 hover:text-stone-900">
-                            <Link href={`/admin/products/${product.id}/edit`}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteTarget(product)}
-                            className="h-8 w-8 text-stone-500 hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {canManage ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-stone-600 hover:text-stone-900">
+                              <Link href={`/admin/products/${product.id}/edit`}>
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteTarget(product)}
+                              className="h-8 w-8 text-stone-500 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-stone-400 font-medium">Read Only</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   )

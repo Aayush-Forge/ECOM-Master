@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { currentUser } from '@/lib/mock-user'
+import { hasRole, getRoleLabel } from '@/lib/roles'
 import {
   SidebarProvider,
   Sidebar,
@@ -31,12 +32,12 @@ export default function AdminLayout({ children }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (currentUser.role === 'employee') {
+    if (currentUser.role === 'admin') {
+      setMounted(true)
+    } else if (hasRole(currentUser, 'read_only')) {
       router.push('/staff/orders')
     } else if (currentUser.role === 'customer') {
       router.push('/account/orders')
-    } else if (currentUser.role === 'admin') {
-      setMounted(true)
     } else {
       router.push('/')
     }
@@ -173,7 +174,7 @@ export default function AdminLayout({ children }) {
                 <span className="text-xs text-gray-400 truncate">{currentUser.email}</span>
               </div>
               <Badge variant="outline" className="bg-saffron/20 text-saffron border-saffron/30">
-                Admin
+                {getRoleLabel(currentUser.role)}
               </Badge>
             </div>
             <Button variant="outline" className="w-full justify-start text-white bg-gray-800/80 border-gray-700 hover:bg-gray-700 hover:text-white font-semibold" asChild>

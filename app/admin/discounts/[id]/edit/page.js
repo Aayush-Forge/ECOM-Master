@@ -8,7 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { getDiscountById, updateDiscount } from '@/lib/api/discounts'
 import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Lock } from 'lucide-react'
+import { currentUser } from '@/lib/mock-user'
+import { hasRole } from '@/lib/roles'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -106,7 +108,13 @@ export default function EditDiscountPage() {
     }
   }, [discountId, form])
 
+  const canManage = hasRole(currentUser, 'editor')
+
   async function onSubmit(values) {
+    if (!canManage) {
+      toast.error('Viewer Employees do not have permission to edit discount rules')
+      return
+    }
     setSubmitting(true)
     try {
       await updateDiscount(discountId, values)
@@ -152,6 +160,13 @@ export default function EditDiscountPage() {
         <h2 className="text-2xl font-display font-bold tracking-tight">Edit Discount Rule</h2>
       </div>
 
+      {!canManage && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2 font-inter">
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>You are logged in with a <strong>Viewer Employee</strong> role (read-only). Editing discount rules is disabled.</span>
+        </div>
+      )}
+
       <Card>
         <CardContent className="pt-6">
           <Form {...form}>
@@ -163,7 +178,7 @@ export default function EditDiscountPage() {
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="E.g. Diwali Special" {...field} />
+                      <Input placeholder="E.g. Diwali Special" disabled={!canManage} {...field} />
                     </FormControl>
                     <FormMessage className="text-xs text-red-600 font-medium" />
                   </FormItem>
@@ -177,7 +192,7 @@ export default function EditDiscountPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={!canManage}>
                         <FormControl>
                           <SelectTrigger className="bg-white">
                             <SelectValue placeholder="Select type" />
@@ -201,7 +216,7 @@ export default function EditDiscountPage() {
                     <FormItem>
                       <FormLabel>Discount Value</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="10" {...field} />
+                        <Input type="number" step="0.01" placeholder="10" disabled={!canManage} {...field} />
                       </FormControl>
                       <FormMessage className="text-xs text-red-600 font-medium" />
                     </FormItem>
@@ -216,7 +231,7 @@ export default function EditDiscountPage() {
                   <FormItem>
                     <FormLabel>Display Value (User-facing text)</FormLabel>
                     <FormControl>
-                      <Input placeholder="E.g. 10% OFF or ₹500 Flat" {...field} />
+                      <Input placeholder="E.g. 10% OFF or ₹500 Flat" disabled={!canManage} {...field} />
                     </FormControl>
                     <FormMessage className="text-xs text-red-600 font-medium" />
                   </FormItem>
@@ -232,6 +247,7 @@ export default function EditDiscountPage() {
                     <FormControl>
                       <Textarea 
                         placeholder="E.g. Min spend ₹2000" 
+                        disabled={!canManage}
                         {...field} 
                       />
                     </FormControl>
@@ -255,6 +271,7 @@ export default function EditDiscountPage() {
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={!canManage}
                       />
                     </FormControl>
                   </FormItem>
@@ -267,7 +284,7 @@ export default function EditDiscountPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!isValid || submitting}
+                  disabled={!canManage || !isValid || submitting}
                   className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-100 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Saving...' : 'Save Changes'}

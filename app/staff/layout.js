@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { currentUser } from '@/lib/mock-user'
+import { hasRole, getRoleLabel } from '@/lib/roles'
 import { 
   SidebarProvider, 
   Sidebar, 
@@ -30,7 +31,7 @@ export default function StaffLayout({ children }) {
   const [authorized, setAuthorized] = useState(false)
 
   useEffect(() => {
-    if (currentUser.role !== 'employee' && currentUser.role !== 'admin') {
+    if (!hasRole(currentUser, 'read_only')) {
       router.push('/account/orders')
     } else {
       setAuthorized(true)
@@ -44,8 +45,8 @@ export default function StaffLayout({ children }) {
       <Sidebar className="bg-[#0D0D0D] text-gray-300 border-r-0 border-gray-800 font-inter">
         <SidebarHeader className="flex flex-row items-center justify-between p-4 bg-[#0D0D0D]">
           <span className="font-display text-xl text-white">Sridattam</span>
-          <Badge variant="outline" className="bg-gray-800 text-white border-gray-700 capitalize">
-            {currentUser.role}
+          <Badge variant="outline" className="bg-gray-800 text-white border-gray-700 font-medium text-xs">
+            {getRoleLabel(currentUser.role)}
           </Badge>
         </SidebarHeader>
         <SidebarContent className="bg-[#0D0D0D]">

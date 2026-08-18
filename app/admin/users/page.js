@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { Shield, UserCog, FilterX, RefreshCw } from 'lucide-react'
+import { getRoleLabel, ROLES } from '@/lib/roles'
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState(() => getAllUsersSync())
@@ -50,7 +51,7 @@ export default function AdminUsersPage() {
     const { user, newRole } = roleChangeTarget
     try {
       await updateUserRole(user.id, newRole)
-      toast.success(`Updated ${user.name}'s role to ${newRole}`)
+      toast.success(`Updated ${user.name}'s role to ${getRoleLabel(newRole)}`)
       setRoleChangeTarget(null)
       fetchUsers()
     } catch (err) {
@@ -62,9 +63,12 @@ export default function AdminUsersPage() {
   const getRoleBadge = (role) => {
     switch (role?.toLowerCase()) {
       case 'admin':
-        return <Badge variant="outline" className="bg-saffron/10 text-saffron border-saffron/30 font-inter text-xs">Admin</Badge>
+        return <Badge variant="outline" className="bg-saffron/10 text-saffron border-saffron/30 font-inter text-xs font-semibold">Admin</Badge>
+      case 'editor':
+        return <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200 font-inter text-xs font-semibold">Editor Employee</Badge>
+      case 'read_only':
       case 'employee':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 font-inter text-xs">Employee</Badge>
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 font-inter text-xs font-semibold">Viewer Employee</Badge>
       case 'customer':
       default:
         return <Badge variant="outline" className="bg-stone-100 text-stone-700 border-stone-200 font-inter text-xs">Customer</Badge>
@@ -73,6 +77,7 @@ export default function AdminUsersPage() {
 
   const filteredUsers = users.filter((u) => {
     if (roleFilter === 'all') return true
+    if (roleFilter === 'read_only' && u.role === 'employee') return true
     return u.role?.toLowerCase() === roleFilter.toLowerCase()
   })
 
@@ -85,13 +90,14 @@ export default function AdminUsersPage() {
         </div>
         <div className="flex items-center gap-3">
           <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-[180px] bg-white border-stone-200 font-inter text-sm">
+            <SelectTrigger className="w-[190px] bg-white border-stone-200 font-inter text-sm">
               <SelectValue placeholder="Filter by role" />
             </SelectTrigger>
             <SelectContent className="bg-white">
               <SelectItem value="all">All Roles</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="employee">Employee</SelectItem>
+              <SelectItem value="editor">Editor Employee</SelectItem>
+              <SelectItem value="read_only">Viewer Employee</SelectItem>
               <SelectItem value="customer">Customer</SelectItem>
             </SelectContent>
           </Select>
@@ -159,19 +165,21 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Select
-                        value={user.role}
+                        value={user.role === 'employee' ? 'read_only' : user.role}
                         onValueChange={(newRole) => {
-                          if (newRole !== user.role) {
-                            setRoleChangeTarget({ user, currentRole: user.role, newRole })
+                          const currentNormalized = user.role === 'employee' ? 'read_only' : user.role
+                          if (newRole !== currentNormalized) {
+                            setRoleChangeTarget({ user, currentRole: currentNormalized, newRole })
                           }
                         }}
                       >
-                        <SelectTrigger className="w-[130px] ml-auto h-8 text-xs bg-white border-stone-200">
+                        <SelectTrigger className="w-[155px] ml-auto h-8 text-xs bg-white border-stone-200">
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
                         <SelectContent className="bg-white">
                           <SelectItem value="customer">Customer</SelectItem>
-                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="read_only">Viewer Employee</SelectItem>
+                          <SelectItem value="editor">Editor Employee</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
@@ -192,8 +200,8 @@ export default function AdminUsersPage() {
             <AlertDialogDescription className="font-inter text-stone-600 space-y-2">
               <span>
                 Are you sure you want to change <span className="font-semibold text-stone-900">{roleChangeTarget?.user?.name}</span>'s role from{' '}
-                <span className="font-semibold capitalize text-stone-900">{roleChangeTarget?.currentRole}</span> to{' '}
-                <span className="font-semibold capitalize text-saffron">{roleChangeTarget?.newRole}</span>?
+                <span className="font-semibold text-stone-900">{getRoleLabel(roleChangeTarget?.currentRole)}</span> to{' '}
+                <span className="font-semibold text-saffron">{getRoleLabel(roleChangeTarget?.newRole)}</span>?
               </span>
               <span className="block text-xs text-stone-500 pt-1">
                 This will immediately update their access permissions across the system.

@@ -19,8 +19,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Tag, RefreshCw } from 'lucide-react'
+import { currentUser } from '@/lib/mock-user'
+import { hasRole } from '@/lib/roles'
 
 export default function AdminDiscountsPage() {
+  const canManage = hasRole(currentUser, 'editor')
   const [discounts, setDiscounts] = useState(() => getAllDiscountsSync())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -45,7 +48,7 @@ export default function AdminDiscountsPage() {
   }, [])
 
   const handleDelete = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget || !canManage) return
     try {
       await deleteDiscount(deleteTarget.id)
       toast.success(`Discount rule "${deleteTarget.name}" deleted successfully`)
@@ -64,11 +67,13 @@ export default function AdminDiscountsPage() {
           <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Discount Rules</h2>
           <p className="text-sm text-stone-500 font-inter">Manage promotional offers and active discount logic</p>
         </div>
-        <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs self-start sm:self-center">
-          <Link href="/admin/discounts/new">
-            <Plus className="h-4 w-4 mr-2" /> Add Discount Rule
-          </Link>
-        </Button>
+        {canManage && (
+          <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs self-start sm:self-center">
+            <Link href="/admin/discounts/new">
+              <Plus className="h-4 w-4 mr-2" /> Add Discount Rule
+            </Link>
+          </Button>
+        )}
       </div>
 
       {error ? (
@@ -88,7 +93,7 @@ export default function AdminDiscountsPage() {
                 <TableHead className="font-semibold text-stone-700">Display Value</TableHead>
                 <TableHead className="font-semibold text-stone-700">Conditions</TableHead>
                 <TableHead className="font-semibold text-stone-700">Status</TableHead>
-                <TableHead className="text-right font-semibold text-stone-700">Actions</TableHead>
+                <TableHead className="text-right font-semibold text-stone-700">{canManage ? 'Actions' : 'Permissions'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-stone-100">
@@ -109,9 +114,11 @@ export default function AdminDiscountsPage() {
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <Tag className="w-8 h-8 text-stone-400" />
                       <p className="font-medium text-stone-700">No discount rules configured yet.</p>
-                      <Button asChild variant="outline" size="sm">
-                        <Link href="/admin/discounts/new">Create First Rule</Link>
-                      </Button>
+                      {canManage && (
+                        <Button asChild variant="outline" size="sm">
+                          <Link href="/admin/discounts/new">Create First Rule</Link>
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -138,21 +145,25 @@ export default function AdminDiscountsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-stone-600 hover:text-stone-900">
-                          <Link href={`/admin/discounts/${discount.id}/edit`}>
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteTarget(discount)}
-                          className="h-8 w-8 text-stone-500 hover:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {canManage ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-stone-600 hover:text-stone-900">
+                            <Link href={`/admin/discounts/${discount.id}/edit`}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(discount)}
+                            className="h-8 w-8 text-stone-500 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-stone-400 font-medium">Read Only</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
