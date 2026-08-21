@@ -1,11 +1,8 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -281,10 +278,10 @@ model User {
   email        String   @unique
   phone        String?
   passwordHash String   @map("password_hash")
-  role         UserRole
+  role         UserRole @default(customer)
   firstName    String   @map("first_name")
   lastName     String   @map("last_name")
-  isActive     Boolean  @map("is_active")
+  isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
 
   carts         Cart[]
