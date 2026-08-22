@@ -1,19 +1,35 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { currentUser } from '@/lib/mock-user';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { ROLE_NAV_ITEMS } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, User } from 'lucide-react';
 
 export default function AccountLayout({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isAuthenticated, loading } = useAuth();
+  const [authorized, setAuthorized] = useState(false);
 
-  const navLinks = [
-    { name: 'Orders', href: '/account/orders' },
-    { name: 'Profile', href: '/account/profile' },
-    { name: 'Addresses', href: '/account/addresses' },
-  ];
+  useEffect(() => {
+    if (loading) return;
+
+    if (!isAuthenticated || !user?.role) {
+      router.push('/login');
+      return;
+    }
+
+    // /account is accessible to ALL authenticated roles
+    setAuthorized(true);
+  }, [loading, isAuthenticated, user, router]);
+
+  // Always use customer nav items for /account
+  const navLinks = ROLE_NAV_ITEMS.customer || [];
+
+  if (!authorized || loading) return null;
 
   const isAccountHome = pathname === '/account';
 
@@ -54,7 +70,7 @@ export default function AccountLayout({ children }) {
                 const isActive = pathname.startsWith(link.href);
                 return (
                   <Link
-                    key={link.name}
+                    key={link.label}
                     href={link.href}
                     className={cn(
                       'inline-flex items-center px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm font-inter font-medium rounded-lg transition-colors',
@@ -63,7 +79,7 @@ export default function AccountLayout({ children }) {
                         : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                     )}
                   >
-                    {link.name}
+                    {link.label}
                   </Link>
                 );
               })}
@@ -74,7 +90,7 @@ export default function AccountLayout({ children }) {
               <div className="flex items-center gap-2 bg-stone-100/80 px-3 py-1.5 rounded-full border border-stone-200/60">
                 <User className="w-3.5 h-3.5 text-stone-600" />
                 <span className="text-xs sm:text-sm font-inter text-stone-800 font-medium hidden md:inline truncate max-w-[120px]">
-                  {currentUser?.name || 'User'}
+                  {user?.name || 'User'}
                 </span>
               </div>
             </div>

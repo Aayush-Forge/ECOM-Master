@@ -1,5 +1,4 @@
 const nextConfig = {
-  output: 'standalone',
   images: {
     unoptimized: true,
   },
@@ -15,10 +14,7 @@ const nextConfig = {
     }
     return config;
   },
-  onDemandEntries: {
-    maxInactiveAge: 10000,
-    pagesBufferLength: 2,
-  },
+
   async headers() {
     return [
       {

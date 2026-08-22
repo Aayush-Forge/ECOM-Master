@@ -61,7 +61,8 @@ enum PaymentWebhookStatus {
 
 enum UserRole {
   admin
-  employee
+  editor
+  read_only
   customer
 }
 
@@ -339,4 +340,22 @@ model NotificationLog {
   @@index([orderId])
   @@index([userId])
   @@map("notification_log")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  userId      String   @map("user_id")
+  userRole    String   @map("user_role") // Snapshot of user role at action execution time
+  actionType  String   @map("action_type") // e.g. "product.price_updated", "order.status_changed", "refund.issued"
+  entityType  String   @map("entity_type") // e.g. "product", "order", "user", "discount"
+  entityId    String   @map("entity_id")
+  beforeValue Json?    @map("before_value") // null for creations
+  afterValue  Json?    @map("after_value")  // null for deletions
+  ipAddress   String?  @map("ip_address")
+
+  @@index([userId])
+  @@index([actionType])
+  @@index([timestamp])
+  @@map("audit_logs")
 }
