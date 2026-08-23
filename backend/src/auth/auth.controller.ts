@@ -20,7 +20,7 @@ export class AuthController {
     return this.authService.loginUser(loginUserDto);
   }
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   @Get('adminPanel')
   adminPanelAuth() {
     return true;
