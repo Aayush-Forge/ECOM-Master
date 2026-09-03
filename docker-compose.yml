@@ -50,6 +50,10 @@ services:
     image: redis:7-alpine
     container_name: sridattam_redis_cache
     restart: always
+    # Disable all persistence — this is a disposable cache, not a datastore.
+    # RDB snapshots (--save "") and AOF (--appendonly no) are both off.
+    # This instance is shared with BullMQ (future phase): never use FLUSHALL.
+    command: redis-server --save "" --appendonly no
     ports:
       - "6379:6379"
     volumes:
