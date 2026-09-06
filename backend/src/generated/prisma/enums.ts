@@ -16,3 +16,29 @@ export const Role = {
 } as const
 
 export type Role = (typeof Role)[keyof typeof Role]
+
+
+export const ProductStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  ARCHIVED: 'ARCHIVED'
+} as const
+
+export type ProductStatus = (typeof ProductStatus)[keyof typeof ProductStatus]
+
+
+export const ClubbingRuleType = {
+  FIXED_PRICE_BUNDLE: 'FIXED_PRICE_BUNDLE',
+  PERCENTAGE_OFF_BUNDLE: 'PERCENTAGE_OFF_BUNDLE'
+} as const
+
+export type ClubbingRuleType = (typeof ClubbingRuleType)[keyof typeof ClubbingRuleType]
+
+
+export const CartStatus = {
+  ACTIVE: 'ACTIVE',
+  CONVERTED: 'CONVERTED',
+  ABANDONED: 'ABANDONED'
+} as const
+
+export type CartStatus = (typeof CartStatus)[keyof typeof CartStatus]

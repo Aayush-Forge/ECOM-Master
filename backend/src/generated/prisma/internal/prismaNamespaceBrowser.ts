@@ -51,7 +51,13 @@ export const AnyNull = runtime.AnyNull
 
 
 export const ModelName = {
-  User: 'User'
+  User: 'User',
+  Category: 'Category',
+  Product: 'Product',
+  ClubbingRule: 'ClubbingRule',
+  ClubbingRuleProduct: 'ClubbingRuleProduct',
+  Cart: 'Cart',
+  CartItem: 'CartItem'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -85,12 +91,107 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const CategoryScalarFieldEnum = {
+  id: 'id',
+  parentId: 'parentId',
+  name: 'name',
+  slug: 'slug',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CategoryScalarFieldEnum = (typeof CategoryScalarFieldEnum)[keyof typeof CategoryScalarFieldEnum]
+
+
+export const ProductScalarFieldEnum = {
+  id: 'id',
+  sku: 'sku',
+  title: 'title',
+  slug: 'slug',
+  description: 'description',
+  shortDescription: 'shortDescription',
+  basePrice: 'basePrice',
+  compareAtPrice: 'compareAtPrice',
+  salePrice: 'salePrice',
+  weight: 'weight',
+  length: 'length',
+  width: 'width',
+  height: 'height',
+  categoryId: 'categoryId',
+  status: 'status',
+  images: 'images',
+  customFields: 'customFields',
+  stockQuantity: 'stockQuantity',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProductScalarFieldEnum = (typeof ProductScalarFieldEnum)[keyof typeof ProductScalarFieldEnum]
+
+
+export const ClubbingRuleScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  type: 'type',
+  requiredQuantity: 'requiredQuantity',
+  fixedPrice: 'fixedPrice',
+  percentageOff: 'percentageOff',
+  applicableCategoryId: 'applicableCategoryId',
+  startsAt: 'startsAt',
+  endsAt: 'endsAt',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ClubbingRuleScalarFieldEnum = (typeof ClubbingRuleScalarFieldEnum)[keyof typeof ClubbingRuleScalarFieldEnum]
+
+
+export const ClubbingRuleProductScalarFieldEnum = {
+  ruleId: 'ruleId',
+  productId: 'productId'
+} as const
+
+export type ClubbingRuleProductScalarFieldEnum = (typeof ClubbingRuleProductScalarFieldEnum)[keyof typeof ClubbingRuleProductScalarFieldEnum]
+
+
+export const CartScalarFieldEnum = {
+  id: 'id',
+  customerId: 'customerId',
+  sessionToken: 'sessionToken',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CartScalarFieldEnum = (typeof CartScalarFieldEnum)[keyof typeof CartScalarFieldEnum]
+
+
+export const CartItemScalarFieldEnum = {
+  id: 'id',
+  cartId: 'cartId',
+  productId: 'productId',
+  quantity: 'quantity',
+  unitPriceSnapshot: 'unitPriceSnapshot'
+} as const
+
+export type CartItemScalarFieldEnum = (typeof CartItemScalarFieldEnum)[keyof typeof CartItemScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
 export const QueryMode = {
@@ -107,4 +208,13 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 

@@ -31,6 +31,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'warn',
       // The following rules are disabled because they were too distracting and complex for dev purposes.
       '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint.io/rules/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
