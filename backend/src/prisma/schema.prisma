@@ -89,9 +89,10 @@ model Product {
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  category   Category    @relation(fields: [categoryId], references: [id])
-  cartItems  CartItem[]
-  orderItems OrderItem[]
+  category      Category              @relation(fields: [categoryId], references: [id])
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  clubbingRules ClubbingRuleProduct[]
 
   @@index([categoryId])
   @@index([status])
@@ -113,22 +114,38 @@ model Category {
 }
 
 model ClubbingRule {
-  id                   String           @id @default(uuid()) @db.Uuid
+  id                   String                @id @default(uuid()) @db.Uuid
   name                 String
   type                 ClubbingRuleType
-  requiredQuantity     Int              @map("required_quantity")
-  fixedPrice           Decimal?         @map("fixed_price")
-  percentageOff        Decimal?         @map("percentage_off")
-  applicableCategoryId String?          @map("applicable_category_id") @db.Uuid
-  applicableProductIds String[]         @map("applicable_product_ids") @db.Uuid
-  startsAt             DateTime?        @map("starts_at")
-  endsAt               DateTime?        @map("ends_at")
-  isActive             Boolean          @map("is_active")
+  requiredQuantity     Int                   @map("required_quantity")
+  fixedPrice           Decimal?              @map("fixed_price") @db.Decimal(10, 2)
+  percentageOff        Decimal?              @map("percentage_off") @db.Decimal(5, 2)
+  applicableCategoryId String?               @map("applicable_category_id") @db.Uuid
+  startsAt             DateTime?             @map("starts_at")
+  endsAt               DateTime?             @map("ends_at")
+  isActive             Boolean               @default(true) @map("is_active")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
 
-  applicableCategory Category? @relation(fields: [applicableCategoryId], references: [id])
+  applicableCategory   Category?             @relation(fields: [applicableCategoryId], references: [id])
+  products             ClubbingRuleProduct[]
 
   @@index([applicableCategoryId])
+  @@index([isActive])
+  @@index([startsAt])
+  @@index([endsAt])
   @@map("clubbing_rules")
+}
+
+model ClubbingRuleProduct {
+  ruleId    String       @map("rule_id") @db.Uuid
+  productId String       @map("product_id") @db.Uuid
+
+  rule      ClubbingRule @relation(fields: [ruleId], references: [id])
+  product   Product      @relation(fields: [productId], references: [id])
+
+  @@id([ruleId, productId])
+  @@map("clubbing_rule_products")
 }
 
 model Cart {
@@ -336,4 +353,22 @@ model NotificationLog {
   @@index([orderId])
   @@index([userId])
   @@map("notification_log")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  userId      String   @map("user_id")
+  userRole    String   @map("user_role")
+  actionType  String   @map("action_type")
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  beforeValue Json?    @map("before_value")
+  afterValue  Json?    @map("after_value")
+  ipAddress   String?  @map("ip_address")
+
+  @@index([userId])
+  @@index([actionType])
+  @@index([timestamp])
+  @@map("audit_logs")
 }

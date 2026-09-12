@@ -7,12 +7,23 @@ import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { R2Module } from './r2/r2.module';
 import { RedisModule } from './redis/redis.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
-  imports: [AuthModule, PrismaModule, AuditLogsModule, UsersModule, RedisModule, R2Module],
+  imports: [
+    AuthModule,
+    PrismaModule,
+    AuditLogsModule,
+    UsersModule,
+    RedisModule,
+    R2Module,
+    CategoriesModule,
+    ProductsModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,
