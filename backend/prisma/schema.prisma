@@ -33,66 +33,6 @@ model User {
   @@map("users")
 }
 
-// enum ProductStatus {
-//   DRAFT
-//   ACTIVE
-//   ARCHIVED
-// }
-
-// model Category {
-//   id        String   @id @default(uuid()) @db.Uuid
-//   parentId  String?  @map("parent_id") @db.Uuid
-//   name      String
-//   slug      String   @unique
-
-//   parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-//   children  Category[] @relation("CategoryHierarchy")
-
-//   products  Product[]
-
-//   createdAt DateTime @default(now()) @map("created_at")
-//   updatedAt DateTime @updatedAt @map("updated_at")
-
-//   @@map("categories")
-// }
-
-// model Product {
-//   id               String         @id @default(uuid()) @db.Uuid
-//   sku              String         @unique
-//   title            String
-//   slug             String         @unique
-//   description      String
-//   shortDescription String?        @map("short_description")
-
-//   basePrice        Decimal        @map("base_price") @db.Decimal(10, 2)
-//   compareAtPrice   Decimal?       @map("compare_at_price") @db.Decimal(10, 2)
-//   salePrice        Decimal?       @map("sale_price") @db.Decimal(10, 2)
-
-//   weight           Decimal?       @db.Decimal(10, 2)
-//   length           Decimal?       @db.Decimal(10, 2)
-//   width            Decimal?       @db.Decimal(10, 2)
-//   height           Decimal?       @db.Decimal(10, 2)
-
-//   categoryId       String         @map("category_id") @db.Uuid
-//   category         Category       @relation(fields: [categoryId], references: [id])
-
-//   status           ProductStatus  @default(DRAFT)
-
-//   images           String[]
-
-//   customFields     Json?          @map("custom_fields")
-
-//   stockQuantity    Int            @default(0) @map("stock_quantity")
-
-//   createdAt        DateTime       @default(now()) @map("created_at")
-//   updatedAt        DateTime       @updatedAt @map("updated_at")
-
-//   @@index([slug])
-//   @@index([categoryId])
-//   @@index([status])
-
-//   @@map("products")
-// }
 
 // =========================
 // ENUMS
