@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import { getOrderById, updateOrderStatus, getValidTransitions, initiateRefund } from '@/lib/api/orders'
 import { getPaymentByOrderId } from '@/lib/api/payments'
-import { currentUser } from '@/lib/mock-user'
+import { useAuth } from '@/lib/auth-context'
 import { hasRole } from '@/lib/roles'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
@@ -31,6 +31,7 @@ import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function OrderDetailView() {
+  const { user } = useAuth()
   const params = useParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -95,7 +96,7 @@ export default function OrderDetailView() {
       await fetchOrderData()
     } catch (error) {
       console.error('Error updating status:', error)
-      toast.error('Failed to update status')
+      toast.error(error?.message || 'Failed to update status')
     } finally {
       setUpdating(false)
     }
@@ -284,7 +285,7 @@ export default function OrderDetailView() {
           </Card>
 
           {/* REFUND SECTION (Editor / Admin only) */}
-          {hasRole(currentUser, 'editor') && order.paymentStatus === 'paid' && (
+          {hasRole(user, 'editor') && order.paymentStatus === 'paid' && (
             <Card className="border-red-200 shadow-sm bg-red-50/50">
               <CardHeader className="pb-3 border-b border-red-100">
                 <CardTitle className="text-red-700 text-lg flex items-center gap-2">

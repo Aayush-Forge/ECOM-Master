@@ -7,22 +7,28 @@ import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { R2Module } from './r2/r2.module';
 import { RedisModule } from './redis/redis.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CategoriesModule } from './categories/categories.module';
+import { OrdersModule } from './orders/orders.module';
 import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
+import { AddressesModule } from './addresses/addresses.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot(),
     AuthModule,
     PrismaModule,
     AuditLogsModule,
     UsersModule,
+    AddressesModule,
     RedisModule,
     R2Module,
     CategoriesModule,
     ProductsModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [

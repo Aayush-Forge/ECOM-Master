@@ -51,6 +51,7 @@ export class ProductsService {
     const [data, total] = await this.prismaService.$transaction([
       this.prismaService.product.findMany({
         where: { status: ProductStatus.active },
+        include: { category: true },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * perPage,
         take: perPage,
@@ -65,6 +66,7 @@ export class ProductsService {
   async findOne(id: string) {
     const product = await this.prismaService.product.findUnique({
       where: { id },
+      include: { category: true },
     });
 
     if (!product) {

@@ -67,8 +67,8 @@ const addressSchema = z.object({
 });
 
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useState(() => getAddressesSync());
-  const [loading, setLoading] = useState(false);
+  const [addresses, setAddresses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   

@@ -71,6 +71,14 @@ export default function DiscountsListView({ basePath = '/admin/discounts' }) {
         </Button>
       </div>
 
+      <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-4 flex items-start gap-3">
+        <Tag className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+        <div className="text-sm">
+          <p className="font-semibold text-amber-900">Discount Rules Engine Coming Soon</p>
+          <p className="text-amber-800 mt-0.5 font-inter">Promotional campaign and coupon rules configuration is scheduled for the next backend release. Custom coupon creation and discount triggers will be managed here once active.</p>
+        </div>
+      </div>
+
       {error ? (
         <div className="text-center py-12 bg-white rounded-lg border border-stone-200 p-6 space-y-4">
           <p className="text-stone-600 font-inter">{error}</p>

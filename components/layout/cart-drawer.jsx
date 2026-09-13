@@ -41,7 +41,7 @@ export default function CartDrawer() {
                 return (
                   <div key={key} className="flex gap-3 pb-4 border-b border-stone-100 animate-fade-in">
                     <div className="w-20 h-20 rounded-lg overflow-hidden bg-stone-50 flex-shrink-0 border border-stone-150">
-                      {item.image && <Image src={item.image} alt={item.name} width={80} height={80} className="w-full h-full object-cover" unoptimized />}
+                      {item.image && <Image src={item.image} alt={item.name} width={80} height={80} className="w-full h-full object-cover" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-midnight line-clamp-2">{item.name}</p>

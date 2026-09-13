@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getAuditLogs, getAuditLogsSync } from '@/lib/api/audit-logs'
-import { getAllUsersSync } from '@/lib/api/users'
+import { getAllUsers } from '@/lib/api/users'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
@@ -28,9 +28,10 @@ import {
 import { getRoleLabel } from '@/lib/roles'
 
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = useState(() => getAuditLogsSync())
-  const [loading, setLoading] = useState(false)
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [knownUsers, setKnownUsers] = useState([])
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -68,9 +69,13 @@ export default function AdminAuditLogsPage() {
   }
 
   useEffect(() => {
-    if (currentUser.role === 'admin') {
-      fetchLogs()
-    }
+    getAllUsers()
+      .then((users) => setKnownUsers(users || []))
+      .catch((err) => console.error('Failed to fetch known users:', err))
+  }, [])
+
+  useEffect(() => {
+    fetchLogs()
   }, [actionFilter, userFilter, entityFilter, startDate, endDate, searchQuery])
 
   const handleResetFilters = () => {
@@ -150,11 +155,6 @@ export default function AdminAuditLogsPage() {
     })
   }
 
-  const allKnownUsers = getAllUsersSync()
-
-  if (currentUser.role !== 'admin') {
-    return null
-  }
 
   return (
     <div className="space-y-6">
@@ -210,7 +210,7 @@ export default function AdminAuditLogsPage() {
               </SelectTrigger>
               <SelectContent className="bg-white">
                 <SelectItem value="all">All Users</SelectItem>
-                {allKnownUsers.map((u) => (
+                {knownUsers.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.name} ({getRoleLabel(u.role)})
                   </SelectItem>

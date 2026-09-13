@@ -78,6 +78,7 @@ export default function AdminLayout({ children }) {
 
   // Get nav items from single source of truth
   const navItems = ROLE_NAV_ITEMS[user.role] || []
+  const displayName = user?.name || (user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email || 'Admin')
   
   // Group nav items by their group property
   const groups = {}
@@ -95,7 +96,7 @@ export default function AdminLayout({ children }) {
             <div className="bg-saffron text-white p-1 rounded">
               <LayoutDashboard size={20} />
             </div>
-            <span className="font-display text-xl text-saffron tracking-wider">Aayush Forge</span>
+            <span className="font-display text-xl text-saffron tracking-wider">Sridattam Admin</span>
           </div>
         </SidebarHeader>
         
@@ -132,10 +133,10 @@ export default function AdminLayout({ children }) {
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-saffron flex items-center justify-center text-white font-bold">
-                {(user?.name || 'A').charAt(0)}
+                {displayName.charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col flex-1 overflow-hidden">
-                <span className="text-sm font-medium text-cream truncate">{user?.name || 'Admin'}</span>
+                <span className="text-sm font-medium text-cream truncate">{displayName}</span>
                 <span className="text-xs text-gray-400 truncate">{user?.email || ''}</span>
               </div>
               <Badge variant="outline" className="bg-saffron/20 text-saffron border-saffron/30">

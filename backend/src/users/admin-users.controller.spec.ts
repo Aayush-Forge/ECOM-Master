@@ -1,35 +1,108 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminUsersController } from './admin-users.controller';
-import { AuthService } from '../auth/auth.service';
-import { JwtModule } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
 import { ROLES } from '../auth/roles.constants';
 
 describe('AdminUsersController', () => {
   let controller: AdminUsersController;
-  let authService: AuthService;
+  let userDb: any[];
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        JwtModule.register({
-          secret: 'test-secret',
-          signOptions: { expiresIn: '1d' },
+    userDb = [
+      {
+        id: 'usr_admin',
+        email: 'admin@sridattam.com',
+        firstName: 'Admin',
+        lastName: 'User',
+        role: 'admin',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'usr_editor',
+        email: 'editor@sridattam.com',
+        firstName: 'Editor',
+        lastName: 'User',
+        role: 'editor',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'usr_viewer',
+        email: 'read_only@sridattam.com',
+        firstName: 'Viewer',
+        lastName: 'User',
+        role: 'read_only',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'usr_customer',
+        email: 'customer@sridattam.com',
+        firstName: 'Customer',
+        lastName: 'User',
+        role: 'customer',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    const mockPrismaService = {
+      user: {
+        findMany: jest.fn().mockImplementation(() => Promise.resolve(userDb)),
+        findUnique: jest.fn().mockImplementation(({ where }) => {
+          if (where.email) return Promise.resolve(userDb.find((u) => u.email === where.email) || null);
+          if (where.id) return Promise.resolve(userDb.find((u) => u.id === where.id) || null);
+          return Promise.resolve(null);
         }),
-      ],
+        create: jest.fn().mockImplementation(({ data }) => {
+          const user = {
+            id: `usr_${Date.now()}`,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role,
+            isActive: data.isActive,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          userDb.push(user);
+          return Promise.resolve(user);
+        }),
+        update: jest.fn().mockImplementation(({ where, data }) => {
+          const user = userDb.find((u) => u.id === where.id);
+          if (user) {
+            Object.assign(user, data);
+            return Promise.resolve(user);
+          }
+          return Promise.resolve(null);
+        }),
+      },
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminUsersController],
-      providers: [AuthService],
+      providers: [
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
+      ],
     }).compile();
 
     controller = module.get<AdminUsersController>(AdminUsersController);
-    authService = module.get<AuthService>(AuthService);
   });
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
 
-  it('should list all users via getAllUsers()', () => {
-    const users = controller.getAllUsers();
+  it('should list all users via getAllUsers()', async () => {
+    const users = await controller.getAllUsers();
     expect(Array.isArray(users)).toBe(true);
     expect(users.length).toBeGreaterThanOrEqual(4);
     // Ensure password hashes are not leaked in the user list

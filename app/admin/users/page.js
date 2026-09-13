@@ -23,8 +23,8 @@ import { Shield, UserCog, FilterX, RefreshCw } from 'lucide-react'
 import { getRoleLabel, ROLES } from '@/lib/roles'
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState(() => getAllUsersSync())
-  const [loading, setLoading] = useState(false)
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [roleFilter, setRoleFilter] = useState('all')
   const [roleChangeTarget, setRoleChangeTarget] = useState(null)

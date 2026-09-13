@@ -114,7 +114,7 @@ export default function DiscountFormView({ basePath = '/admin/discounts', isEdit
       router.push(basePath)
     } catch (error) {
       console.error(error)
-      toast.error(isEdit ? 'Failed to update discount' : 'Failed to create discount')
+      toast.error(error?.message || (isEdit ? 'Failed to update discount' : 'Failed to create discount'))
     } finally {
       setSubmitting(false)
     }
@@ -148,6 +148,11 @@ export default function DiscountFormView({ basePath = '/admin/discounts', isEdit
         <h2 className="text-2xl font-display font-bold tracking-tight">
           {isEdit ? 'Edit Discount Rule' : 'New Discount Rule'}
         </h2>
+      </div>
+
+      <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-4 text-sm text-amber-800">
+        <p className="font-semibold text-amber-900">Discount Configuration Pending</p>
+        <p className="mt-0.5 font-inter">The discount engine is currently in development. Rules created or updated here will be persisted once the backend discount service is deployed.</p>
       </div>
 
       <Card>

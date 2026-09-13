@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FilterX, RefreshCw } from 'lucide-react'
+import { FilterX, RefreshCw, CreditCard } from 'lucide-react'
 
 export function PaymentsListView({ basePath = '/staff/orders', title = 'Payment Records' }) {
   const [payments, setPayments] = useState(() => getAllPaymentsSync())
@@ -67,6 +67,14 @@ export function PaymentsListView({ basePath = '/staff/orders', title = 'Payment 
         </div>
       </div>
 
+      <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-4 flex items-start gap-3">
+        <CreditCard className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+        <div className="text-sm">
+          <p className="font-semibold text-amber-900">Payment Gateway Integration Coming Soon</p>
+          <p className="text-amber-800 mt-0.5 font-inter">Razorpay and UPI payment gateway endpoints are currently in development. Direct transactions, refunds, and gateway audits will appear here once payment processing goes live.</p>
+        </div>
+      </div>
+
       {error ? (
         <div className="text-center py-12 bg-white rounded-lg border border-stone-200 p-6 space-y-4">
           <p className="text-stone-600 font-inter">{error}</p>
@@ -109,7 +117,10 @@ export function PaymentsListView({ basePath = '/staff/orders', title = 'Payment 
                       <p className="font-medium text-stone-700">
                         {statusFilter !== 'all'
                           ? `No payments match the "${statusFilter}" status filter.`
-                          : 'No payment records found.'}
+                          : 'No payment records available.'}
+                      </p>
+                      <p className="text-xs text-stone-500 max-w-sm text-center">
+                        Payment records will populate here once transactions are processed through the payment gateway.
                       </p>
                       {statusFilter !== 'all' && (
                         <Button variant="outline" size="sm" onClick={() => setStatusFilter('all')}>

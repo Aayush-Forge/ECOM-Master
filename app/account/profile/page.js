@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { currentUser } from '@/lib/mock-user';
+import { useAuth } from '@/lib/auth-context';
 import {
   Form,
   FormControl,
@@ -18,43 +18,45 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-
 import { isValidPhoneNumber } from 'libphonenumber-js';
 import { ShieldCheck, Lock, Bell, AlertTriangle } from 'lucide-react';
 
-const phoneSchema = z
-  .string()
-  .trim()
-  .min(1, { message: 'Phone Number is required.' })
-  .refine(
-    (val) => isValidPhoneNumber(val, 'IN'),
-    {
-      message: 'Please enter a valid phone number (e.g. 9876543210 or +91 98765 43210).',
-    }
-  );
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('auth_session');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    return session.access_token || session.token || null;
+  } catch {
+    return null;
+  }
+}
 
 const profileSchema = z.object({
-  name: z
+  firstName: z
     .string()
     .trim()
-    .min(1, { message: 'Full Name is required.' })
-    .max(100, { message: 'Full Name cannot exceed 100 characters.' }),
-  email: z
+    .min(1, { message: 'First Name is required.' })
+    .max(50, { message: 'First Name cannot exceed 50 characters.' }),
+  lastName: z
     .string()
     .trim()
-    .min(1, { message: 'Email Address is required.' })
-    .email({ message: 'Please enter a valid email address.' }),
-  phone: phoneSchema,
+    .min(1, { message: 'Last Name is required.' })
+    .max(50, { message: 'Last Name cannot exceed 50 characters.' }),
+  email: z.string().email(),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (val) => !val || isValidPhoneNumber(val, 'IN'),
+      {
+        message: 'Please enter a valid phone number (e.g. +91 9876543210).',
+      }
+    ),
 });
 
 const passwordSchema = z
@@ -69,18 +71,43 @@ const passwordSchema = z
   });
 
 export default function ProfilePage() {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const { user } = useAuth();
 
   // 1. Personal Info Form
   const profileForm = useForm({
     resolver: zodResolver(profileSchema),
     mode: 'onChange',
     defaultValues: {
-      name: currentUser?.name || '',
-      email: currentUser?.email || '',
-      phone: currentUser?.phone || '',
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
     },
   });
+
+  useEffect(() => {
+    async function loadLatestProfile() {
+      const token = getAuthToken();
+      if (!token) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/users/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const fresh = await res.json();
+          profileForm.reset({
+            firstName: fresh.firstName || '',
+            lastName: fresh.lastName || '',
+            email: fresh.email || '',
+            phone: fresh.phone || '',
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load profile:', e);
+      }
+    }
+    loadLatestProfile();
+  }, [user, profileForm]);
 
   // 2. Security Form
   const passwordForm = useForm({
@@ -100,24 +127,91 @@ export default function ProfilePage() {
     whatsapp: true,
   });
 
-  function onSaveProfile(values) {
-    console.log('Submitted profile values:', values);
-    toast.success('Personal details updated successfully');
+  async function onSaveProfile(values) {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error('Session expired. Please log in again.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/users/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          firstName: values.firstName,
+          lastName: values.lastName,
+          phone: values.phone || '',
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to update profile');
+      }
+
+      const updated = await res.json();
+
+      // Update localStorage auth_session so header/nav update immediately
+      const raw = localStorage.getItem('auth_session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        session.user = {
+          ...session.user,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          name: `${updated.firstName} ${updated.lastName}`.trim(),
+          phone: updated.phone,
+        };
+        localStorage.setItem('auth_session', JSON.stringify(session));
+        window.dispatchEvent(new Event('auth-change'));
+      }
+
+      toast.success('Personal details updated successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to update profile');
+    }
   }
 
-  function onUpdatePassword(values) {
-    console.log('Submitted password change:', values);
-    toast.success('Password updated successfully');
-    passwordForm.reset();
+  async function onUpdatePassword(values) {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error('Session expired. Please log in again.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/change-password`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to change password');
+      }
+
+      toast.success('Password updated successfully');
+      passwordForm.reset();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to change password');
+    }
   }
 
   function onSavePrefs() {
     toast.success('Communication preferences saved');
-  }
-
-  function handleDeleteAccount() {
-    toast.error('Account deletion is restricted in demo mode.');
-    setDeleteDialogOpen(false);
   }
 
   return (
@@ -135,7 +229,7 @@ export default function ProfilePage() {
             Personal Information
           </CardTitle>
           <CardDescription className="font-inter text-xs text-stone-500">
-            Update your primary contact details used for orders and shipping receipts.
+            Update your contact details used for orders and shipping receipts.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
@@ -144,15 +238,35 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <FormField
                   control={profileForm.control}
-                  name="name"
+                  name="firstName"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
+                    <FormItem>
                       <FormLabel className="font-inter text-stone-700 font-medium text-xs uppercase tracking-wider">
-                        Full Name
+                        First Name
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Aayush Sharma"
+                          placeholder="Your first name"
+                          {...field}
+                          className="font-inter bg-stone-50/50 border-stone-200 text-stone-900 focus:bg-white"
+                        />
+                      </FormControl>
+                      <FormMessage className="font-inter text-xs text-red-600 font-medium" />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={profileForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-inter text-stone-700 font-medium text-xs uppercase tracking-wider">
+                        Last Name
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Your last name"
                           {...field}
                           className="font-inter bg-stone-50/50 border-stone-200 text-stone-900 focus:bg-white"
                         />
@@ -168,17 +282,19 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="font-inter text-stone-700 font-medium text-xs uppercase tracking-wider">
-                        Email Address
+                        Email Address (Read-only)
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="aayush@sridattam.com"
                           type="email"
+                          disabled
                           {...field}
-                          className="font-inter bg-stone-50/50 border-stone-200 text-stone-900 focus:bg-white"
+                          className="font-inter bg-stone-100 border-stone-200 text-stone-500 cursor-not-allowed"
                         />
                       </FormControl>
-                      <FormMessage className="font-inter text-xs text-red-600 font-medium" />
+                      <FormMessage className="font-inter text-xs text-stone-400 font-normal">
+                        Contact support to update your registered email address.
+                      </FormMessage>
                     </FormItem>
                   )}
                 />
@@ -193,7 +309,7 @@ export default function ProfilePage() {
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="+91 98765 43210"
+                          placeholder="+91 9876543210"
                           {...field}
                           className="font-inter bg-stone-50/50 border-stone-200 text-stone-900 focus:bg-white"
                         />
@@ -384,44 +500,26 @@ export default function ProfilePage() {
       </Card>
 
       {/* 4. Delete Account (Danger Zone) */}
-      <Card className="bg-white border border-red-200 shadow-2xs">
-        <CardHeader className="pb-3 border-b border-red-100/60">
-          <CardTitle className="font-display text-base text-red-700 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-600" />
+      <Card className="bg-white border border-stone-200 shadow-2xs">
+        <CardHeader className="pb-3 border-b border-stone-100">
+          <CardTitle className="font-display text-base text-stone-700 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-stone-500" />
             Delete Account
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <p className="text-xs font-inter text-stone-600">
-            Permanently delete your account and remove saved address data. This action cannot be undone.
+            Permanently delete your account and remove saved address data.
           </p>
           <Button
+            disabled
             variant="outline"
-            onClick={() => setDeleteDialogOpen(true)}
-            className="border-red-200 text-red-600 hover:bg-red-50 font-inter text-xs shrink-0"
+            className="border-stone-200 text-stone-400 font-inter text-xs shrink-0 cursor-not-allowed"
           >
-            Delete Account...
+            Account deletion coming soon
           </Button>
         </CardContent>
       </Card>
-
-      {/* Delete Account AlertDialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="bg-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-xl text-stone-900">Delete Account</AlertDialogTitle>
-            <AlertDialogDescription className="font-inter text-stone-600">
-              Are you sure you want to delete your account? All saved addresses and personal preferences will be permanently removed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAccount} className="bg-red-600 hover:bg-red-700 text-white font-inter">
-              Confirm Deletion
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

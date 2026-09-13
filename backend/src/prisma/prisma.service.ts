@@ -15,7 +15,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // Disabled for Phase 1 until PostgreSQL is configured
-    // await this.$connect();
+    await this.$connect();
   }
 }

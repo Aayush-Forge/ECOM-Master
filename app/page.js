@@ -30,7 +30,34 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { SEED_PRODUCTS, SEED_CATEGORIES } from '@/lib/products-seed'
+
+function normalizeStoreProduct(p) {
+  if (!p) return null
+  const rawImages = Array.isArray(p.images) ? p.images : []
+  const images = rawImages.map(img => (typeof img === 'string' ? { src: img } : img))
+  const basePrice = Number(p.basePrice ?? p.regular_price ?? p.price ?? 0)
+  const salePrice = p.salePrice ? Number(p.salePrice) : null
+  const currentPrice = salePrice !== null ? salePrice : basePrice
+  const compareAt = salePrice !== null ? basePrice : 0
+  const inStock = p.stockQuantity !== undefined ? p.stockQuantity > 0 : (p.stock_status === 'instock' || p.stock_status === undefined)
+
+  return {
+    ...p,
+    id: p.id,
+    name: p.title || p.name || 'Untitled Product',
+    slug: p.slug,
+    price: currentPrice,
+    regular_price: basePrice,
+    compareAt: compareAt,
+    images: images.length > 0 ? images : [{ src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' }],
+    short_description: p.shortDescription || p.short_description || '',
+    description: p.description || '',
+    category: p.category?.name || (typeof p.category === 'string' ? p.category : ''),
+    category_slug: p.category?.slug || '',
+    stock_status: inStock ? 'instock' : 'outofstock',
+    in_stock: inStock,
+  }
+}
 
 function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart }) {
   const [activeImgIdx, setActiveImgIdx] = useState(0)
@@ -71,8 +98,8 @@ function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart })
             src={currentImg} 
             alt={product.name} 
             fill 
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 280px"
             className="object-cover opacity-90 transition-transform duration-700 ease-out group-hover:scale-105"
-            unoptimized
           />
           
           {/* Swiper Arrow buttons, visible on hover */}
@@ -235,11 +262,11 @@ const testimonials = [
 export default function Home() {
   const { addItem, openDrawer } = useCart()
   
-  // WooCommerce connection state
+  // Backend connection state
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
-  const [notConfigured, setNotConfigured] = useState(false)
+  const [error, setError] = useState(null)
 
   // Wishlist, Slider and Testimonial states
   const [wishlist, setWishlist] = useState([])
@@ -247,46 +274,50 @@ export default function Home() {
   const [touchStart, setTouchStart] = useState(null)
   const [touchEnd, setTouchEnd] = useState(null)
   const [testimonialIndex, setTestimonialIndex] = useState(0)
-  const [dynamicTestimonials, setDynamicTestimonials] = useState([])
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+    // Fetch real products and categories from NestJS backend
+    // NOTE: Product schema currently lacks an isFeatured flag; displaying first N products by creation date.
+    // NOTE: No backend reviews/testimonials module exists yet; using curated static testimonials.
     Promise.all([
-      fetch('/api/products?featured=true&limit=8').then(async r => ({ ok: r.ok, status: r.status, data: await r.json() })),
-      fetch('/api/categories').then(async r => ({ ok: r.ok, status: r.status, data: await r.json() })),
-      fetch('/api/products/reviews').then(async r => ({ ok: r.ok, status: r.status, data: await r.json() })).catch(() => ({ ok: false, data: [] }))
-    ]).then(([p, c, rev]) => {
-      if (!p.ok && p.data?.code === 'WC_NOT_CONFIGURED') {
-        setNotConfigured(true)
-        setProducts(SEED_PRODUCTS.slice(0, 8))
-      } else {
-        setProducts(Array.isArray(p.data) && p.data.length > 0 ? p.data : SEED_PRODUCTS.slice(0, 8))
-      }
-      setCategories(Array.isArray(c.data) ? c.data : [])
-
-      if (rev.ok && Array.isArray(rev.data)) {
-        const filtered = rev.data.filter(r => r.rating === 4 || r.rating === 5)
-        if (filtered.length > 0) {
-          const mapped = filtered.map(r => ({
-            name: r.reviewer,
-            role: 'Verified Buyer',
-            quote: r.review.replace(/<[^>]*>/g, '').trim(),
-            rating: r.rating,
-            initial: (r.reviewer || 'D').trim().charAt(0).toUpperCase()
-          }))
-          setDynamicTestimonials(mapped)
-        }
-      }
-
-      setLoading(false)
-    }).catch(() => {
-      setProducts(SEED_PRODUCTS.slice(0, 8))
-      setLoading(false)
-    })
+      fetch(`${backendUrl}/all-products?per_page=13`).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
+      fetch(`${backendUrl}/admin/all-categories`).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
+    ])
+      .then(([pData, cData]) => {
+        const rawProducts = Array.isArray(pData) ? pData : pData?.data || []
+        const mappedProducts = rawProducts.map(normalizeStoreProduct).filter(Boolean)
+        setProducts(mappedProducts)
+        setCategories(Array.isArray(cData) ? cData : [])
+        setError(null)
+      })
+      .catch((err) => {
+        console.error('Failed to load products or categories from backend:', err)
+        setError('Unable to load products right now. Please check your connection or try again later.')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [])
 
   // Auto-play testimonials slider
   useEffect(() => {
-    const totalMobileSlides = dynamicTestimonials.length > 0 ? dynamicTestimonials.length : testimonials.length
+    const totalMobileSlides = testimonials.length
     const totalDesktopSlides = Math.ceil(totalMobileSlides / 3)
     if (totalMobileSlides <= 1) return
 
@@ -296,7 +327,7 @@ export default function Home() {
       setTestimonialIndex(prev => (prev + 1) % maxSlides)
     }, 8000)
     return () => clearInterval(timer)
-  }, [dynamicTestimonials.length, testimonials.length])
+  }, [])
 
   // Wishlist Handler
   const toggleWishlist = (productId, productName) => {
@@ -447,6 +478,11 @@ export default function Home() {
   const getCategoryImage = (cat) => {
     if (cat.image?.src) return cat.image.src
     const fallbacks = {
+      'incense-sticks': 'https://images.unsplash.com/photo-1617954095840-0427f79be4cf?auto=format&fit=crop&w=600&q=80',
+      'dhoop-sticks': 'https://images.unsplash.com/photo-1581600140682-d4e68c8cde32?auto=format&fit=crop&w=600&q=80',
+      'dhoop-cones': 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=600&q=80',
+      'sambrani-kits': 'https://images.unsplash.com/photo-1760835249761-dc1ad2d7d759?auto=format&fit=crop&w=600&q=80',
+      'ritual-kit': '/ritual-kit.png',
       sandalwood: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
       floral: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=600&q=80',
       resins: 'https://images.unsplash.com/photo-1581600140682-d4e68c8cde32?auto=format&fit=crop&w=600&q=80',
@@ -459,6 +495,11 @@ export default function Home() {
 
   const getCategoryDesc = (cat) => {
     const descriptions = {
+      'incense-sticks': 'Hand-rolled botanical incense sticks crafted for daily rituals and calm.',
+      'dhoop-sticks': 'Charcoal-free bambooless dhoop sticks for pure sacred aroma.',
+      'dhoop-cones': 'Easy-light pooja cones for fast and soothing devotion.',
+      'sambrani-kits': 'Traditional DIY Sambrani cowdung cups and herbal powders.',
+      'ritual-kit': 'Flagship curated hampers bringing together signature scents.',
       sandalwood: 'Premium slow-burning natural Mysore sandalwood formulations.',
       floral: 'Velvety damask rose, Mogra jasmine and garden flora.',
       resins: 'Oman frankincense, Loban and golden guggulu gum crystals.',
@@ -469,12 +510,12 @@ export default function Home() {
     return descriptions[cat.slug] || 'Authentic pure Indian fragrances.'
   }
 
-  // Filter Categories to display 4 cards
+  // Filter Categories to display real categories
   const displayedCategories = categories.length > 0 
-    ? categories.filter(c => c.slug !== 'uncategorized').slice(0, 4) 
-    : SEED_CATEGORIES.slice(0, 4)
+    ? categories.filter(c => c.slug !== 'uncategorized').slice(0, 5) 
+    : []
 
-  const activeTestimonials = dynamicTestimonials.length > 0 ? dynamicTestimonials : testimonials
+  const activeTestimonials = testimonials
 
   // Group testimonials into pages of 3 for desktop
   const desktopSlides = []
@@ -499,53 +540,35 @@ export default function Home() {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {slides.map((slide, idx) => (
-          <div
-            key={slide.id}
-            className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
-              currentSlide === idx ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-            }`}
-          >
-            {/* Clickable Image Slide Link */}
-            <Link href={slide.link} className="absolute inset-0 z-20 cursor-pointer">
-              {slide.desktopImage && slide.mobileImage ? (
-                <>
-                  {/* Desktop version */}
-                  <div className="hidden md:block absolute inset-0">
-                    <Image 
-                      src={slide.desktopImage}
-                      alt={slide.headline} 
-                      fill 
-                      priority={idx === 0}
-                      className="object-cover"
-                      unoptimized 
-                    />
-                  </div>
-                  {/* Mobile version */}
-                  <div className="block md:hidden absolute inset-0">
-                    <Image 
-                      src={slide.mobileImage}
-                      alt={slide.headline} 
-                      fill 
-                      priority={idx === 0}
-                      className="object-cover"
-                      unoptimized 
-                    />
-                  </div>
-                </>
-              ) : (
-                <Image 
-                  src={slide.image}
-                  alt={slide.headline} 
-                  fill 
-                  priority={idx === 0}
-                  className="object-cover"
-                  unoptimized 
-                />
-              )}
-            </Link>
-          </div>
-        ))}
+        {slides.map((slide, idx) => {
+          const activeImageSrc =
+            isMobile && slide.mobileImage
+              ? slide.mobileImage
+              : slide.desktopImage || slide.image
+
+          return (
+            <div
+              key={slide.id}
+              className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
+                currentSlide === idx ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+              }`}
+            >
+              {/* Clickable Image Slide Link */}
+              <Link href={slide.link} className="absolute inset-0 z-20 cursor-pointer">
+                <div className="absolute inset-0">
+                  <Image 
+                    src={activeImageSrc}
+                    alt={slide.headline} 
+                    fill 
+                    sizes="100vw"
+                    priority={idx === 0}
+                    className="object-cover"
+                  />
+                </div>
+              </Link>
+            </div>
+          )
+        })}
 
         {/* Carousel controls */}
         {slides.length > 1 && (
@@ -606,6 +629,23 @@ export default function Home() {
                 <Skeleton key={i} className="aspect-square bg-stone-300/40 rounded-none animate-pulse" />
               ))}
             </div>
+          ) : error ? (
+            <div className="text-center py-12 px-6 border border-stone-200 bg-white max-w-md mx-auto space-y-4 shadow-sm">
+              <AlertCircle className="w-8 h-8 text-[#6B1024] mx-auto opacity-75" />
+              <p className="text-sm text-[#6B1024] font-medium">{error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="border-[#6B1024] text-[#6B1024] hover:bg-[#6B1024] hover:text-white text-xs uppercase tracking-wider"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-12 px-6 border border-stone-200 bg-white max-w-md mx-auto shadow-sm">
+              <p className="text-sm text-[#6B1024]/80">No products available at the moment.</p>
+            </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 md:gap-8">
               {products.slice(0, 8).map((product) => (
@@ -640,8 +680,8 @@ export default function Home() {
                   src="/ritual-kit.png" 
                   alt="Sankalpa Premium Spiritual Gift Hamper" 
                   fill 
+                  sizes="(max-width: 1024px) 100vw, 450px"
                   className="object-cover transition-transform duration-1000 ease-out group-hover:scale-105" 
-                  unoptimized 
                 />
               </div>
               {/* Subtle gold corner decorations */}
@@ -754,11 +794,11 @@ export default function Home() {
                       src={getCategoryImage(cat)} 
                       alt={cat.name} 
                       fill 
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 280px"
                       className="object-cover opacity-90 transition-transform duration-700 ease-out group-hover:scale-105" 
-                      unoptimized 
                     />
                     <div className="absolute bottom-2.5 right-2.5 bg-[#6B1024] text-white text-[9px] font-bold tracking-widest px-2.5 py-1 uppercase border border-[#D7A65B]/20 z-10">
-                      {cat.count} Products
+                      {cat.count ? `${cat.count} Products` : 'Collection'}
                     </div>
                   </div>
                   <div className="space-y-1 sm:space-y-1.5 text-left">
@@ -783,8 +823,8 @@ export default function Home() {
             src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1600&q=80" 
             alt="Warm atmosphere" 
             fill 
+            sizes="100vw"
             className="object-cover opacity-5 scale-105" 
-            unoptimized 
           />
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/80 to-white/90" />
         </div>

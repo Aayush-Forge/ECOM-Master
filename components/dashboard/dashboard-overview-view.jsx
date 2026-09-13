@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ShoppingCart, IndianRupee, Clock, AlertTriangle, ArrowRight, ChevronRight } from 'lucide-react'
+import { ShoppingCart, IndianRupee, Clock, AlertTriangle, ArrowRight, ChevronRight, Info } from 'lucide-react'
 
 export default function DashboardOverviewView({ ordersBasePath = '/admin/orders' }) {
   const [stats, setStats] = useState(() => getDashboardStatsSync())
@@ -56,6 +56,14 @@ export default function DashboardOverviewView({ ordersBasePath = '/admin/orders'
       <div>
         <h2 className="text-2xl font-display font-bold tracking-tight text-stone-900">Dashboard Overview</h2>
         <p className="text-sm font-inter text-stone-500">Key metrics and recent customer order activity</p>
+      </div>
+
+      <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-4 flex items-start gap-3">
+        <Info className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+        <div className="text-sm">
+          <p className="font-semibold text-amber-900">Order Management &amp; Analytics API Pending</p>
+          <p className="text-amber-800 mt-0.5 font-inter">Live catalog inventory is connected. Aggregate order revenue, pending counts, and customer order history will activate once backend order reporting services are deployed.</p>
+        </div>
       </div>
 
       {/* 4 Stat Cards Grid */}
@@ -153,7 +161,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/admin/orders'
               {recentOrders.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-8 text-center text-stone-500 font-inter text-sm">
-                    No recent orders found.
+                    No recent orders to display. Orders will appear here once the admin order listing API is active.
                   </TableCell>
                 </TableRow>
               ) : (

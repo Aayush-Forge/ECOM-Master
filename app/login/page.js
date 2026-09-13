@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS, ROLE_HOME_ROUTES } from '@/lib/roles'
 import {
@@ -54,7 +55,9 @@ const QUICK_LOGIN_PRESETS = [
   },
 ]
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams()
+  const redirectParam = searchParams.get('redirect')
   const { login, isAuthenticated, user } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -66,8 +69,7 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     try {
-      await login(email, password)
-      // login() auto-redirects to role's home
+      await login(email, password, redirectParam)
     } catch (err) {
       setError(err.message || 'Login failed. Make sure the backend is running.')
     } finally {
@@ -79,8 +81,7 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     try {
-      await login(presetEmail, 'password123')
-      // login() auto-redirects to role's home
+      await login(presetEmail, 'password123', redirectParam)
     } catch (err) {
       setError(err.message || 'Login failed. Make sure the backend is running on port 5000.')
     } finally {
@@ -90,7 +91,7 @@ export default function LoginPage() {
 
   // If already authenticated, show redirect info
   if (isAuthenticated && user) {
-    const destination = ROLE_HOME_ROUTES[user.role] || '/'
+    const destination = redirectParam || ROLE_HOME_ROUTES[user.role] || '/'
     return (
       <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center space-y-4">
@@ -163,12 +164,22 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-saffron hover:bg-saffron/90 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-60"
+              className="w-full py-3.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-60 shadow-md cursor-pointer mt-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+
+          <div className="pt-2 text-center text-sm text-stone-600 font-inter border-t border-stone-100">
+            <span>New here? </span>
+            <Link
+              href={redirectParam ? `/register?redirect=${encodeURIComponent(redirectParam)}` : '/register'}
+              className="font-semibold text-saffron hover:underline"
+            >
+              Create an account
+            </Link>
+          </div>
         </div>
 
         {/* Quick Login (Dev Only) */}
@@ -206,5 +217,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF7F2]" />}>
+      <LoginForm />
+    </Suspense>
   )
 }

@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ROLES_KEY, IS_PUBLIC_KEY, ROLES } from './roles.constants';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('Auth & RolesGuard Integration', () => {
   let authService: AuthService;
@@ -15,6 +16,26 @@ describe('Auth & RolesGuard Integration', () => {
   let reflector: Reflector;
 
   beforeEach(async () => {
+    const userDb: any[] = [];
+    const mockPrismaService = {
+      user: {
+        findUnique: jest.fn().mockImplementation(({ where }) => {
+          if (where.email) {
+            return Promise.resolve(userDb.find((u) => u.email === where.email) || null);
+          }
+          if (where.id) {
+            return Promise.resolve(userDb.find((u) => u.id === where.id) || null);
+          }
+          return Promise.resolve(null);
+        }),
+        create: jest.fn().mockImplementation(({ data }) => {
+          const user = { id: `usr_${Date.now()}_${Math.random()}`, ...data, createdAt: new Date() };
+          userDb.push(user);
+          return Promise.resolve(user);
+        }),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [
         JwtModule.register({
@@ -26,6 +47,10 @@ describe('Auth & RolesGuard Integration', () => {
         AuthService,
         RolesGuard,
         JwtAuthGuard,
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
         {
           provide: Reflector,
           useValue: {
@@ -197,5 +222,60 @@ describe('Auth & RolesGuard Integration', () => {
 
     const context = createMockContext(undefined);
     expect(jwtAuthGuard.canActivate(context)).toBe(true);
+  });
+
+  describe('Stateless Refresh Token Flow', () => {
+    it('should issue both access_token and refresh_token on login and register', async () => {
+      const registered = await authService.register({
+        email: 'refresh_test@example.com',
+        password: 'password123',
+        firstName: 'Refresh',
+        lastName: 'User',
+      });
+
+      expect(registered.access_token).toBeDefined();
+      expect(registered.refresh_token).toBeDefined();
+
+      const loginRes = await authService.login({
+        email: 'refresh_test@example.com',
+        password: 'password123',
+      });
+
+      expect(loginRes.access_token).toBeDefined();
+      expect(loginRes.refresh_token).toBeDefined();
+    });
+
+    it('should accept a valid refresh_token and issue a new access_token', async () => {
+      const registered = await authService.register({
+        email: 'refresh_test2@example.com',
+        password: 'password123',
+        firstName: 'Refresh',
+        lastName: 'User',
+      });
+
+      const refreshRes = await authService.refreshToken(registered.refresh_token);
+      expect(refreshRes.access_token).toBeDefined();
+
+      const decoded = jwtService.verify(refreshRes.access_token, {
+        secret: 'test-secret-key',
+      });
+      expect(decoded.email).toBe('refresh_test2@example.com');
+    });
+
+    it('SECURITY: should reject tampered or invalid refresh_token with UnauthorizedException', async () => {
+      await expect(authService.refreshToken('invalid.tampered.token')).rejects.toThrow();
+      await expect(authService.refreshToken('')).rejects.toThrow();
+    });
+
+    it('SECURITY: should reject an access_token when submitted to refreshToken endpoint', async () => {
+      const registered = await authService.register({
+        email: 'refresh_test3@example.com',
+        password: 'password123',
+        firstName: 'Refresh',
+        lastName: 'User',
+      });
+
+      await expect(authService.refreshToken(registered.access_token)).rejects.toThrow();
+    });
   });
 });
