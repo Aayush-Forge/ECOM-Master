@@ -43,11 +43,11 @@ enum OrderAddressType {
 }
 
 enum PaymentStatus {
-  created
-  authorized
-  captured
-  failed
-  refunded
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
 }
 
 enum PaymentWebhookStatus {
@@ -264,21 +264,20 @@ model OrderAddress {
 model Payment {
   id                String        @id @default(uuid()) @db.Uuid
   orderId           String        @map("order_id") @db.Uuid
-  razorpayOrderId   String        @map("razorpay_order_id")
+  order             Order         @relation(fields: [orderId], references: [id])
+  razorpayOrderId   String        @unique @map("razorpay_order_id")
   razorpayPaymentId String?       @map("razorpay_payment_id")
   razorpaySignature String?       @map("razorpay_signature")
-  status            PaymentStatus
+  status            PaymentStatus @default(CREATED)
   amount            Decimal
-  currency          String
+  currency          String        @default("INR")
   method            String?
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  order         Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  webhookEvents PaymentWebhookEvent[]
+  webhookEvents     PaymentWebhookEvent[]
 
   @@index([orderId])
-  @@index([razorpayOrderId])
   @@map("payments")
 }
 

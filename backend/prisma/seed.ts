@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, ProductStatus } from '@prisma/client';
+import { PrismaClient, UserRole, ProductStatus, OrderStatus, OrderAddressType } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
@@ -252,6 +252,143 @@ async function main() {
     `[Seed Notice] Skipped variable product SKU 'DHC-NAN-36' (Lobhan Earthy Resin Dhoop Cones) and 12 child variations pending variant data model design.`,
   );
   console.log(`Successfully seeded ${simpleRows.length} real products from CSV.`);
+
+  // -------------------------------------------------------------
+  // 6. Seed Test Orders (ORD-TEST-001 paid, ORD-TEST-002 payment_pending)
+  // -------------------------------------------------------------
+  const customerUser = await prisma.user.findUnique({
+    where: { email: 'customer@sridattam.com' },
+  });
+
+  const firstProduct = await prisma.product.findFirst();
+
+  if (customerUser && firstProduct) {
+    const paidOrder = await prisma.order.upsert({
+      where: { orderNumber: 'ORD-TEST-001' },
+      update: {
+        customerId: customerUser.id,
+        status: OrderStatus.paid,
+        subtotal: 210.0,
+        discountTotal: 0.0,
+        taxTotal: 0.0,
+        shippingTotal: 50.0,
+        grandTotal: 260.0,
+        currency: 'INR',
+      },
+      create: {
+        orderNumber: 'ORD-TEST-001',
+        customerId: customerUser.id,
+        status: OrderStatus.paid,
+        subtotal: 210.0,
+        discountTotal: 0.0,
+        taxTotal: 0.0,
+        shippingTotal: 50.0,
+        grandTotal: 260.0,
+        currency: 'INR',
+        items: {
+          create: [
+            {
+              productId: firstProduct.id,
+              titleSnapshot: firstProduct.title,
+              skuSnapshot: firstProduct.sku,
+              unitPriceSnapshot: 210.0,
+              quantity: 1,
+              lineTotal: 210.0,
+            },
+          ],
+        },
+        addresses: {
+          create: [
+            {
+              type: OrderAddressType.shipping,
+              fullName: 'Customer Test',
+              phone: '9876543210',
+              addressLine1: '123 Temple Road',
+              city: 'Varanasi',
+              state: 'Uttar Pradesh',
+              postalCode: '221001',
+              country: 'India',
+            },
+          ],
+        },
+        statusHistory: {
+          create: [
+            {
+              toStatus: OrderStatus.paid,
+              changedBySystem: 'Seeder',
+              note: 'Order paid successfully',
+            },
+          ],
+        },
+      },
+    });
+    console.log(
+      `Successfully seeded test order: ${paidOrder.orderNumber} (ID: ${paidOrder.id}) with status ${paidOrder.status} and grandTotal ${paidOrder.grandTotal}`,
+    );
+
+    const testOrder = await prisma.order.upsert({
+      where: { orderNumber: 'ORD-TEST-002' },
+      update: {
+        customerId: customerUser.id,
+        status: OrderStatus.payment_pending,
+        subtotal: 210.0,
+        discountTotal: 0.0,
+        taxTotal: 0.0,
+        shippingTotal: 50.0,
+        grandTotal: 260.0,
+        currency: 'INR',
+      },
+      create: {
+        orderNumber: 'ORD-TEST-002',
+        customerId: customerUser.id,
+        status: OrderStatus.payment_pending,
+        subtotal: 210.0,
+        discountTotal: 0.0,
+        taxTotal: 0.0,
+        shippingTotal: 50.0,
+        grandTotal: 260.0,
+        currency: 'INR',
+        items: {
+          create: [
+            {
+              productId: firstProduct.id,
+              titleSnapshot: firstProduct.title,
+              skuSnapshot: firstProduct.sku,
+              unitPriceSnapshot: 210.0,
+              quantity: 1,
+              lineTotal: 210.0,
+            },
+          ],
+        },
+        addresses: {
+          create: [
+            {
+              type: OrderAddressType.shipping,
+              fullName: 'Customer Test',
+              phone: '9876543210',
+              addressLine1: '123 Temple Road',
+              city: 'Varanasi',
+              state: 'Uttar Pradesh',
+              postalCode: '221001',
+              country: 'India',
+            },
+          ],
+        },
+        statusHistory: {
+          create: [
+            {
+              toStatus: OrderStatus.payment_pending,
+              changedBySystem: 'Seeder',
+              note: 'Order placed awaiting checkout payment',
+            },
+          ],
+        },
+      },
+    });
+    console.log(
+      `Successfully seeded test order: ${testOrder.orderNumber} (ID: ${testOrder.id}) with status ${testOrder.status} and grandTotal ${testOrder.grandTotal}`,
+    );
+  }
 }
 
 main()
