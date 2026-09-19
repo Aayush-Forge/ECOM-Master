@@ -243,7 +243,25 @@ async function main() {
           aromaFamily,
           tags,
         },
-        images: [],
+        images: (() => {
+          const r2BaseUrl = process.env.R2_PUBLIC_BASE_URL || 'https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev';
+          const r2Map: Record<string, string> = {
+            'AGB-CHA-100': `${r2BaseUrl}/products/AGB-CHA-100.png`,
+            'AGB-KAL-100': `${r2BaseUrl}/products/AGB-KAL-100.png`,
+            'AGB-NAN-100': `${r2BaseUrl}/products/AGB-NAN-100.png`,
+            'AGB-RAJ-100': `${r2BaseUrl}/products/AGB-RAJ-100.png`,
+            'DHC-KAL-36': `${r2BaseUrl}/products/DHC-KAL-36.png`,
+            'DHC-RAJ-36': `${r2BaseUrl}/products/DHC-RAJ-36.png`,
+            'DHC-TRI-36': `${r2BaseUrl}/products/DHC-TRI-36.png`,
+            'DHS-KAL-20': `${r2BaseUrl}/products/DHS-KAL-20.png`,
+            'DHS-NAN-20': `${r2BaseUrl}/products/DHS-NAN-20.png`,
+            'DHS-RAJ-20': `${r2BaseUrl}/products/DHS-RAJ-20.png`,
+            'DHS-TRI-21': `${r2BaseUrl}/products/DHS-TRI-21.jpg`,
+            'HAM-SAN-01': `${r2BaseUrl}/products/HAM-SAN-01.png`,
+            'SMB-SAN-09': `${r2BaseUrl}/products/SMB-SAN-09.png`,
+          };
+          return r2Map[sku] ? [r2Map[sku]] : [];
+        })(),
       },
     });
   }
