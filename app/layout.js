@@ -2,9 +2,7 @@ import './globals.css'
 import { Yatra_One, Lora, Noto_Sans_Devanagari, Cormorant_Garamond, Inter } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import CartProvider from '@/lib/cart-context'
-import MandalaBackground from '@/components/layout/mandala-background'
-import { Suspense } from 'react'
-import PageLoader from '@/components/layout/page-loader'
+import { AuthProvider } from '@/lib/auth-context'
 import WhatsAppButton from '@/components/layout/whatsapp-button'
 
 
@@ -60,16 +58,15 @@ export default function RootLayout({ children }) {
             `
           }}
         />
-        <MandalaBackground />
-        <Suspense fallback={null}>
-          <PageLoader />
-        </Suspense>
         <CartProvider>
-          {children}
-          <WhatsAppButton />
-          <Toaster position="top-center" richColors duration={2000} />
+          <AuthProvider>
+            {children}
+            <WhatsAppButton />
+            <Toaster position="top-center" richColors duration={2000} />
+          </AuthProvider>
         </CartProvider>
       </body>
     </html>
   )
 }
+

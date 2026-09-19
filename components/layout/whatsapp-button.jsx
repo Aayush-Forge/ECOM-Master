@@ -1,8 +1,17 @@
 'use client'
 
 import React from 'react'
+import { usePathname } from 'next/navigation'
 
 export default function WhatsAppButton() {
+  const pathname = usePathname()
+  if (
+    pathname?.startsWith('/admin') ||
+    pathname?.startsWith('/staff') ||
+    pathname?.startsWith('/login')
+  ) {
+    return null
+  }
   return (
     <a
       href="https://wa.me/917975600729"
