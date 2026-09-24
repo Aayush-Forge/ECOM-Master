@@ -44,6 +44,7 @@ export default function OrderDetailView() {
   const [loading, setLoading] = useState(true)
   const [validTransitions, setValidTransitions] = useState([])
   const [selectedStatus, setSelectedStatus] = useState('')
+  const [statusNote, setStatusNote] = useState('')
   
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
   const [refundDialogOpen, setRefundDialogOpen] = useState(false)
@@ -64,9 +65,7 @@ export default function OrderDetailView() {
       
       const transitions = await getValidTransitions(orderData.status)
       setValidTransitions(transitions || [])
-      if (transitions?.length > 0) {
-        setSelectedStatus(transitions[0])
-      }
+      setSelectedStatus(transitions?.[0] || '')
 
       const paymentData = await getPaymentByOrderId(orderId)
       setPayment(paymentData)
@@ -88,11 +87,16 @@ export default function OrderDetailView() {
 
   const handleUpdateStatus = async () => {
     if (!selectedStatus) return
+    if (selectedStatus === 'cancelled' && !statusNote.trim()) {
+      toast.error('A cancellation reason is required')
+      return
+    }
     setUpdating(true)
     try {
-      await updateOrderStatus(orderId, selectedStatus)
+      await updateOrderStatus(orderId, selectedStatus, statusNote.trim() || undefined)
       toast.success(`Status updated to ${selectedStatus}`)
       setStatusDialogOpen(false)
+      setStatusNote('')
       await fetchOrderData()
     } catch (error) {
       console.error('Error updating status:', error)
@@ -151,16 +155,30 @@ export default function OrderDetailView() {
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-lg border shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight mb-2 text-stone-900">Order #{order.id}</h1>
+          <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
+            <h1 className="text-2xl font-bold tracking-tight text-stone-900">
+              {order.orderNumber ? `Order #${order.orderNumber}` : `Order #${order.id?.slice(0, 8)}`}
+            </h1>
+            <Badge variant="outline" className="font-mono text-xs text-stone-500 bg-stone-50 border-stone-200">
+              UUID: {order.id}
+            </Badge>
+          </div>
           <p className="text-stone-600 text-sm flex flex-col sm:flex-row sm:items-center gap-2">
             <span>{new Date(order.date).toLocaleString()}</span>
             <span className="hidden sm:inline">•</span>
             <span className="font-medium text-stone-900">{order.customer?.name} ({order.customer?.email})</span>
           </p>
         </div>
-        <Badge className={`text-base px-3 py-1 ${getStatusColor(order.status)} hover:opacity-80`} variant="secondary">
-          {order.status.toUpperCase()}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild className="border-stone-300 text-stone-700 font-inter text-xs">
+            <Link href={`/track-order?orderId=${order.id}`} target="_blank" rel="noopener noreferrer">
+              <Truck className="w-3.5 h-3.5 mr-1 text-stone-500" /> Open Tracking Page
+            </Link>
+          </Button>
+          <Badge className={`text-base px-3 py-1 ${getStatusColor(order.status)} hover:opacity-80`} variant="secondary">
+            {order.status.toUpperCase()}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -228,7 +246,7 @@ export default function OrderDetailView() {
             <CardHeader className="bg-saffron/10 pb-4 border-b border-saffron/20">
               <CardTitle className="text-lg flex items-center gap-2 text-stone-900 font-bold">
                 <RefreshCw className="h-5 w-5 text-saffron" /> 
-                Update Fulfillment Status
+                Fulfillment Status
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -237,15 +255,19 @@ export default function OrderDetailView() {
                   <p className="text-sm font-semibold text-stone-800 mb-2 flex items-center gap-2">
                     Current Status: <Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge>
                   </p>
-                  {validTransitions.length > 0 ? (
+                  {!hasRole(user, 'editor') ? (
+                    <div className="p-3 bg-stone-50 border border-stone-200 rounded-md text-xs text-stone-500 font-medium mt-3">
+                      Status updates require editor or administrator privileges.
+                    </div>
+                  ) : validTransitions.length > 0 ? (
                     <div className="flex items-center gap-3 w-full max-w-sm mt-4">
                       <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                        <SelectTrigger className="bg-white border-stone-300 text-stone-900 font-medium">
+                        <SelectTrigger className="bg-white border-stone-300 text-stone-900 font-medium capitalize">
                           <SelectValue placeholder="Select next status" />
                         </SelectTrigger>
                         <SelectContent>
                           {validTransitions.map(status => (
-                            <SelectItem key={status} value={status}>{status}</SelectItem>
+                            <SelectItem key={status} value={status} className="capitalize">{status.replace('_', ' ')}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -262,12 +284,37 @@ export default function OrderDetailView() {
                           <AlertDialogHeader>
                             <AlertDialogTitle className="text-stone-900 font-bold">Change Order Status</AlertDialogTitle>
                             <AlertDialogDescription className="text-stone-600">
-                              Are you sure you want to change the status of order #{order.id} from <strong className="text-stone-900">{order.status}</strong> to <strong className="text-saffron">{selectedStatus}</strong>?
+                              Change order #{order.orderNumber || order.id?.slice(0, 8)} status from <strong className="text-stone-900">{order.status}</strong> to <strong className="text-saffron">{selectedStatus}</strong>.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
+                          <div className="space-y-1.5 py-3">
+                            <label className="text-xs font-semibold text-stone-700">
+                              {selectedStatus === 'cancelled'
+                                ? 'Cancellation Reason *'
+                                : selectedStatus === 'shipped'
+                                ? 'Courier & Tracking / AWB Details (optional)'
+                                : 'Status Note / Remarks (optional)'}
+                            </label>
+                            <Input
+                              value={statusNote}
+                              onChange={(e) => setStatusNote(e.target.value)}
+                              placeholder={
+                                selectedStatus === 'cancelled'
+                                  ? 'e.g. Customer requested cancellation / Out of stock (required)'
+                                  : selectedStatus === 'shipped'
+                                  ? 'e.g. Delhivery - AWB 92837492'
+                                  : 'Optional remarks...'
+                              }
+                              className="bg-stone-50 border-stone-200 text-sm"
+                            />
+                          </div>
                           <AlertDialogFooter>
                             <AlertDialogCancel className="border-stone-300 text-stone-800">Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleUpdateStatus} disabled={updating} className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold">
+                            <AlertDialogAction 
+                              onClick={handleUpdateStatus} 
+                              disabled={updating || (selectedStatus === 'cancelled' && !statusNote.trim())} 
+                              className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold disabled:opacity-50"
+                            >
                               {updating ? 'Updating...' : 'Confirm'}
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -294,20 +341,19 @@ export default function OrderDetailView() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <p className="text-sm text-red-600 mb-4">
-                  Warning: Refunding this order will reverse the transaction. This action cannot be undone.
-                </p>
-                <AlertDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive">Issue Refund</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Issue Refund for Order #{order.id}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action will initiate a refund. This cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-stone-600 font-medium">Issue full or partial transaction refund</p>
+                  <AlertDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">Issue Refund</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Issue Refund for Order #{order.orderNumber || order.id}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Refund ₹{refundAmount || order.total} to customer payment method? This action cannot be reversed.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Refund Amount (₹)</label>
@@ -339,7 +385,8 @@ export default function OrderDetailView() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-              </CardContent>
+              </div>
+            </CardContent>
             </Card>
           )}
         </div>

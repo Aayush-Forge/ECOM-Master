@@ -152,8 +152,7 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">User Management</h2>
-          <p className="text-sm text-stone-500 font-inter">View registered accounts and assign system access permissions</p>
+          <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Users</h2>
         </div>
         <div className="flex items-center gap-3">
           <Select value={roleFilter} onValueChange={setRoleFilter}>

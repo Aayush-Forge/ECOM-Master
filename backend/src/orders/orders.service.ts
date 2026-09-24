@@ -122,6 +122,7 @@ export class OrdersService {
         taxTotal: 0,
         shippingTotal,
         grandTotal,
+        couponCode: dto.couponCode || null,
         items: {
           create: orderItemsData,
         },
@@ -168,6 +169,66 @@ export class OrdersService {
     }
 
     return order;
+  }
+
+  async getAllOrders(status?: string, page = 1, perPage = 20, search?: string) {
+    const skip = (page - 1) * perPage;
+    const where: any = {};
+
+    if (status && status !== 'all') {
+      where.status = status as OrderStatus;
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      where.OR = [
+        { orderNumber: { contains: term, mode: 'insensitive' } },
+        { customer: { firstName: { contains: term, mode: 'insensitive' } } },
+        { customer: { lastName: { contains: term, mode: 'insensitive' } } },
+        { customer: { email: { contains: term, mode: 'insensitive' } } },
+        { addresses: { some: { fullName: { contains: term, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prismaService.order.findMany({
+        where,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          addresses: true,
+          statusHistory: {
+            orderBy: { changedAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: perPage,
+      }),
+      this.prismaService.order.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+      },
+    };
   }
 
   async updateStatus(
@@ -348,6 +409,73 @@ export class OrdersService {
 
     if (!order) {
       throw new NotFoundException('Order not found');
+    }
+
+    return order;
+  }
+
+  async trackOrder(orderNumber: string, phone: string, email?: string) {
+    const cleanNumber = orderNumber?.trim();
+    const cleanPhone = phone?.replace(/\D/g, '').slice(-10);
+
+    if (!cleanNumber || !cleanPhone) {
+      throw new BadRequestException('Order number and phone number are required');
+    }
+
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        cleanNumber,
+      );
+
+    const order = await this.prismaService.order.findFirst({
+      where: isUuid
+        ? { OR: [{ id: cleanNumber }, { orderNumber: cleanNumber }] }
+        : { orderNumber: cleanNumber },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                images: true,
+              },
+            },
+          },
+        },
+        addresses: true,
+        statusHistory: {
+          orderBy: { changedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('No order found matching the provided details');
+    }
+
+    const matchesPhone =
+      order.addresses.some((addr) => {
+        const addrPhone = addr.phone?.replace(/\D/g, '').slice(-10);
+        return addrPhone === cleanPhone;
+      }) ||
+      (order.customer?.phone &&
+        order.customer.phone.replace(/\D/g, '').slice(-10) === cleanPhone);
+
+    const matchesEmail =
+      email &&
+      order.customer?.email &&
+      order.customer.email.toLowerCase() === email.trim().toLowerCase();
+
+    if (!matchesPhone && !matchesEmail) {
+      throw new NotFoundException('No order found matching the provided details');
     }
 
     return order;

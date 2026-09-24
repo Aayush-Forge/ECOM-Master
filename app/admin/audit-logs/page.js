@@ -162,7 +162,6 @@ export default function AdminAuditLogsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Audit Logs</h2>
-          <p className="text-sm text-stone-500 font-inter">View system activity and change history</p>
         </div>
       </div>
 

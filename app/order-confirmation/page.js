@@ -173,10 +173,17 @@ function Confirmation() {
           )}
 
           <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-            <Button asChild size="lg" className="bg-[#6B1024] hover:bg-[#4D0013] text-white font-semibold">
+            {orderId && (
+              <Button asChild size="lg" className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-semibold">
+                <Link href={`/track-order?orderId=${orderId}`}>
+                  <Truck className="w-4 h-4 mr-2" /> Track Order Status
+                </Link>
+              </Button>
+            )}
+            <Button asChild size="lg" variant="outline" className="border-stone-300 bg-white text-midnight hover:bg-stone-50">
               <Link href="/products">Continue Shopping <ChevronRight className="w-4 h-4 ml-1" /></Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="border-stone-300 bg-white text-midnight hover:bg-stone-50">
+            <Button asChild size="lg" variant="ghost" className="text-stone-600 hover:bg-stone-100">
               <Link href="/">Back to Home</Link>
             </Button>
           </div>

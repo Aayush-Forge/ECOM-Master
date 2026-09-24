@@ -221,11 +221,8 @@ export default function DiscountsListView({ basePath = '/admin/discounts' }) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold font-display tracking-tight text-stone-900">
-            Coupons & Discount Rules
+            Coupons &amp; Discounts
           </h1>
-          <p className="text-sm text-stone-500 font-inter">
-            Create and manage promotional discounts, bundling offers, and automated cart savings.
-          </p>
         </div>
         <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs self-start sm:self-center">
           <Link href={`${basePath}/new`}>

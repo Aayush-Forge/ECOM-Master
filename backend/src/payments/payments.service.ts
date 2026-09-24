@@ -178,4 +178,81 @@ export class PaymentsService {
       status: OrderStatus.paid,
     };
   }
+
+  async getAllPayments(status?: string, page = 1, perPage = 20) {
+    const skip = (page - 1) * perPage;
+    const where: any = {};
+
+    if (status && status !== 'all') {
+      const normalizedStatus = status.toUpperCase();
+      if (Object.values(PaymentStatus).includes(normalizedStatus as PaymentStatus)) {
+        where.status = normalizedStatus as PaymentStatus;
+      }
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        include: {
+          order: {
+            include: {
+              customer: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
+              },
+              addresses: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: perPage,
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+      },
+    };
+  }
+
+  async getPaymentByOrderId(orderId: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { orderId },
+      include: {
+        order: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+            addresses: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`No payment record found for order "${orderId}"`);
+    }
+
+    return payment;
+  }
 }

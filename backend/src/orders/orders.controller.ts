@@ -3,7 +3,9 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
+  Query,
   Req,
   UseInterceptors,
 } from '@nestjs/common';
@@ -18,6 +20,17 @@ import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor
 @UseInterceptors(AuditLogInterceptor)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @Get()
+  @Roles(ROLES.READ_ONLY)
+  getAllOrders(
+    @Query('status') status?: string,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.ordersService.getAllOrders(status, page, perPage, search);
+  }
 
   @Get(':id')
   @Roles(ROLES.READ_ONLY)

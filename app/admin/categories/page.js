@@ -297,9 +297,6 @@ export default function AdminCategoriesPage() {
           <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">
             Categories
           </h2>
-          <p className="text-sm text-stone-500 font-inter">
-            Organize catalog products into hierarchical category trees
-          </p>
         </div>
         {canMutate && (
           <Button

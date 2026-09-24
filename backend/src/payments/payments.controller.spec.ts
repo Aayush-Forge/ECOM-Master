@@ -61,4 +61,25 @@ describe('PaymentsController', () => {
     expect(paymentsService.verifyPayment).toHaveBeenCalledWith(mockDto);
     expect(result).toEqual(mockResult);
   });
+
+  it('should delegate getAllPayments to paymentsService', async () => {
+    const mockList = { data: [{ id: 'pmt_1' }], meta: { total: 1 } };
+    paymentsService.getAllPayments = jest.fn().mockResolvedValue(mockList);
+
+    const result = await controller.getAllPayments('CAPTURED', 1, 20);
+
+    expect(paymentsService.getAllPayments).toHaveBeenCalledWith('CAPTURED', 1, 20);
+    expect(result).toEqual(mockList);
+  });
+
+  it('should delegate getPaymentByOrderId to paymentsService', async () => {
+    const mockPmt = { id: 'pmt_1', orderId: 'ord_1' };
+    paymentsService.getPaymentByOrderId = jest.fn().mockResolvedValue(mockPmt);
+
+    const result = await controller.getPaymentByOrderId('ord_1');
+
+    expect(paymentsService.getPaymentByOrderId).toHaveBeenCalledWith('ord_1');
+    expect(result).toEqual(mockPmt);
+  });
 });
+

@@ -247,9 +247,6 @@ export default function DiscountFormView({ basePath = '/admin/discounts', isEdit
             <h1 className="text-2xl font-display font-bold text-stone-900 tracking-tight">
               {isEdit ? 'Edit Coupon' : 'Add New Coupon'}
             </h1>
-            <p className="text-xs text-stone-500 font-inter">
-              Configure discount amounts, minimum item thresholds, and product/category restrictions.
-            </p>
           </div>
         </div>
       </div>

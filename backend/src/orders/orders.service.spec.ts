@@ -15,6 +15,7 @@ describe('OrdersService', () => {
     prismaService = {
       order: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
       },
       orderStatusHistory: {
@@ -167,6 +168,62 @@ describe('OrdersService', () => {
         toStatus: OrderStatus.paid,
         changedById: 'user_admin',
       });
+    });
+  });
+
+  describe('trackOrder', () => {
+    it('throws BadRequestException if orderNumber or phone is missing', async () => {
+      await expect(service.trackOrder('', '9876543210')).rejects.toThrow(BadRequestException);
+      await expect(service.trackOrder('ORD-123', '')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws NotFoundException if order does not exist', async () => {
+      prismaService.order.findFirst.mockResolvedValue(null);
+      await expect(service.trackOrder('ORD-123', '9876543210')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException if phone does not match', async () => {
+      prismaService.order.findFirst.mockResolvedValue({
+        id: 'ord_1',
+        orderNumber: 'ORD-123',
+        addresses: [{ type: 'shipping', phone: '+91 9999999999' }],
+        customer: null,
+      });
+      await expect(service.trackOrder('ORD-123', '9876543210')).rejects.toThrow(NotFoundException);
+    });
+
+    it('successfully returns order when phone matches shipping address by orderNumber', async () => {
+      const mockOrder = {
+        id: 'ord_1',
+        orderNumber: 'ORD-123',
+        addresses: [{ type: 'shipping', phone: '+91 9876543210' }],
+        customer: null,
+      };
+      prismaService.order.findFirst.mockResolvedValue(mockOrder);
+
+      const result = await service.trackOrder('ORD-123', '9876543210');
+      expect(result).toEqual(mockOrder);
+    });
+
+    it('successfully returns order when tracking by UUID order ID', async () => {
+      const uuid = '5055452f-a99a-4406-99ea-917e43d61f89';
+      const mockOrder = {
+        id: uuid,
+        orderNumber: 'ORD-1790261612987-5034',
+        addresses: [{ type: 'shipping', phone: '9876543210' }],
+        customer: null,
+      };
+      prismaService.order.findFirst.mockResolvedValue(mockOrder);
+
+      const result = await service.trackOrder(uuid, '9876543210');
+      expect(result).toEqual(mockOrder);
+      expect(prismaService.order.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [{ id: uuid }, { orderNumber: uuid }],
+          },
+        }),
+      );
     });
   });
 });

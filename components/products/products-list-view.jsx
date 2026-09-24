@@ -84,7 +84,6 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Products</h2>
-          <p className="text-sm text-stone-500 font-inter">Manage storefront inventory and product details</p>
         </div>
         <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs self-start sm:self-center">
           <Link href={`${basePath}/new`}>

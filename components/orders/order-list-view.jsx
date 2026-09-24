@@ -1,35 +1,35 @@
 'use client'
 
-/**
- * FUTURE IMPROVEMENT: Bulk status updates and export actions can be added here
- * for high-volume order management workflows.
- */
-
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getAllOrders, getAllOrdersSync } from '@/lib/api/orders'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FilterX, RefreshCw, ClipboardList } from 'lucide-react'
+import { FilterX, RefreshCw, Search } from 'lucide-react'
 
 export function OrderListView({ basePath = '/staff/orders', title = 'Orders' }) {
   const [orders, setOrders] = useState(() => getAllOrdersSync())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [searchTerm, setSearchTerm] = useState('')
 
   const fetchOrders = async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await getAllOrders({ status: statusFilter })
+      const data = await getAllOrders({
+        status: statusFilter,
+        search: searchTerm.trim() || undefined,
+      })
       setOrders(data || [])
     } catch (err) {
       console.error('Failed to fetch orders:', err)
-      setError('Failed to load orders. Please try again.')
+      setError(err?.message || 'Failed to load orders. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -37,16 +37,45 @@ export function OrderListView({ basePath = '/staff/orders', title = 'Orders' }) 
 
   useEffect(() => {
     fetchOrders()
+
+    const handleFocus = () => {
+      fetchOrders()
+    }
+    const handleAuth = () => {
+      fetchOrders()
+    }
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('auth-change', handleAuth)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('auth-change', handleAuth)
+    }
   }, [statusFilter])
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault()
+    fetchOrders()
+  }
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'pending': return 'bg-amber-100 text-amber-800 border-amber-200'
-      case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'shipped': return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'delivered': return 'bg-green-100 text-green-800 border-green-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200'
-      default: return 'bg-stone-100 text-stone-800 border-stone-200'
+      case 'paid':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      case 'payment_pending':
+      case 'pending':
+        return 'bg-amber-100 text-amber-800 border-amber-200'
+      case 'processing':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'shipped':
+        return 'bg-purple-100 text-purple-800 border-purple-200'
+      case 'delivered':
+        return 'bg-green-100 text-green-800 border-green-200'
+      case 'cancelled':
+        return 'bg-rose-100 text-rose-800 border-rose-200'
+      case 'refunded':
+        return 'bg-stone-200 text-stone-800 border-stone-300'
+      default:
+        return 'bg-stone-100 text-stone-800 border-stone-200'
     }
   }
 
@@ -55,42 +84,55 @@ export function OrderListView({ basePath = '/staff/orders', title = 'Orders' }) 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">{title}</h2>
-          <p className="text-sm text-stone-500 font-inter">Manage customer orders and fulfillment</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-stone-400" />
+            <Input
+              type="search"
+              placeholder="Search order # or customer..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 bg-white border-stone-200 text-xs h-9"
+            />
+          </form>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px] bg-white border-stone-200">
+            <SelectTrigger className="w-[180px] bg-white border-stone-200 text-xs h-9">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent className="bg-white">
               <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="payment_pending">Payment Pending</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-      </div>
-
-      <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-4 flex items-start gap-3">
-        <ClipboardList className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-        <div className="text-sm">
-          <p className="font-semibold text-amber-900">Order Management API Pending</p>
-          <p className="text-amber-800 mt-0.5 font-inter">Individual customer order detail and status transitions are live. Full staff order list aggregation endpoint is scheduled for the upcoming API release.</p>
+          <Button onClick={fetchOrders} variant="outline" size="sm" className="h-9 px-3 border-stone-200">
+            <RefreshCw className="w-3.5 h-3.5" />
+          </Button>
         </div>
       </div>
 
       {error ? (
         <div className="text-center py-12 bg-white rounded-lg border border-stone-200 p-6 space-y-4">
           <p className="text-stone-600 font-inter">{error}</p>
-          <Button onClick={fetchOrders} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" /> Retry
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button onClick={fetchOrders} variant="outline" size="sm">
+              <RefreshCw className="w-4 h-4 mr-2" /> Retry
+            </Button>
+            {error.toLowerCase().includes('sign in') && (
+              <Button asChild size="sm">
+                <Link href="/login">Sign In</Link>
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
-        <div className="rounded-md border border-stone-200 bg-white overflow-x-auto">
+        <div className="rounded-md border border-stone-200 bg-white overflow-x-auto shadow-sm">
           <Table>
             <TableHeader className="bg-stone-50">
               <TableRow>
@@ -124,10 +166,7 @@ export function OrderListView({ basePath = '/staff/orders', title = 'Orders' }) 
                       <p className="font-medium text-stone-700">
                         {statusFilter !== 'all'
                           ? `No orders match the "${statusFilter}" status filter.`
-                          : 'No order records available.'}
-                      </p>
-                      <p className="text-xs text-stone-500 max-w-sm text-center">
-                        Placed customer orders will populate here upon activation of the admin order listing service.
+                          : 'No orders found.'}
                       </p>
                       {statusFilter !== 'all' && (
                         <Button variant="outline" size="sm" onClick={() => setStatusFilter('all')}>
@@ -140,8 +179,8 @@ export function OrderListView({ basePath = '/staff/orders', title = 'Orders' }) 
               ) : (
                 orders.map((order) => (
                   <TableRow key={order.id} className="hover:bg-stone-50/50">
-                    <TableCell className="font-semibold text-stone-900">{order.orderNumber || order.id}</TableCell>
-                    <TableCell className="font-inter text-stone-800">{order.customer?.name}</TableCell>
+                    <TableCell className="font-semibold text-stone-900">{order.orderNumber || order.id?.slice(0, 8)}</TableCell>
+                    <TableCell className="font-inter text-stone-800">{order.customer?.name || order.shippingAddress?.name || 'Guest'}</TableCell>
                     <TableCell className="font-inter text-stone-600 text-sm whitespace-nowrap">
                       {new Date(order.date).toLocaleDateString('en-IN', {
                         year: 'numeric', month: 'short', day: 'numeric'
@@ -151,7 +190,7 @@ export function OrderListView({ basePath = '/staff/orders', title = 'Orders' }) 
                     <TableCell className="text-right font-semibold text-stone-900">₹{order.total?.toLocaleString('en-IN')}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`capitalize font-inter text-xs px-2.5 py-0.5 ${getStatusColor(order.status)}`}>
-                        {order.status}
+                        {order.status?.replace('_', ' ')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus } from '@prisma/client';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
@@ -56,5 +56,14 @@ describe('OrdersController', () => {
       'user_456',
     );
     expect(result).toBe(mockUpdated);
+  });
+
+  it('should call getAllOrders with query params', async () => {
+    const mockList = { data: [{ id: 'ord_1' }], meta: { total: 1 } };
+    ordersService.getAllOrders = jest.fn().mockResolvedValue(mockList);
+
+    const result = await controller.getAllOrders('paid', 1, 20, 'test');
+    expect(ordersService.getAllOrders).toHaveBeenCalledWith('paid', 1, 20, 'test');
+    expect(result).toBe(mockList);
   });
 });
