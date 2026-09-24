@@ -8,7 +8,7 @@ import { UserModule } from './user/user.module';
 import { ProductsModule } from './products/products.module';
 
 @Module({
-  imports: [AuthModule, UserModule, ProductsModule, ClubbingModule],
+  imports: [AuthModule, UserModule, ProductsModule, ClubbingModule, OrdersModule],
 =======
 import { AuditLogsModule } from './audit/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
@@ -17,6 +17,7 @@ import { UsersModule } from './users/users.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ClubbingModule } from './clubbing/clubbing.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [AuthModule, PrismaModule, AuditLogsModule, UsersModule],
