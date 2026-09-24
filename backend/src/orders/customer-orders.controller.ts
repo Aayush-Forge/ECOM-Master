@@ -1,21 +1,40 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
   ParseIntPipe,
+  Post,
   Query,
   Req,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('orders')
-@Roles(ROLES.CUSTOMER)
 export class CustomerOrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @Post()
+  @Public()
+  createOrder(
+    @Body() dto: CreateOrderDto,
+    @Req() req: { user?: { userId: string } },
+  ) {
+    return this.ordersService.createOrder(dto, req.user?.userId);
+  }
+
+  @Get(':id')
+  @Public()
+  getOrder(@Param('id') id: string) {
+    return this.ordersService.getOrderById(id);
+  }
+
   @Get('me')
+  @Roles(ROLES.CUSTOMER)
   getMyOrders(
     @Req() req: { user: { userId: string } },
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,

@@ -9,6 +9,7 @@ describe('PaymentsController', () => {
   beforeEach(async () => {
     const mockPaymentsService = {
       createSession: jest.fn(),
+      verifyPayment: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -39,5 +40,25 @@ describe('PaymentsController', () => {
       'f477218f-a073-4e86-9d5d-4c78c6776a76',
     );
     expect(result).toEqual(mockSession);
+  });
+
+  it('should delegate verify to paymentsService', async () => {
+    const mockDto = {
+      orderId: 'f477218f-a073-4e86-9d5d-4c78c6776a76',
+      razorpayOrderId: 'order_123',
+      razorpayPaymentId: 'pay_123',
+      razorpaySignature: 'sig_123',
+    };
+    const mockResult = {
+      success: true,
+      orderId: mockDto.orderId,
+      status: 'paid',
+    };
+    (paymentsService.verifyPayment as jest.Mock).mockResolvedValue(mockResult);
+
+    const result = await controller.verify(mockDto);
+
+    expect(paymentsService.verifyPayment).toHaveBeenCalledWith(mockDto);
+    expect(result).toEqual(mockResult);
   });
 });

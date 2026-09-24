@@ -2,12 +2,24 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getAllUsers, getAllUsersSync, updateUserRole } from '@/lib/api/users'
+import Link from 'next/link'
+import { getAllUsers, getAllUsersSync, updateUserRole, createUser } from '@/lib/api/users'
+import { useAuth } from '@/lib/auth-context'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,15 +31,29 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Shield, UserCog, FilterX, RefreshCw } from 'lucide-react'
+import { Shield, UserCog, FilterX, RefreshCw, UserPlus } from 'lucide-react'
 import { getRoleLabel, ROLES } from '@/lib/roles'
 
 export default function AdminUsersPage() {
+  const { user: currentUser } = useAuth()
+  const isAdmin = currentUser?.role === 'admin'
+
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [roleFilter, setRoleFilter] = useState('all')
   const [roleChangeTarget, setRoleChangeTarget] = useState(null)
+
+  // Create User dialog state
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    role: 'editor',
+  })
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -37,7 +63,7 @@ export default function AdminUsersPage() {
       setUsers(data || [])
     } catch (err) {
       console.error('Failed to fetch users:', err)
-      setError('Failed to load user accounts. Please try again.')
+      setError(err.message || 'Failed to load user accounts. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -47,6 +73,45 @@ export default function AdminUsersPage() {
     fetchUsers()
   }, [])
 
+
+  const handleOpenCreate = () => {
+    setCreateForm({
+      email: '',
+      password: '',
+      firstName: '',
+      lastName: '',
+      role: 'editor',
+    })
+    setIsCreateOpen(true)
+  }
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault()
+    if (
+      !createForm.email.trim() ||
+      !createForm.password ||
+      !createForm.firstName.trim() ||
+      !createForm.lastName.trim()
+    ) {
+      toast.error('All fields are required')
+      return
+    }
+
+    setCreateSubmitting(true)
+    try {
+      await createUser(createForm)
+      toast.success(
+        `User ${createForm.firstName} ${createForm.lastName} created successfully`
+      )
+      setIsCreateOpen(false)
+      fetchUsers()
+    } catch (err) {
+      console.error('Failed to create user:', err)
+      toast.error(err.message || 'Failed to create user')
+    } finally {
+      setCreateSubmitting(false)
+    }
+  }
 
   const handleConfirmRoleChange = async () => {
     if (!roleChangeTarget) return
@@ -103,15 +168,33 @@ export default function AdminUsersPage() {
               <SelectItem value="customer">Customer</SelectItem>
             </SelectContent>
           </Select>
+          {isAdmin && (
+            <Button
+              onClick={handleOpenCreate}
+              className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs"
+            >
+              <UserPlus className="h-4 w-4 mr-2" /> Create User
+            </Button>
+          )}
         </div>
       </div>
 
       {error ? (
         <div className="text-center py-12 bg-white rounded-lg border border-stone-200 p-6 space-y-4">
           <p className="text-stone-600 font-inter">{error}</p>
-          <Button onClick={fetchUsers} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" /> Retry
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button onClick={fetchUsers} variant="outline" size="sm">
+              <RefreshCw className="w-4 h-4 mr-2" /> Retry
+            </Button>
+            {(error.toLowerCase().includes('session') ||
+              error.toLowerCase().includes('unauthorized') ||
+              error.toLowerCase().includes('sign in') ||
+              error.toLowerCase().includes('401')) && (
+              <Button asChild size="sm" className="bg-[#FF6B00] hover:bg-[#e05e00] text-white">
+                <Link href="/login?redirect=/admin/users">Sign In as Admin</Link>
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="rounded-md border border-stone-200 bg-white overflow-x-auto">
@@ -218,6 +301,134 @@ export default function AdminUsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Staff / User Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="bg-white sm:max-w-md">
+          <form onSubmit={handleCreateUser}>
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl text-stone-900">
+                Create User
+              </DialogTitle>
+              <DialogDescription className="font-inter text-stone-600">
+                Create a new user or staff account with assigned role and permissions.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4 font-inter">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-firstname" className="text-stone-700 font-medium">
+                    First Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="create-firstname"
+                    placeholder="e.g. John"
+                    value={createForm.firstName}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, firstName: e.target.value }))
+                    }
+                    className="bg-white border-stone-200"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-lastname" className="text-stone-700 font-medium">
+                    Last Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="create-lastname"
+                    placeholder="e.g. Doe"
+                    value={createForm.lastName}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, lastName: e.target.value }))
+                    }
+                    className="bg-white border-stone-200"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-email" className="text-stone-700 font-medium">
+                  Email Address <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="create-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={createForm.email}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                  className="bg-white border-stone-200"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-password" className="text-stone-700 font-medium">
+                  Password <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="create-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={createForm.password}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({ ...prev, password: e.target.value }))
+                  }
+                  className="bg-white border-stone-200"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-role" className="text-stone-700 font-medium">
+                  Role <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={createForm.role}
+                  onValueChange={(val) =>
+                    setCreateForm((prev) => ({ ...prev, role: val }))
+                  }
+                >
+                  <SelectTrigger id="create-role" className="bg-white border-stone-200">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="editor">Editor Employee</SelectItem>
+                    <SelectItem value="read_only">Viewer Employee</SelectItem>
+                    <SelectItem value="customer">Customer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-stone-400">
+                  Select the system permission level for this account.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateOpen(false)}
+                disabled={createSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-inter"
+                disabled={createSubmitting}
+              >
+                {createSubmitting ? 'Creating...' : 'Create User'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getAdminProducts, getAdminProductsSync, deleteProduct } from '@/lib/api/products-api'
+import { getAdminProducts, getAdminProductsSync, deleteProduct, getProductCategories } from '@/lib/api/products-api'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ import { Plus, Pencil, Trash2, Search, FilterX, RefreshCw, AlertTriangle } from 
 
 export default function ProductsListView({ basePath = '/admin/products' }) {
   const [products, setProducts] = useState(() => getAdminProductsSync())
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -46,6 +47,9 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
 
   useEffect(() => {
     fetchProducts()
+    getProductCategories()
+      .then((cats) => setCategories(cats || []))
+      .catch((err) => console.error('Failed to load categories for filter:', err))
   }, [])
 
   const handleDelete = async () => {
@@ -67,7 +71,11 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
       p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory =
-      categoryFilter === 'all' || p.category?.toLowerCase() === categoryFilter.toLowerCase()
+      categoryFilter === 'all' ||
+      p.categoryId === categoryFilter ||
+      p.categoryDetails?.id === categoryFilter ||
+      p.category?.toLowerCase() === categoryFilter.toLowerCase() ||
+      p.categoryDetails?.slug?.toLowerCase() === categoryFilter.toLowerCase()
     return matchesSearch && matchesCategory
   })
 
@@ -102,11 +110,11 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
           </SelectTrigger>
           <SelectContent className="bg-white">
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="sandalwood">Sandalwood</SelectItem>
-            <SelectItem value="floral">Floral</SelectItem>
-            <SelectItem value="resins">Resins</SelectItem>
-            <SelectItem value="camphor">Camphor</SelectItem>
-            <SelectItem value="combos">Combos</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat.id || cat.name} value={cat.id || cat.name}>
+                {cat.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         {(searchQuery || categoryFilter !== 'all') && (

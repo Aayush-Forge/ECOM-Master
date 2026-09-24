@@ -1,8 +1,9 @@
-﻿import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClubbingService } from '../clubbing/clubbing.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
@@ -31,6 +32,12 @@ describe('OrdersService', () => {
         OrdersService,
         { provide: PrismaService, useValue: prismaService },
         { provide: EventEmitter2, useValue: eventEmitter },
+        {
+          provide: ClubbingService,
+          useValue: {
+            calculateCartDiscount: jest.fn().mockResolvedValue({ discountTotal: 0 }),
+          },
+        },
       ],
     }).compile();
 
@@ -39,6 +46,49 @@ describe('OrdersService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('createOrder', () => {
+    it('throws BadRequestException if items array is empty', async () => {
+      await expect(
+        service.createOrder({ items: [] } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws NotFoundException if products do not exist', async () => {
+      prismaService.product = { findMany: jest.fn().mockResolvedValue([]) };
+      await expect(
+        service.createOrder({
+          items: [{ productId: 'missing-p1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('creates order with snapshotted items', async () => {
+      prismaService.product = {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p1',
+            title: 'Sandalwood Incense',
+            sku: 'INC-001',
+            basePrice: 200,
+            salePrice: 150,
+          },
+        ]),
+      };
+      prismaService.order.create = jest.fn().mockResolvedValue({
+        id: 'ord-123',
+        grandTotal: 300,
+      });
+
+      const result = await service.createOrder(
+        { items: [{ productId: 'p1', quantity: 2 }] },
+        'customer-1',
+      );
+
+      expect(prismaService.order.create).toHaveBeenCalled();
+      expect(result.id).toBe('ord-123');
+    });
   });
 
   describe('getOrderById', () => {

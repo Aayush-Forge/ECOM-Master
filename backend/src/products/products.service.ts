@@ -3,10 +3,21 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import sanitizeHtml from 'sanitize-html';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, ProductStatus } from '@prisma/client';
+
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: ['b', 'strong', 'i', 'em', 'ul', 'ol', 'li', 'p', 'br'],
+  allowedAttributes: {},
+};
+
+export function sanitizeRichText(html?: string): string {
+  if (!html) return '';
+  return sanitizeHtml(html, SANITIZE_OPTIONS).trim();
+}
 
 @Injectable()
 export class ProductsService {
@@ -25,8 +36,12 @@ export class ProductsService {
           sku: createProductDto.sku,
           title: createProductDto.title,
           slug: createProductDto.slug,
-          description: createProductDto.description ?? '',
-          shortDescription: createProductDto.shortDescription ?? '',
+          description: createProductDto.description
+            ? sanitizeRichText(createProductDto.description)
+            : '',
+          shortDescription: createProductDto.shortDescription
+            ? sanitizeRichText(createProductDto.shortDescription)
+            : '',
           basePrice: createProductDto.basePrice,
           compareAtPrice: createProductDto.compareAtPrice,
           salePrice: createProductDto.salePrice,
@@ -86,12 +101,20 @@ export class ProductsService {
       }
     }
 
+    const dataToUpdate = { ...updateProductDto };
+    if (updateProductDto.description !== undefined) {
+      dataToUpdate.description = sanitizeRichText(updateProductDto.description);
+    }
+    if (updateProductDto.shortDescription !== undefined) {
+      dataToUpdate.shortDescription = sanitizeRichText(updateProductDto.shortDescription);
+    }
+
     try {
       return await this.prismaService.product.update({
         where: { id },
         data: {
-          ...updateProductDto,
-          customFields: updateProductDto.customFields as
+          ...dataToUpdate,
+          customFields: dataToUpdate.customFields as
             Prisma.InputJsonValue | undefined,
         },
       });

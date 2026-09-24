@@ -9,6 +9,7 @@ import { R2Module } from './r2/r2.module';
 import { RedisModule } from './redis/redis.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CategoriesModule } from './categories/categories.module';
+import { ClubbingModule } from './clubbing/clubbing.module';
 import { OrdersModule } from './orders/orders.module';
 import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
@@ -29,6 +30,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     R2Module,
     CategoriesModule,
     ProductsModule,
+    ClubbingModule,
     OrdersModule,
     PaymentsModule,
   ],

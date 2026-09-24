@@ -86,7 +86,7 @@ export default function ProductCard({ product, compact = false }) {
           </div>
           
           <p className="text-[11px] text-[#6B1024]/75 line-clamp-2 mt-1 font-light leading-relaxed">
-            {product.short_description?.replace(/<[^>]*>/g, '') || 'Authentic pure botanical fragrance.'}
+            {(product.shortDescription || product.short_description)?.replace(/<[^>]*>/g, '') || 'Authentic pure botanical fragrance.'}
           </p>
         </div>
 

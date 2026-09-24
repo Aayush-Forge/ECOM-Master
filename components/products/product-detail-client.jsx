@@ -364,10 +364,10 @@ export default function ProductDetailClient({ initialProduct }) {
                 </span>
               </div>
 
-              {product.short_description && (
+              {(product.shortDescription || product.short_description) && (
                 <div
-                  className="text-base text-muted-foreground italic mt-2 prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: product.short_description }}
+                  className="text-base text-muted-foreground italic mt-2 prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                  dangerouslySetInnerHTML={{ __html: product.shortDescription || product.short_description }}
                 />
               )}
             </div>
@@ -472,7 +472,7 @@ export default function ProductDetailClient({ initialProduct }) {
               <AccordionItem value="desc" className="border-stone-200">
                 <AccordionTrigger className="font-display text-[#6B1024] font-bold">Full Description</AccordionTrigger>
                 <AccordionContent>
-                  <div className="text-sm leading-relaxed prose prose-sm max-w-none text-[#6B1024]/85" dangerouslySetInnerHTML={{ __html: product.description || product.short_description || '' }} />
+                  <div className="text-sm leading-relaxed prose prose-sm max-w-none text-[#6B1024]/85 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5" dangerouslySetInnerHTML={{ __html: product.description || product.shortDescription || product.short_description || '' }} />
                   
                   {/* ACF Features placed vertically below full description */}
                   {features.length > 0 && (

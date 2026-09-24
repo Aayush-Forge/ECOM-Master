@@ -6,6 +6,8 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClubbingService } from '../clubbing/clubbing.service';
+import { CreateOrderDto } from './dto/create-order.dto';
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.payment_pending]: [OrderStatus.paid, OrderStatus.cancelled],
@@ -23,7 +25,118 @@ export class OrdersService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly clubbingService: ClubbingService,
   ) {}
+
+  async createOrder(dto: CreateOrderDto, customerId?: string) {
+    if (!dto.items || dto.items.length === 0) {
+      throw new BadRequestException('Order must contain at least one item');
+    }
+
+    const productIds = dto.items.map((item) => item.productId);
+    const products = await this.prismaService.product.findMany({
+      where: { id: { in: productIds } },
+    });
+
+    if (products.length !== productIds.length) {
+      throw new NotFoundException('One or more products were not found');
+    }
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    let subtotal = 0;
+
+    const discountInputItems: { productId: string; quantity: number; price: number }[] = [];
+
+    const orderItemsData = dto.items.map((item) => {
+      const product = productMap.get(item.productId)!;
+      const unitPrice = Number(product.salePrice ?? product.basePrice);
+      const lineTotal = unitPrice * item.quantity;
+      subtotal += lineTotal;
+
+      discountInputItems.push({
+        productId: product.id,
+        quantity: item.quantity,
+        price: unitPrice,
+      });
+
+      return {
+        productId: product.id,
+        titleSnapshot: product.title,
+        skuSnapshot: product.sku,
+        unitPriceSnapshot: unitPrice,
+        quantity: item.quantity,
+        lineTotal,
+      };
+    });
+
+    let discountTotal = 0;
+    try {
+      const discountRes = await this.clubbingService.calculateCartDiscount(discountInputItems);
+      discountTotal = Number(discountRes.discountTotal || 0);
+    } catch {
+      discountTotal = 0;
+    }
+
+    const shippingTotal = dto.shippingTotal !== undefined ? Number(dto.shippingTotal) : (subtotal >= 499 || subtotal === 0 ? 0 : 49);
+    const grandTotal = Math.max(0, subtotal - discountTotal + shippingTotal);
+
+    const orderNumber = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const effectiveCustomerId = customerId || dto.customerId || null;
+
+    const addressCreates: any[] = [];
+    if (dto.shippingAddress) {
+      addressCreates.push({
+        type: 'shipping',
+        fullName: dto.shippingAddress.fullName,
+        phone: dto.shippingAddress.phone,
+        addressLine1: dto.shippingAddress.addressLine1,
+        addressLine2: dto.shippingAddress.addressLine2 || null,
+        city: dto.shippingAddress.city,
+        state: dto.shippingAddress.state,
+        postalCode: dto.shippingAddress.postalCode,
+        country: dto.shippingAddress.country || 'IN',
+      });
+    }
+
+    if (dto.billingAddress) {
+      addressCreates.push({
+        type: 'billing',
+        fullName: dto.billingAddress.fullName,
+        phone: dto.billingAddress.phone,
+        addressLine1: dto.billingAddress.addressLine1,
+        addressLine2: dto.billingAddress.addressLine2 || null,
+        city: dto.billingAddress.city,
+        state: dto.billingAddress.state,
+        postalCode: dto.billingAddress.postalCode,
+        country: dto.billingAddress.country || 'IN',
+      });
+    }
+
+    return this.prismaService.order.create({
+      data: {
+        orderNumber,
+        customerId: effectiveCustomerId,
+        status: OrderStatus.payment_pending,
+        subtotal,
+        discountTotal,
+        taxTotal: 0,
+        shippingTotal,
+        grandTotal,
+        items: {
+          create: orderItemsData,
+        },
+        addresses: addressCreates.length > 0 ? { create: addressCreates } : undefined,
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        addresses: true,
+      },
+    });
+  }
 
   async getOrderById(id: string) {
     const order = await this.prismaService.order.findUnique({
@@ -38,7 +151,11 @@ export class OrdersService {
             phone: true,
           },
         },
-        items: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
         addresses: true,
         statusHistory: {
           orderBy: { changedAt: 'desc' },

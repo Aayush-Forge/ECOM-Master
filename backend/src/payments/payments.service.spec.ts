@@ -19,11 +19,17 @@ describe('PaymentsService', () => {
     prismaService = {
       order: {
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
       payment: {
         findFirst: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
+      orderStatusHistory: {
+        create: jest.fn(),
+      },
+      $transaction: jest.fn(async (cb) => cb(prismaService)),
     };
 
     const mockRazorpayService = {
@@ -144,6 +150,79 @@ describe('PaymentsService', () => {
       amount: 260,
       currency: 'INR',
       keyId: RAZORPAY_CONFIG.keyId,
+    });
+  });
+
+  describe('verifyPayment', () => {
+    it('should throw NotFoundException if order does not exist', async () => {
+      prismaService.order.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.verifyPayment({
+          orderId: 'non-existent-order',
+          razorpayOrderId: 'rzp_order_1',
+          razorpayPaymentId: 'rzp_pay_1',
+          razorpaySignature: 'sig_1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if payment row does not exist', async () => {
+      prismaService.order.findUnique.mockResolvedValue({
+        id: 'order-1',
+        status: OrderStatus.payment_pending,
+      });
+      prismaService.payment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.verifyPayment({
+          orderId: 'order-1',
+          razorpayOrderId: 'rzp_order_1',
+          razorpayPaymentId: 'rzp_pay_1',
+          razorpaySignature: 'sig_1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should capture payment and transition order to paid', async () => {
+      prismaService.order.findUnique.mockResolvedValue({
+        id: 'order-1',
+        status: OrderStatus.payment_pending,
+      });
+      prismaService.payment.findFirst.mockResolvedValue({
+        id: 'payment-1',
+        orderId: 'order-1',
+        razorpayOrderId: 'rzp_order_1',
+        status: PaymentStatus.CREATED,
+      });
+
+      const result = await service.verifyPayment({
+        orderId: 'order-1',
+        razorpayOrderId: 'rzp_order_1',
+        razorpayPaymentId: 'rzp_pay_1',
+        razorpaySignature: 'sig_1',
+      });
+
+      expect(result).toEqual({
+        success: true,
+        orderId: 'order-1',
+        status: OrderStatus.paid,
+      });
+      expect(prismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-1' },
+        data: {
+          razorpayPaymentId: 'rzp_pay_1',
+          razorpaySignature: 'sig_1',
+          status: PaymentStatus.CAPTURED,
+        },
+      });
+      expect(prismaService.order.update).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        data: {
+          status: OrderStatus.paid,
+          placedAt: expect.any(Date),
+        },
+      });
     });
   });
 });
