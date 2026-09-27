@@ -1,14 +1,11 @@
-
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
   moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
-
 }
 
 enum Role {
@@ -18,21 +15,21 @@ enum Role {
 }
 
 model User {
-  id            String   @id @default(uuid()) @db.Uuid
-  email         String   @unique
-  phone         String?
-  passwordHash  String   @map("password_hash")
-  role          Role
-  firstName     String   @map("first_name")
-  lastName      String   @map("last_name")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  carts         Cart[]
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  phone        String?
+  passwordHash String   @map("password_hash")
+  role         Role
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  carts        Cart[]
+  orders       Order[]
   // updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("users")
 }
-
 
 // =========================
 // ENUMS
@@ -60,14 +57,14 @@ enum CartStatus {
 // =========================
 
 model Category {
-  id        String   @id @default(uuid()) @db.Uuid
-  parentId  String?  @map("parent_id") @db.Uuid
+  id       String  @id @default(uuid()) @db.Uuid
+  parentId String? @map("parent_id") @db.Uuid
 
-  name      String
-  slug      String   @unique
+  name String
+  slug String @unique
 
-  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryHierarchy")
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
 
   products Product[]
 
@@ -77,7 +74,6 @@ model Category {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([parentId])
-
   @@map("categories")
 }
 
@@ -86,46 +82,47 @@ model Category {
 // =========================
 
 model Product {
-  id               String   @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  sku              String   @unique
-  title            String
-  slug             String   @unique
+  sku   String @unique
+  title String
+  slug  String @unique
 
   description      String?
-  shortDescription String?  @map("short_description")
+  shortDescription String? @map("short_description")
 
-  basePrice        Decimal  @map("base_price") @db.Decimal(10, 2)
-  compareAtPrice   Decimal? @map("compare_at_price") @db.Decimal(10, 2)
-  salePrice        Decimal? @map("sale_price") @db.Decimal(10, 2)
+  basePrice      Decimal  @map("base_price") @db.Decimal(10, 2)
+  compareAtPrice Decimal? @map("compare_at_price") @db.Decimal(10, 2)
+  salePrice      Decimal? @map("sale_price") @db.Decimal(10, 2)
 
-  weight           Decimal? @db.Decimal(10, 2)
-  length           Decimal? @db.Decimal(10, 2)
-  width            Decimal? @db.Decimal(10, 2)
-  height           Decimal? @db.Decimal(10, 2)
+  weight Decimal? @db.Decimal(10, 2)
+  length Decimal? @db.Decimal(10, 2)
+  width  Decimal? @db.Decimal(10, 2)
+  height Decimal? @db.Decimal(10, 2)
 
-  categoryId       String   @map("category_id") @db.Uuid
-  category         Category @relation(fields: [categoryId], references: [id])
+  categoryId String   @map("category_id") @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id])
 
-  status           ProductStatus @default(DRAFT)
+  status ProductStatus @default(DRAFT)
 
-  images           String[]
+  images String[]
 
-  customFields     Json? @map("custom_fields")
+  customFields Json? @map("custom_fields")
 
-  stockQuantity    Int @default(0) @map("stock_quantity")
+  stockQuantity Int @default(0) @map("stock_quantity")
 
-  cartItems        CartItem[]
+  cartItems CartItem[]
 
-  clubbingRules    ClubbingRuleProduct[]
+  clubbingRules ClubbingRuleProduct[]
 
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([slug])
   @@index([categoryId])
   @@index([status])
-
   @@map("products")
 }
 
@@ -142,9 +139,9 @@ model ClubbingRule {
 
   requiredQuantity Int @map("required_quantity")
 
-  fixedPrice Decimal? @map("fixed_price") @db.Decimal(10,2)
+  fixedPrice Decimal? @map("fixed_price") @db.Decimal(10, 2)
 
-  percentageOff Decimal? @map("percentage_off") @db.Decimal(5,2)
+  percentageOff Decimal? @map("percentage_off") @db.Decimal(5, 2)
 
   applicableCategoryId String? @map("applicable_category_id") @db.Uuid
 
@@ -165,7 +162,6 @@ model ClubbingRule {
   @@index([isActive])
   @@index([startsAt])
   @@index([endsAt])
-
   @@map("clubbing_rules")
 }
 
@@ -184,7 +180,6 @@ model ClubbingRuleProduct {
   product Product @relation(fields: [productId], references: [id])
 
   @@id([ruleId, productId])
-
   @@map("clubbing_rule_products")
 }
 
@@ -210,7 +205,6 @@ model Cart {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([customerId])
-
   @@map("carts")
 }
 
@@ -227,13 +221,233 @@ model CartItem {
 
   quantity Int
 
-  unitPriceSnapshot Decimal @map("unit_price_snapshot") @db.Decimal(10,2)
+  unitPriceSnapshot Decimal @map("unit_price_snapshot") @db.Decimal(10, 2)
 
   cart Cart @relation(fields: [cartId], references: [id])
 
   product Product @relation(fields: [productId], references: [id])
 
   @@unique([cartId, productId])
-
   @@map("cart_items")
+}
+
+// =========================
+// ORDER
+// =========================
+
+enum OrderStatus {
+  CART
+  PAYMENT_PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum OrderAddressType {
+  BILLING
+  SHIPPING
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+model Order {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderNumber String @unique @map("order_number")
+
+  customerId String? @map("customer_id") @db.Uuid
+
+  customer User? @relation(fields: [customerId], references: [id])
+
+  status OrderStatus
+
+  subtotal Decimal @db.Decimal(10, 2)
+
+  discountTotal Decimal @default(0) @map("discount_total") @db.Decimal(10, 2)
+
+  taxTotal Decimal @default(0) @map("tax_total") @db.Decimal(10, 2)
+
+  shippingTotal Decimal @default(0) @map("shipping_total") @db.Decimal(10, 2)
+
+  grandTotal Decimal @map("grand_total") @db.Decimal(10, 2)
+
+  currency String @default("INR")
+
+  placedAt DateTime @default(now()) @map("placed_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items OrderItem[]
+
+  statusHistory OrderStatusHistory[]
+
+  addresses OrderAddress[]
+
+  payments Payment[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("orders")
+}
+
+// =========================
+// ORDER ITEM
+// order snapshotting: title/sku/unitPrice are captured once at
+// creation and never updated, even if the source product later
+// changes price or is deleted — historical orders must stay accurate.
+// =========================
+
+model OrderItem {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderId String @map("order_id") @db.Uuid
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  productId String @map("product_id") @db.Uuid
+
+  product Product @relation(fields: [productId], references: [id])
+
+  titleSnapshot String @map("title_snapshot")
+
+  skuSnapshot String @map("sku_snapshot")
+
+  unitPriceSnapshot Decimal @map("unit_price_snapshot") @db.Decimal(10, 2)
+
+  quantity Int
+
+  lineTotal Decimal @map("line_total") @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// =========================
+// ORDER STATUS HISTORY
+// =========================
+
+model OrderStatusHistory {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderId String @map("order_id") @db.Uuid
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  status String
+
+  changedBy String @map("changed_by")
+
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  note String?
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+// =========================
+// ORDER ADDRESS
+// =========================
+
+model OrderAddress {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderId String @map("order_id") @db.Uuid
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  type OrderAddressType
+
+  fullName String @map("full_name")
+
+  phone String
+
+  addressLine1 String @map("address_line1")
+
+  addressLine2 String? @map("address_line2")
+
+  city String
+
+  state String
+
+  postalCode String @map("postal_code")
+
+  country String
+
+  @@index([orderId])
+  @@map("order_addresses")
+}
+
+// =========================
+// PAYMENT
+// =========================
+
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderId String @map("order_id") @db.Uuid
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  razorpayOrderId String @unique @map("razorpay_order_id")
+
+  razorpayPaymentId String? @unique @map("razorpay_payment_id")
+
+  razorpaySignature String? @map("razorpay_signature")
+
+  status PaymentStatus @default(CREATED)
+
+  amount Decimal @db.Decimal(10, 2)
+
+  currency String
+
+  method String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+// =========================
+// PAYMENT WEBHOOK EVENT
+// razorpayEventId is the idempotency key — Razorpay retries webhook
+// delivery, and without this unique constraint a retried delivery
+// could double-process a refund or re-fire a confirmation email.
+// =========================
+
+model PaymentWebhookEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  razorpayEventId String @unique @map("razorpay_event_id")
+
+  eventType String @map("event_type")
+
+  payload Json
+
+  status WebhookEventStatus @default(RECEIVED)
+
+  processedAt DateTime? @map("processed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([status])
+  @@map("payment_webhook_events")
 }

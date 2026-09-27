@@ -42,3 +42,45 @@ export const CartStatus = {
 } as const
 
 export type CartStatus = (typeof CartStatus)[keyof typeof CartStatus]
+
+
+export const OrderStatus = {
+  CART: 'CART',
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  PAID: 'PAID',
+  PROCESSING: 'PROCESSING',
+  SHIPPED: 'SHIPPED',
+  DELIVERED: 'DELIVERED',
+  CANCELLED: 'CANCELLED',
+  REFUNDED: 'REFUNDED'
+} as const
+
+export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus]
+
+
+export const OrderAddressType = {
+  BILLING: 'BILLING',
+  SHIPPING: 'SHIPPING'
+} as const
+
+export type OrderAddressType = (typeof OrderAddressType)[keyof typeof OrderAddressType]
+
+
+export const PaymentStatus = {
+  CREATED: 'CREATED',
+  AUTHORIZED: 'AUTHORIZED',
+  CAPTURED: 'CAPTURED',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED'
+} as const
+
+export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus]
+
+
+export const WebhookEventStatus = {
+  RECEIVED: 'RECEIVED',
+  PROCESSED: 'PROCESSED',
+  FAILED: 'FAILED'
+} as const
+
+export type WebhookEventStatus = (typeof WebhookEventStatus)[keyof typeof WebhookEventStatus]
