@@ -69,7 +69,7 @@ export default function Header() {
     }
   }
 
-  const dashboardHref = user ? (ROLE_HOME_ROUTES[user.role] || '/account') : '/login'
+  const dashboardHref = user ? '/account' : '/login'
 
   return (
     <>
@@ -222,7 +222,7 @@ export default function Header() {
                               onClick={() => setOpen(false)}
                               className="block text-base font-body font-medium tracking-[0.2em] uppercase text-midnight hover:text-saffron-600 transition-colors"
                             >
-                              My Dashboard
+                              My Account
                             </Link>
                             <button
                               onClick={() => { logout(); setOpen(false); }}
@@ -270,7 +270,7 @@ export default function Header() {
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:text-saffron hover:border-saffron/30 transition-all text-xs font-medium"
                   >
                     <User className="w-3.5 h-3.5" />
-                    <span className="hidden lg:inline max-w-[80px] truncate">{user?.name}</span>
+                    <span className="hidden lg:inline max-w-[80px] truncate">{user?.firstName || user?.name || 'Account'}</span>
                   </Link>
                   <button
                     onClick={logout}

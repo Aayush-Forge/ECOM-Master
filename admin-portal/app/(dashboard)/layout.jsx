@@ -19,6 +19,7 @@ import {
   SidebarGroupContent,
   SidebarInset,
   SidebarTrigger,
+  SidebarRail,
 } from '@/components/ui/sidebar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -79,10 +80,10 @@ export default function DashboardLayout({ children }) {
 
   if (!authorized || loading) {
     return (
-      <div className="min-h-screen bg-stone-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-stone-400">
-          <Loader2 className="animate-spin text-saffron" size={32} />
-          <span className="text-sm font-medium">Verifying access...</span>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-stone-500">
+          <Loader2 className="animate-spin text-[#FF6B00]" size={32} />
+          <span className="text-sm font-medium">Verifying authorization...</span>
         </div>
       </div>
     )
@@ -108,19 +109,19 @@ export default function DashboardLayout({ children }) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-stone-950 text-stone-100">
-        <Sidebar className="bg-stone-900 border-r border-stone-800 text-stone-300">
-          <SidebarHeader className="p-4 border-b border-stone-800">
+      <div className="min-h-screen flex w-full bg-slate-50 text-slate-900 font-sans">
+        <Sidebar className="bg-stone-900 border-r border-stone-800 text-stone-200">
+          <SidebarHeader className="p-4 border-b border-stone-800 bg-stone-950">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="bg-saffron text-white p-2 rounded-lg shadow-sm">
+                <div className="bg-[#FF6B00] text-white p-2 rounded-lg shadow-sm">
                   <Shield size={20} />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-base font-bold text-white tracking-wide leading-tight">
                     SRIDATTAM
                   </span>
-                  <span className="font-mono text-[10px] text-saffron tracking-widest uppercase">
+                  <span className="font-mono text-[10px] text-[#FF6B00] tracking-widest uppercase font-semibold">
                     Admin Portal
                   </span>
                 </div>
@@ -128,7 +129,7 @@ export default function DashboardLayout({ children }) {
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="px-2 py-3 space-y-4">
+          <SidebarContent className="px-2 py-3 space-y-4 bg-stone-900">
             {Object.entries(groups).map(([groupName, items]) => (
               <SidebarGroup key={groupName}>
                 <SidebarGroupLabel className="text-[10px] uppercase font-mono tracking-wider text-stone-400 px-3 py-1 font-semibold">
@@ -146,7 +147,7 @@ export default function DashboardLayout({ children }) {
                             isActive={active}
                             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                               active
-                                ? 'bg-saffron text-white font-semibold shadow-sm'
+                                ? 'bg-[#FF6B00] text-white font-semibold shadow-sm'
                                 : 'text-stone-300 hover:bg-stone-800 hover:text-white'
                             }`}
                           >
@@ -164,16 +165,16 @@ export default function DashboardLayout({ children }) {
             ))}
           </SidebarContent>
 
-          <SidebarFooter className="p-3 border-t border-stone-800 mt-auto">
+          <SidebarFooter className="p-3 border-t border-stone-800 bg-stone-950 mt-auto">
             <div className="flex flex-col gap-2">
-              <div className="px-3 py-2 bg-stone-950/60 rounded-lg border border-stone-800/80 flex items-center justify-between">
+              <div className="px-3 py-2 bg-stone-900 rounded-lg border border-stone-800 flex items-center justify-between">
                 <div className="min-w-0 pr-2">
                   <p className="text-xs font-semibold text-white truncate">{displayName}</p>
                   <p className="text-[10px] text-stone-400 truncate">{user?.email}</p>
                 </div>
                 <Badge
                   variant="outline"
-                  className="shrink-0 text-[10px] px-1.5 py-0.2 bg-saffron/10 text-saffron border-saffron/30"
+                  className="shrink-0 text-[10px] px-1.5 py-0.2 bg-[#FF6B00]/10 text-[#FF6B00] border-[#FF6B00]/30 font-medium"
                 >
                   {getRoleLabel(user?.role)}
                 </Badge>
@@ -192,28 +193,29 @@ export default function DashboardLayout({ children }) {
               </Button>
             </div>
           </SidebarFooter>
+          <SidebarRail />
         </Sidebar>
 
-        <SidebarInset className="flex-1 flex flex-col min-w-0 bg-stone-950">
-          <header className="h-14 border-b border-stone-800 bg-stone-900/60 backdrop-blur-sm sticky top-0 z-30 flex items-center justify-between px-4">
+        <SidebarInset className="flex-1 flex flex-col min-w-0 bg-slate-50">
+          <header className="h-14 border-b border-stone-200 bg-white sticky top-0 z-30 flex items-center justify-between px-5 shadow-xs">
             <div className="flex items-center gap-3">
-              <SidebarTrigger className="text-stone-400 hover:text-white" />
-              <Separator orientation="vertical" className="h-5 bg-stone-800" />
-              <span className="text-xs font-mono uppercase tracking-widest text-stone-400">
-                Operations
-              </span>
+              <SidebarTrigger className="text-stone-600 hover:text-stone-900" />
+              <Separator orientation="vertical" className="h-5 bg-stone-200" />
+              <h1 className="text-sm font-semibold text-stone-900 tracking-tight">
+                Operations & Management
+              </h1>
             </div>
             <div className="flex items-center gap-3">
               <Badge
-                variant="outline"
-                className="text-xs bg-stone-900 border-stone-700 text-stone-300 font-mono"
+                variant="secondary"
+                className="text-xs bg-stone-100 border-stone-200 text-stone-700 font-mono font-normal"
               >
                 {getRoleLabel(user?.role)}
               </Badge>
             </div>
           </header>
 
-          <main className="flex-1 p-6 overflow-y-auto">
+          <main className="flex-1 p-6 overflow-y-auto bg-slate-50 text-slate-900">
             {children}
           </main>
         </SidebarInset>

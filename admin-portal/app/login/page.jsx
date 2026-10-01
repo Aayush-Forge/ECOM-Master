@@ -53,28 +53,28 @@ function LoginForm() {
   }
 
   return (
-    <Card className="bg-stone-900 border-stone-800 text-stone-100 shadow-2xl">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-lg font-semibold text-white">Sign In</CardTitle>
-        <CardDescription className="text-stone-400 text-xs">
-          Enter your staff credentials to access your dashboard
+    <Card className="bg-white border-stone-200 text-stone-900 shadow-xl rounded-xl">
+      <CardHeader className="space-y-1 pb-4">
+        <CardTitle className="text-xl font-bold text-stone-900">Sign In</CardTitle>
+        <CardDescription className="text-stone-500 text-xs">
+          Enter your credentials to access operations & catalog management
         </CardDescription>
       </CardHeader>
       <CardContent>
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-950/50 border border-red-800/50 text-red-300 text-xs flex items-start gap-2">
-            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
+            <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-xs text-stone-300 font-medium">
+            <Label htmlFor="email" className="text-xs text-stone-700 font-semibold">
               Work Email
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-2.5 h-4 w-4 text-stone-500" />
+              <Mail className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
               <Input
                 id="email"
                 type="email"
@@ -82,17 +82,17 @@ function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="staff@sridattam.com"
-                className="pl-9 bg-stone-950 border-stone-800 text-white placeholder:text-stone-600 focus-visible:ring-saffron"
+                className="pl-9 bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 focus-visible:ring-[#FF6B00]"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-xs text-stone-300 font-medium">
+            <Label htmlFor="password" className="text-xs text-stone-700 font-semibold">
               Password
             </Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-stone-500" />
+              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
               <Input
                 id="password"
                 type="password"
@@ -100,7 +100,7 @@ function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="••••••••"
-                className="pl-9 bg-stone-950 border-stone-800 text-white placeholder:text-stone-600 focus-visible:ring-saffron"
+                className="pl-9 bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 focus-visible:ring-[#FF6B00]"
               />
             </div>
           </div>
@@ -108,15 +108,15 @@ function LoginForm() {
           <Button
             type="submit"
             disabled={loading}
-            className="w-full bg-saffron hover:bg-saffron/90 text-white font-medium shadow-md transition-colors"
+            className="w-full bg-[#FF6B00] hover:bg-[#e05e00] text-white font-semibold shadow-sm transition-colors py-2"
           >
             {loading ? (
               <>
                 <Loader2 size={16} className="animate-spin mr-2" />
-                Authenticating...
+                Signing in...
               </>
             ) : (
-              'Sign In to Dashboard'
+              'Sign In'
             )}
           </Button>
         </form>
@@ -127,14 +127,14 @@ function LoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <div className="min-h-screen bg-stone-950 flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-saffron/10 text-saffron border border-saffron/20 mb-3 shadow-lg">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/20 mb-3 shadow-sm">
             <Shield size={24} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Sridattam Portal</h1>
-          <p className="text-sm text-stone-400 mt-1">Staff & Management Operations</p>
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900 font-display">SRIDATTAM</h1>
+          <p className="text-xs text-stone-500 font-mono tracking-widest uppercase mt-0.5">Management Portal</p>
         </div>
 
         <Suspense fallback={
@@ -143,8 +143,8 @@ export default function AdminLoginPage() {
           <LoginForm />
         </Suspense>
 
-        <p className="text-center text-xs text-stone-500 mt-6">
-          Authorized personnel only. All access attempts are logged and monitored.
+        <p className="text-center text-xs text-stone-400 mt-6">
+          Authorized personnel only. All access attempts are monitored and logged.
         </p>
       </div>
     </div>
