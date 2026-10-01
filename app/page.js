@@ -41,9 +41,12 @@ function normalizeStoreProduct(p) {
   const compareAt = salePrice !== null ? basePrice : 0
   const inStock = p.stockQuantity !== undefined ? p.stockQuantity > 0 : (p.stock_status === 'instock' || p.stock_status === undefined)
 
+  const isVariable = p.productType === 'variable' || p.type === 'variable'
+
   return {
     ...p,
     id: p.id,
+    type: isVariable ? 'variable' : (p.type || 'simple'),
     name: p.title || p.name || 'Untitled Product',
     slug: p.slug,
     price: currentPrice,
@@ -226,7 +229,7 @@ function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart })
             className="w-full bg-[#6B1024] hover:bg-[#4D0013] text-white border border-[#6B1024] px-2 py-3.5 sm:py-4 rounded-none font-bold uppercase tracking-wider text-[9px] flex items-center justify-center gap-1.5 h-10"
             disabled={!inStock}
           >
-            <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" /> {inStock ? 'Add To Cart' : 'Out of Stock'}
+            <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" /> {inStock ? (isVariable ? 'Select Options' : 'Add To Cart') : 'Out of Stock'}
           </Button>
         </div>
       </div>

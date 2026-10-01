@@ -17,11 +17,14 @@ describe('OrdersService', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       orderStatusHistory: {
         create: jest.fn(),
       },
       $transaction: jest.fn(),
+      $queryRawUnsafe: jest.fn().mockResolvedValue([{ nextval: 1000 }]),
+      $executeRawUnsafe: jest.fn().mockResolvedValue(1),
     };
 
     eventEmitter = {
@@ -77,9 +80,16 @@ describe('OrdersService', () => {
           },
         ]),
       };
-      prismaService.order.create = jest.fn().mockResolvedValue({
-        id: 'ord-123',
-        grandTotal: 300,
+      prismaService.$transaction.mockImplementation(async (cb: any) => {
+        return cb({
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          order: {
+            create: jest.fn().mockResolvedValue({
+              id: 'ord-123',
+              grandTotal: 300,
+            }),
+          },
+        });
       });
 
       const result = await service.createOrder(
@@ -87,7 +97,7 @@ describe('OrdersService', () => {
         'customer-1',
       );
 
-      expect(prismaService.order.create).toHaveBeenCalled();
+      expect(prismaService.$transaction).toHaveBeenCalled();
       expect(result.id).toBe('ord-123');
     });
   });
@@ -224,6 +234,27 @@ describe('OrdersService', () => {
           },
         }),
       );
+    });
+  });
+
+  describe('generateOrderNumber', () => {
+    it('generates order number matching SDOXXXX pattern using PostgreSQL sequence', async () => {
+      prismaService.$queryRawUnsafe.mockResolvedValueOnce([{ nextval: 1000 }]);
+      const num1 = await service.generateOrderNumber();
+      expect(num1).toBe('SDO1000');
+
+      prismaService.$queryRawUnsafe.mockResolvedValueOnce([{ nextval: 1045 }]);
+      const num2 = await service.generateOrderNumber();
+      expect(num2).toBe('SDO1045');
+    });
+
+    it('falls back safely to SDOXXXX pattern when queryRaw fails', async () => {
+      prismaService.$queryRawUnsafe.mockRejectedValue(new Error('DB connection failed'));
+      prismaService.$executeRawUnsafe.mockRejectedValue(new Error('Sequence creation failed'));
+      prismaService.order.count.mockResolvedValue(5);
+
+      const fallbackNum = await service.generateOrderNumber();
+      expect(fallbackNum).toMatch(/^SDO\d{4,}$/);
     });
   });
 });

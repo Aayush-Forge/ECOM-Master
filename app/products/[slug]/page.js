@@ -45,11 +45,19 @@ const getProduct = cache(async (slug) => {
         stock_status: (p.stockQuantity ?? 1) > 0 ? 'instock' : 'outofstock',
       }))
 
+    const attributes = Array.isArray(product.attributes) ? product.attributes : []
+    const variationsData = Array.isArray(product.variationsData) ? product.variationsData : []
+    const isVariable =
+      product.productType === 'variable' ||
+      product.type === 'variable' ||
+      variationsData.length > 0
+
     return {
       ...product,
       id: product.id,
       name: product.title || product.name,
       slug: product.slug,
+      type: isVariable ? 'variable' : 'simple',
       price: currentPrice,
       regular_price: basePrice,
       sale_price: salePrice,
@@ -68,8 +76,8 @@ const getProduct = cache(async (slug) => {
       in_stock: inStock,
       average_rating: '5.00',
       rating_count: 8,
-      attributes: [],
-      variationsData: [],
+      attributes,
+      variationsData,
       related,
     }
   } catch (e) {

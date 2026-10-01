@@ -27,12 +27,17 @@ import { ROLES } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
 import { R2Service } from '../r2/r2.service';
 
+import { ProductsImportExportService } from './products-import-export.service';
+import type { Response } from 'express';
+import { Res } from '@nestjs/common';
+
 @Controller('')
 export class ProductsController {
   private readonly logger = new Logger(ProductsController.name);
 
   constructor(
     private readonly productsService: ProductsService,
+    private readonly productsImportExportService: ProductsImportExportService,
     private readonly r2Service: R2Service,
   ) {}
 
@@ -131,6 +136,37 @@ export class ProductsController {
     }
   }
 
+  @Get('admin/products/export-csv')
+  @Roles(ROLES.EDITOR)
+  async exportCsv(@Res() res: Response) {
+    const csvData = await this.productsImportExportService.exportProductsToCsv();
+    const filename = `products-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(csvData);
+  }
+
+  @Post('admin/products/import-csv')
+  @Roles(ROLES.EDITOR)
+  @UseInterceptors(FileInterceptor('file'))
+  async importCsv(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('updateExisting') updateExisting?: string,
+  ) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('CSV file is required');
+    }
+    const csvContent = file.buffer.toString('utf-8');
+    const shouldUpdate = updateExisting !== 'false';
+    return this.productsImportExportService.importProductsFromCsv(csvContent, shouldUpdate);
+  }
+
+  @Get('admin/products/next-sku')
+  @Roles(ROLES.EDITOR)
+  getNextSku() {
+    return this.productsService.getNextSuggestedSku();
+  }
+
   @Post('admin/create-products')
   @Roles(ROLES.EDITOR)
   create(@Body() createProductDto: CreateProductDto) {
@@ -143,13 +179,23 @@ export class ProductsController {
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
   ) {
-    return this.productsService.findAll(page, perPage);
+    return this.productsService.findAll(page, perPage, false);
   }
 
   @Public()
   @Get('products/:id')
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @Query('admin') admin?: string,
+  ) {
+    const isAdmin = admin === 'true' || admin === '1';
+    return this.productsService.findOne(id, isAdmin);
+  }
+
+  @Get('admin/products/:id')
+  @Roles(ROLES.EDITOR)
+  findOneAdmin(@Param('id') id: string) {
+    return this.productsService.findOne(id, true);
   }
 
   @Patch('admin/update-products/:id')

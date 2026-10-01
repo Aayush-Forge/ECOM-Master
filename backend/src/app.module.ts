@@ -15,6 +15,7 @@ import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { PaymentsModule } from './payments/payments.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -34,6 +35,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ClubbingModule,
     OrdersModule,
     PaymentsModule,
+    NotificationsModule,
     AnalyticsModule,
   ],
   controllers: [AppController],

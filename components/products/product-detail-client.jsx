@@ -180,8 +180,8 @@ export default function ProductDetailClient({ initialProduct }) {
 
   const isVariable = product?.type === 'variable'
 
-  // Variation attributes shown to user (only those flagged variation: true)
-  const variationAttrs = useMemo(() => (product?.attributes || []).filter(a => a.variation), [product])
+  // Variation attributes shown to user (only those not explicitly disabled)
+  const variationAttrs = useMemo(() => (product?.attributes || []).filter(a => a.variation !== false), [product])
 
   // Find matching variation given current selectedAttrs
   const matchedVariation = useMemo(() => {
@@ -189,12 +189,37 @@ export default function ProductDetailClient({ initialProduct }) {
     return product.variationsData.find(v => {
       return variationAttrs.every(va => {
         const sel = selectedAttrs[va.name]
-        const va_match = v.attributes.find(x => x.name === va.name)
-        if (!va_match || !va_match.option) return true // "any"
-        return va_match.option === sel
+        const va_match = (v.attributes || []).find(
+          x => (x.name || '').toLowerCase() === (va.name || '').toLowerCase()
+        )
+        if (!va_match) return true
+        const val = va_match.option ?? va_match.value
+        if (val === undefined || val === null || val === '') return true // "any"
+        return String(val).toLowerCase() === String(sel || '').toLowerCase()
       })
     }) || null
   }, [isVariable, product, variationAttrs, selectedAttrs])
+
+  // Pre-select first available variation by default if none selected
+  useEffect(() => {
+    if (isVariable && Array.isArray(product?.variationsData) && product.variationsData.length > 0) {
+      if (Object.keys(selectedAttrs).length === 0) {
+        const firstValid =
+          product.variationsData.find(v => v.stock_status !== 'outofstock' && Number(v.stock_quantity ?? 1) > 0) ||
+          product.variationsData[0]
+        if (firstValid && Array.isArray(firstValid.attributes)) {
+          const initial = {}
+          firstValid.attributes.forEach(a => {
+            const val = a.option ?? a.value
+            if (a.name && val !== undefined && val !== null) initial[a.name] = val
+          })
+          if (Object.keys(initial).length > 0) {
+            setSelectedAttrs(initial)
+          }
+        }
+      }
+    }
+  }, [isVariable, product, selectedAttrs])
 
   const features = useMemo(() => {
     if (!product?.acf) return []
@@ -245,7 +270,11 @@ export default function ProductDetailClient({ initialProduct }) {
   const stockStatus = isVariable
     ? (matchedVariation?.stock_status || product?.stock_status || 'instock')
     : (product?.stock_status || 'instock')
-  const inStock = stockStatus === 'instock'
+  const inStock = isVariable
+    ? (matchedVariation
+        ? (matchedVariation.stock_status === 'instock' || matchedVariation.stock_status === 'in_stock' || Number(matchedVariation.stock_quantity ?? 1) > 0)
+        : (product?.stock_status === 'instock' || product?.in_stock !== false))
+    : (stockStatus === 'instock' || product?.in_stock !== false)
 
   const handleAdd = (buyNow = false) => {
     if (!product) return
@@ -401,17 +430,28 @@ export default function ProductDetailClient({ initialProduct }) {
                 <div className="flex flex-wrap gap-2">
                   {attr.options.map(opt => {
                     const selected = selectedAttrs[attr.name] === opt
-                    const possible = product.variationsData?.some(v => {
-                      const a = v.attributes.find(x => x.name === attr.name)
-                      if (a?.option && a.option !== opt) return false
-                      if (v.stock_status === 'outofstock') return false
-                      return Object.entries(selectedAttrs).every(([n, val]) => {
-                        if (n === attr.name) return true
-                        const x = v.attributes.find(p => p.name === n)
-                        if (!x?.option) return true
-                        return x.option === val
-                      })
-                    }) ?? true
+                    const possible =
+                      Array.isArray(product.variationsData) && product.variationsData.length > 0
+                        ? product.variationsData.some(v => {
+                            const a = (v.attributes || []).find(
+                              x => (x.name || '').toLowerCase() === (attr.name || '').toLowerCase()
+                            )
+                            const aVal = a?.option ?? a?.value
+                            if (aVal !== undefined && aVal !== null && String(aVal).toLowerCase() !== String(opt).toLowerCase()) {
+                              return false
+                            }
+                            if (v.stock_status === 'outofstock' && Number(v.stock_quantity ?? 0) <= 0) return false
+                            return Object.entries(selectedAttrs).every(([n, val]) => {
+                              if (n.toLowerCase() === attr.name.toLowerCase()) return true
+                              const x = (v.attributes || []).find(
+                                p => (p.name || '').toLowerCase() === n.toLowerCase()
+                              )
+                              const xVal = x?.option ?? x?.value
+                              if (xVal === undefined || xVal === null || xVal === '') return true
+                              return String(xVal).toLowerCase() === String(val || '').toLowerCase()
+                            })
+                          })
+                        : true
                     return (
                       <button
                         key={opt}
@@ -445,13 +485,19 @@ export default function ProductDetailClient({ initialProduct }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Button onClick={() => handleAdd(false)} disabled={added || !inStock || (isVariable && !matchedVariation)}
+              <Button onClick={() => handleAdd(false)} disabled={added || !inStock}
                 className="bg-[#6B1024] hover:bg-[#4D0013] text-white font-bold py-6 text-base shadow-lg shadow-stone-100">
-                {added ? <><Check className="w-4 h-4 mr-2" /> Added</> : <><ShoppingBag className="w-4 h-4 mr-2" /> Add to Cart</>}
+                {added ? (
+                  <><Check className="w-4 h-4 mr-2" /> Added</>
+                ) : (isVariable && !matchedVariation) ? (
+                  'Select Options'
+                ) : (
+                  <><ShoppingBag className="w-4 h-4 mr-2" /> Add to Cart</>
+                )}
               </Button>
-              <Button onClick={() => handleAdd(true)} variant="outline" disabled={!inStock || (isVariable && !matchedVariation)}
+              <Button onClick={() => handleAdd(true)} variant="outline" disabled={!inStock}
                 className="border-[#D7A65B] text-[#6B1024] hover:bg-stone-100 font-bold py-6 text-base bg-white">
-                Buy Now — ₹{(displayPrice * qty).toFixed(0)}
+                {isVariable && !matchedVariation ? 'Select Options' : `Buy Now — ₹${(displayPrice * qty).toFixed(0)}`}
               </Button>
             </div>
 

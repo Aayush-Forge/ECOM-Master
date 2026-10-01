@@ -2,13 +2,27 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getAdminProducts, getAdminProductsSync, deleteProduct, getProductCategories } from '@/lib/api/products-api'
+import { 
+  getAdminProducts, 
+  getAdminProductsSync, 
+  deleteProduct, 
+  getProductCategories,
+  exportProductsCsv,
+  importProductsCsv 
+} from '@/lib/api/products-api'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +34,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Search, FilterX, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, FilterX, RefreshCw, AlertTriangle, Download, Upload, FileText, CheckCircle2 } from 'lucide-react'
 
 export default function ProductsListView({ basePath = '/admin/products' }) {
   const [products, setProducts] = useState(() => getAdminProductsSync())
@@ -30,6 +44,46 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [updateExisting, setUpdateExisting] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await exportProductsCsv()
+      toast.success('Catalog CSV exported successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error(err?.message || 'Failed to export products')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImportSubmit = async (e) => {
+    e.preventDefault()
+    if (!importFile) {
+      toast.error('Please select a CSV file to import')
+      return
+    }
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const result = await importProductsCsv(importFile, updateExisting)
+      setImportResult(result)
+      toast.success(`Import complete: ${result.createdParents} created, ${result.updatedParents} updated`)
+      fetchProducts()
+    } catch (err) {
+      console.error(err)
+      toast.error(err?.message || 'Failed to import CSV')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const fetchProducts = async () => {
     setLoading(true)
@@ -85,11 +139,36 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
         <div>
           <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Products</h2>
         </div>
-        <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs self-start sm:self-center">
-          <Link href={`${basePath}/new`}>
-            <Plus className="h-4 w-4 mr-2" /> Add Product
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={exporting}
+            className="border-stone-300 bg-white text-stone-700 hover:text-stone-900 font-inter text-xs shadow-2xs"
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5 text-stone-500" />
+            {exporting ? 'Exporting...' : 'Export'}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => {
+              setImportFile(null)
+              setImportResult(null)
+              setImportDialogOpen(true)
+            }}
+            className="border-stone-300 bg-white text-stone-700 hover:text-stone-900 font-inter text-xs shadow-2xs"
+          >
+            <Upload className="h-3.5 w-3.5 mr-1.5 text-stone-500" />
+            Import
+          </Button>
+
+          <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs">
+            <Link href={`${basePath}/new`}>
+              <Plus className="h-4 w-4 mr-2" /> Add Product
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Search and Category Filter Bar */}
@@ -195,15 +274,24 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
                   return (
                     <TableRow key={product.id} className="hover:bg-stone-50/50">
                       <TableCell>
-                        <div className="h-10 w-10 rounded-md overflow-hidden bg-stone-100 border border-stone-200 relative shrink-0">
-                          <img
-                            src={product.imageUrl || 'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300'}
-                            alt={product.title}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
+                        <Link href={`${basePath}/${product.id}/edit`} className="block group">
+                          <div className="h-10 w-10 rounded-md overflow-hidden bg-stone-100 border border-stone-200 relative shrink-0 transition-transform group-hover:scale-105">
+                            <img
+                              src={product.imageUrl || 'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300'}
+                              alt={product.title}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        </Link>
                       </TableCell>
-                      <TableCell className="font-semibold text-stone-900 font-inter">{product.title}</TableCell>
+                      <TableCell className="font-semibold text-stone-900 font-inter">
+                        <Link 
+                          href={`${basePath}/${product.id}/edit`}
+                          className="hover:text-[#FF6B00] hover:underline transition-colors"
+                        >
+                          {product.title}
+                        </Link>
+                      </TableCell>
                       <TableCell className="font-mono text-xs text-stone-600">{product.sku}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize font-inter text-xs bg-stone-100 text-stone-800 border-stone-200">
@@ -271,6 +359,104 @@ export default function ProductsListView({ basePath = '/admin/products' }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV Import Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-white border-stone-200 text-stone-900 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl text-stone-900 flex items-center gap-2">
+              <Upload className="h-5 w-5 text-[#FF6B00]" /> Import Products via CSV
+            </DialogTitle>
+          </DialogHeader>
+
+          {!importResult ? (
+            <form onSubmit={handleImportSubmit} className="space-y-4 pt-2">
+              <div className="border-2 border-dashed border-stone-200 rounded-lg p-6 text-center hover:border-stone-400 transition-colors bg-stone-50/50">
+                <FileText className="h-8 w-8 text-stone-400 mx-auto mb-2" />
+                <label className="cursor-pointer block text-xs font-semibold text-stone-800 hover:text-[#FF6B00]">
+                  <span>{importFile ? importFile.name : 'Choose a .csv file from your computer'}</span>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+                <p className="text-[11px] text-stone-500 mt-1 font-inter">
+                  Standard WooCommerce/Shopify CSV format with Parent/Variation rows
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="updateExisting"
+                  checked={updateExisting}
+                  onChange={(e) => setUpdateExisting(e.target.checked)}
+                  className="rounded border-stone-300 text-[#FF6B00] focus:ring-[#FF6B00]"
+                />
+                <label htmlFor="updateExisting" className="text-xs text-stone-700 cursor-pointer font-inter">
+                  Update existing products with matching SKU
+                </label>
+              </div>
+
+              <DialogFooter className="pt-4 border-t border-stone-100 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setImportDialogOpen(false)}
+                  disabled={importing}
+                  className="border-stone-300 text-xs font-inter"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!importFile || importing}
+                  className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter text-xs"
+                >
+                  {importing ? 'Importing...' : 'Upload & Process'}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <div className="space-y-4 pt-2">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-emerald-900 text-xs space-y-1.5 font-inter">
+                <div className="flex items-center gap-1.5 font-semibold text-emerald-800 text-sm">
+                  <CheckCircle2 className="h-4 w-4" /> Import Complete
+                </div>
+                <p>Processed Rows: <span className="font-mono font-medium">{importResult.totalRowsProcessed}</span></p>
+                <p>Created Products: <span className="font-mono font-medium">{importResult.createdParents}</span></p>
+                <p>Updated Products: <span className="font-mono font-medium">{importResult.updatedParents}</span></p>
+                <p>Variations Synced: <span className="font-mono font-medium">{importResult.totalVariations}</span></p>
+              </div>
+
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-xs max-h-36 overflow-y-auto font-inter">
+                  <p className="font-semibold text-amber-800 mb-1">Row Warnings/Errors:</p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {importResult.errors.map((err, i) => (
+                      <li key={i}>Row {err.row}: {err.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <DialogFooter className="pt-2">
+                <Button
+                  onClick={() => {
+                    setImportDialogOpen(false)
+                    setImportResult(null)
+                  }}
+                  className="w-full bg-stone-900 hover:bg-stone-800 text-white font-inter text-xs"
+                >
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

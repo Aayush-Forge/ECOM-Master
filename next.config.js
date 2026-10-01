@@ -21,6 +21,14 @@ const nextConfig = {
         protocol: 'https',
         hostname: '*.hostingersite.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'cdn.example.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.example.com',
+      },
     ],
   },
 

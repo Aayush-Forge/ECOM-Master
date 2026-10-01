@@ -226,16 +226,35 @@ export default function OrderDetailView() {
               <div className="space-y-2 text-sm text-stone-700">
                 <div className="flex justify-between">
                   <span className="text-stone-500">Subtotal</span>
-                  <span className="font-medium text-stone-900">₹{order.subtotal?.toLocaleString('en-IN') || order.total?.toLocaleString('en-IN')}</span>
+                  <span className="font-medium text-stone-900">₹{(order.subtotal ?? order.total ?? 0).toLocaleString('en-IN')}</span>
                 </div>
+                {(order.discountTotal > 0 || order.discount > 0 || order.couponCode) && (
+                  <div className="flex justify-between items-center text-emerald-700">
+                    <span className="flex items-center gap-1.5">
+                      <span>Discount</span>
+                      {order.couponCode && (
+                        <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 bg-emerald-100 text-emerald-800 border-emerald-200">
+                          {order.couponCode}
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="font-medium">-₹{(order.discountTotal || order.discount || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                {order.taxTotal > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-stone-500">Tax</span>
+                    <span className="font-medium text-stone-900">₹{order.taxTotal.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-stone-500">Shipping</span>
-                  <span className="font-medium text-stone-900">₹{(order.shipping || 0).toLocaleString('en-IN')}</span>
+                  <span className="font-medium text-stone-900">₹{(order.shippingTotal ?? order.shipping ?? 0).toLocaleString('en-IN')}</span>
                 </div>
                 <Separator className="my-2" />
                 <div className="flex justify-between font-bold text-base text-stone-900">
-                  <span>Total</span>
-                  <span>₹{order.total?.toLocaleString('en-IN')}</span>
+                  <span>Grand Total</span>
+                  <span>₹{(order.grandTotal ?? order.total ?? 0).toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </CardContent>
@@ -412,47 +431,106 @@ export default function OrderDetailView() {
             </CardContent>
           </Card>
 
-          {/* Payment Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><CreditCard className="h-4 w-4 text-muted-foreground" /> Payment Info</CardTitle>
+          {/* Payment Details & Financial Breakdown */}
+          <Card className="bg-white border-stone-200 shadow-sm">
+            <CardHeader className="pb-3 border-b border-stone-100">
+              <CardTitle className="text-base flex items-center justify-between text-stone-900 font-bold">
+                <span className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-stone-500" /> Payment & Transaction Info
+                </span>
+                <Badge
+                  variant="outline"
+                  className={
+                    (payment?.status || order.paymentStatus || order.status) === 'paid'
+                      ? 'border-emerald-300 text-emerald-800 bg-emerald-50'
+                      : (payment?.status || order.paymentStatus || order.status) === 'refunded'
+                      ? 'border-blue-300 text-blue-800 bg-blue-50'
+                      : 'border-amber-300 text-amber-800 bg-amber-50'
+                  }
+                >
+                  {payment?.status || order.paymentStatus || order.status || 'unknown'}
+                </Badge>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="text-sm space-y-3">
-              {payment ? (
-                <>
+            <CardContent className="text-sm pt-4 space-y-4">
+              {/* Gateway & Transaction Record */}
+              <div className="space-y-2 text-xs">
+                {payment?.id && (
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Payment ID:</span>
-                    <span className="font-medium font-mono text-xs">{payment.id}</span>
+                    <span className="text-stone-500">Payment ID:</span>
+                    <span className="font-mono font-medium text-stone-900">{payment.id}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Method:</span>
-                    <span className="uppercase font-medium">{payment.method}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Status:</span>
-                    <Badge variant="outline" className={
-                      payment.status === 'paid' ? 'border-green-500 text-green-700' :
-                      payment.status === 'refunded' ? 'border-blue-500 text-blue-700' : 'border-amber-500 text-amber-700'
-                    }>
-                      {payment.status}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-muted-foreground">Amount:</span>
-                    <span className="font-medium text-base">₹{payment.amount?.toLocaleString('en-IN')}</span>
-                  </div>
-                </>
-              ) : (
+                )}
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Status:</span>
-                  <Badge variant="outline" className={
-                    order.paymentStatus === 'paid' ? 'border-green-500 text-green-700' :
-                    order.paymentStatus === 'refunded' ? 'border-blue-500 text-blue-700' : 'border-amber-500 text-amber-700'
-                  }>
-                    {order.paymentStatus || 'unknown'}
-                  </Badge>
+                  <span className="text-stone-500">Payment Method:</span>
+                  <span className="uppercase font-medium text-stone-900">
+                    {payment?.method || order.paymentMethod || 'Online / Razorpay'}
+                  </span>
                 </div>
-              )}
+                {payment?.amount !== undefined && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-500">Captured Amount:</span>
+                    <span className="font-mono font-medium text-stone-900">₹{Number(payment.amount).toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+              </div>
+
+              <Separator className="bg-stone-200" />
+
+              {/* Accounting & Invoice Breakdown */}
+              <div className="space-y-2 text-xs">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+                  Billing Breakdown
+                </p>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-600">Original Subtotal:</span>
+                  <span className="font-mono font-medium text-stone-900">
+                    ₹{(order.subtotal ?? order.total ?? 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-600 flex items-center gap-1.5">
+                    <span>Coupon / Discount:</span>
+                    {order.couponCode ? (
+                      <Badge variant="secondary" className="font-mono text-[10px] px-1 py-0 bg-emerald-100 text-emerald-800 border-emerald-200">
+                        {order.couponCode}
+                      </Badge>
+                    ) : null}
+                  </span>
+                  <span className={`font-mono font-medium ${(order.discountTotal || order.discount || 0) > 0 ? 'text-emerald-700' : 'text-stone-500'}`}>
+                    {(order.discountTotal || order.discount || 0) > 0
+                      ? `-₹${(order.discountTotal || order.discount || 0).toLocaleString('en-IN')}`
+                      : '₹0'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-600">Taxes:</span>
+                  <span className="font-mono font-medium text-stone-900">
+                    {order.taxTotal > 0 ? `₹${order.taxTotal.toLocaleString('en-IN')}` : '₹0 (Included)'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-600">Shipping Charges:</span>
+                  <span className="font-mono font-medium text-stone-900">
+                    {(order.shippingTotal ?? order.shipping ?? 0) > 0
+                      ? `₹${(order.shippingTotal ?? order.shipping ?? 0).toLocaleString('en-IN')}`
+                      : 'FREE'}
+                  </span>
+                </div>
+
+                <Separator className="my-2 bg-stone-200" />
+
+                <div className="flex justify-between items-center pt-1 text-sm font-bold text-stone-950">
+                  <span>Grand Total Billed:</span>
+                  <span className="font-mono text-base">
+                    ₹{(order.grandTotal ?? order.total ?? 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

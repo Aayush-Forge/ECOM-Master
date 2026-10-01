@@ -62,6 +62,10 @@ const discountSchema = z
       .default(1),
     applicableCategoryId: z.string().optional(),
     applicableProductIds: z.array(z.string()).default([]),
+    usageLimit: z.preprocess(
+      (val) => (val === '' || val === undefined || val === null ? undefined : Number(val)),
+      z.number().int().min(1, 'Usage limit must be at least 1.').optional(),
+    ),
     startsAt: z.string().optional(),
     endsAt: z.string().optional(),
     isActive: z.boolean().default(true),
@@ -111,6 +115,7 @@ export default function DiscountFormView({ basePath = '/admin/discounts', isEdit
       requiredQuantity: 1,
       applicableCategoryId: 'all',
       applicableProductIds: [],
+      usageLimit: '',
       startsAt: '',
       endsAt: '',
       isActive: true,
@@ -152,6 +157,7 @@ export default function DiscountFormView({ basePath = '/admin/discounts', isEdit
               requiredQuantity: discount.requiredQuantity || 1,
               applicableCategoryId: discount.applicableCategoryId || 'all',
               applicableProductIds: (discount.products || []).map((p) => p.productId),
+              usageLimit: discount.usageLimit != null ? String(discount.usageLimit) : '',
               startsAt: discount.startsAt ? discount.startsAt.slice(0, 10) : '',
               endsAt: discount.endsAt ? discount.endsAt.slice(0, 10) : '',
               isActive: discount.isActive !== undefined ? discount.isActive : true,
@@ -182,6 +188,7 @@ export default function DiscountFormView({ basePath = '/admin/discounts', isEdit
         percentageOff: values.type === 'percentage_off_bundle' ? values.discountValue : undefined,
         applicableCategoryId: values.applicableCategoryId === 'all' ? undefined : values.applicableCategoryId,
         applicableProductIds: values.applicableProductIds || [],
+        usageLimit: values.usageLimit !== undefined && values.usageLimit !== '' ? Number(values.usageLimit) : undefined,
         startsAt: values.startsAt ? `${values.startsAt}T00:00:00.000Z` : undefined,
         endsAt: values.endsAt ? `${values.endsAt}T23:59:59.999Z` : undefined,
         isActive: values.isActive,
@@ -410,30 +417,57 @@ export default function DiscountFormView({ basePath = '/admin/discounts', isEdit
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="requiredQuantity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-semibold text-stone-700">
-                          Minimum required item quantity
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="1"
-                            placeholder="1"
-                            className="w-36 border-stone-300 font-mono"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription className="text-xs text-stone-500">
-                          Number of qualifying items needed in cart to activate this coupon (default is 1 for standard coupons, or 2+ for bundle deals).
-                        </FormDescription>
-                        <FormMessage className="text-xs text-rose-600" />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="requiredQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-semibold text-stone-700">
+                            Minimum item quantity
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              placeholder="1"
+                              className="border-stone-300 font-mono"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs text-stone-500">
+                            Items needed in cart to activate (default 1).
+                          </FormDescription>
+                          <FormMessage className="text-xs text-rose-600" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="usageLimit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-semibold text-stone-700">
+                            User limit / Total usage limit
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              placeholder="Unlimited"
+                              className="border-stone-300 font-mono"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs text-stone-500">
+                            Max users/orders that can avail this discount (leave blank for unlimited).
+                          </FormDescription>
+                          <FormMessage className="text-xs text-rose-600" />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <div className="pt-3 border-t border-stone-100">
                     <FormField

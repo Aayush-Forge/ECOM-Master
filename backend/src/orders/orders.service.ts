@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, ProductType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClubbingService } from '../clubbing/clubbing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -49,7 +49,79 @@ export class OrdersService {
 
     const orderItemsData = dto.items.map((item) => {
       const product = productMap.get(item.productId)!;
-      const unitPrice = Number(product.salePrice ?? product.basePrice);
+      let unitPrice = Number(product.salePrice ?? product.basePrice);
+      let skuSnapshot = product.sku;
+      let titleSnapshot = product.title;
+      let variantId: string | null = null;
+      let attributesSnapshot: any = null;
+
+      const isVariable = product.productType === ProductType.variable;
+
+      if (isVariable) {
+        if (!item.variationId) {
+          throw new BadRequestException(
+            `Variation ID is required for variable product "${product.title}"`,
+          );
+        }
+
+        const variations = Array.isArray(product.variations)
+          ? (product.variations as any[])
+          : [];
+        const variant = variations.find((v: any) => String(v.id) === String(item.variationId));
+
+        if (!variant || variant.isActive === false) {
+          throw new BadRequestException(
+            `Active variation "${item.variationId}" not found for product "${product.title}"`,
+          );
+        }
+
+        // Unit price comes strictly from the variation's effective price, never the client
+        const regPrice = Number(variant.regularPrice);
+        const salePrice =
+          variant.salePrice !== undefined && variant.salePrice !== null
+            ? Number(variant.salePrice)
+            : null;
+        unitPrice = salePrice !== null && salePrice < regPrice ? salePrice : regPrice;
+
+        skuSnapshot = String(variant.sku);
+        variantId = String(variant.id);
+        attributesSnapshot = variant.attributes || [];
+
+        const attrLabels = (variant.attributes || [])
+          .map((a: any) => a.option || a.value)
+          .filter(Boolean)
+          .join(', ');
+        titleSnapshot = attrLabels ? `${product.title} - ${attrLabels}` : product.title;
+
+        // Stock validation (check only, no decrement)
+        if (
+          variant.stockQuantity !== null &&
+          variant.stockQuantity !== undefined &&
+          item.quantity > variant.stockQuantity
+        ) {
+          throw new BadRequestException(
+            `Insufficient stock for variation "${variant.sku || variant.id}"`,
+          );
+        }
+      } else {
+        // Simple product
+        if (item.variationId) {
+          throw new BadRequestException(
+            `Variation ID cannot be specified for simple product "${product.title}"`,
+          );
+        }
+
+        if (
+          product.stockQuantity !== null &&
+          product.stockQuantity !== undefined &&
+          item.quantity > product.stockQuantity
+        ) {
+          throw new BadRequestException(
+            `Insufficient stock for product "${product.title}"`,
+          );
+        }
+      }
+
       const lineTotal = unitPrice * item.quantity;
       subtotal += lineTotal;
 
@@ -61,8 +133,10 @@ export class OrdersService {
 
       return {
         productId: product.id,
-        titleSnapshot: product.title,
-        skuSnapshot: product.sku,
+        variantId,
+        attributesSnapshot,
+        titleSnapshot,
+        skuSnapshot,
         unitPriceSnapshot: unitPrice,
         quantity: item.quantity,
         lineTotal,
@@ -80,8 +154,28 @@ export class OrdersService {
     const shippingTotal = dto.shippingTotal !== undefined ? Number(dto.shippingTotal) : (subtotal >= 499 || subtotal === 0 ? 0 : 49);
     const grandTotal = Math.max(0, subtotal - discountTotal + shippingTotal);
 
-    const orderNumber = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderNumber = await this.generateOrderNumber();
     const effectiveCustomerId = customerId || dto.customerId || null;
+
+    let orderEmail: string | null = null;
+    if (!effectiveCustomerId) {
+      if (!dto.email || !dto.email.trim()) {
+        throw new BadRequestException('Email is required for guest checkout');
+      }
+      orderEmail = dto.email.trim().toLowerCase();
+    } else {
+      if (dto.email && dto.email.trim()) {
+        orderEmail = dto.email.trim().toLowerCase();
+      } else {
+        const customer = this.prismaService.user
+          ? await this.prismaService.user.findUnique({
+              where: { id: effectiveCustomerId },
+              select: { email: true },
+            })
+          : null;
+        orderEmail = customer?.email?.toLowerCase() || null;
+      }
+    }
 
     const addressCreates: any[] = [];
     if (dto.shippingAddress) {
@@ -112,31 +206,52 @@ export class OrdersService {
       });
     }
 
-    return this.prismaService.order.create({
-      data: {
-        orderNumber,
-        customerId: effectiveCustomerId,
-        status: OrderStatus.payment_pending,
-        subtotal,
-        discountTotal,
-        taxTotal: 0,
-        shippingTotal,
-        grandTotal,
-        couponCode: dto.couponCode || null,
-        items: {
-          create: orderItemsData,
-        },
-        addresses: addressCreates.length > 0 ? { create: addressCreates } : undefined,
-      },
-      include: {
-        items: {
-          include: {
-            product: true,
+    const order = await this.prismaService.$transaction(async (tx) => {
+      if (dto.couponCode && dto.couponCode.trim()) {
+        const trimmedCode = dto.couponCode.trim();
+        const updated = await tx.$executeRaw`
+          UPDATE "clubbing_rules"
+          SET "usage_count" = "usage_count" + 1
+          WHERE LOWER("name") = LOWER(${trimmedCode})
+            AND ("usage_limit" IS NULL OR "usage_count" < "usage_limit")
+            AND "is_active" = true
+        `;
+        if (updated === 0) {
+          throw new BadRequestException('Coupon is invalid or usage limit reached');
+        }
+      }
+
+      return tx.order.create({
+        data: {
+          orderNumber,
+          customerId: effectiveCustomerId,
+          email: orderEmail,
+          status: OrderStatus.payment_pending,
+          subtotal,
+          discountTotal,
+          taxTotal: 0,
+          shippingTotal,
+          grandTotal,
+          couponCode: dto.couponCode || null,
+          items: {
+            create: orderItemsData,
           },
+          addresses: addressCreates.length > 0 ? { create: addressCreates } : undefined,
         },
-        addresses: true,
-      },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          addresses: true,
+        },
+      });
     });
+
+    this.eventEmitter.emit('order.created', { orderId: order.id });
+
+    return order;
   }
 
   async getOrderById(id: string) {
@@ -275,6 +390,14 @@ export class OrdersService {
         },
       });
 
+      if (toStatus === OrderStatus.cancelled && order.couponCode && order.couponCode.trim()) {
+        await tx.$executeRaw`
+          UPDATE "clubbing_rules"
+          SET "usage_count" = GREATEST(0, "usage_count" - 1)
+          WHERE LOWER("name") = LOWER(${order.couponCode.trim()})
+        `;
+      }
+
       return tx.order.update({
         where: { id: orderId },
         data: { status: toStatus },
@@ -303,6 +426,19 @@ export class OrdersService {
       toStatus,
       changedById: userId,
     });
+
+    const statusEventMap: Partial<Record<OrderStatus, string>> = {
+      [OrderStatus.paid]: 'order.paid',
+      [OrderStatus.processing]: 'order.processing',
+      [OrderStatus.shipped]: 'order.shipped',
+      [OrderStatus.delivered]: 'order.delivered',
+      [OrderStatus.cancelled]: 'order.cancelled',
+      [OrderStatus.refunded]: 'order.refunded',
+    };
+    const specificEvent = statusEventMap[toStatus];
+    if (specificEvent) {
+      this.eventEmitter.emit(specificEvent, { orderId });
+    }
 
     return updatedOrder;
   }
@@ -479,6 +615,37 @@ export class OrdersService {
     }
 
     return order;
+  }
+
+  async generateOrderNumber(): Promise<string> {
+    try {
+      const result = await this.prismaService.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
+        `SELECT nextval('order_number_seq') AS nextval`
+      );
+      if (result?.[0]?.nextval != null) {
+        return `SDO${result[0].nextval}`;
+      }
+    } catch {
+      // Sequence may not exist yet or connection issue: ensure sequence exists and retry
+      try {
+        await this.prismaService.$executeRawUnsafe(
+          `CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1000 INCREMENT BY 1;`
+        );
+        const result = await this.prismaService.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
+          `SELECT nextval('order_number_seq') AS nextval`
+        );
+        if (result?.[0]?.nextval != null) {
+          return `SDO${result[0].nextval}`;
+        }
+      } catch (retryError) {
+        console.error('Failed to generate sequence-based order number:', retryError);
+      }
+    }
+
+    // High-availability fallback preserving pattern SDOXXXX
+    const count = await this.prismaService.order.count();
+    const fallbackNumber = 1000 + count + Math.floor(Math.random() * 100);
+    return `SDO${fallbackNumber}`;
   }
 }
 

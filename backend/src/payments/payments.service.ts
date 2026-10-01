@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RazorpayService } from './razorpay.service.js';
@@ -15,6 +16,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly razorpayService: RazorpayService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createSession(orderId: string) {
@@ -171,6 +173,8 @@ export class PaymentsService {
         },
       });
     });
+
+    this.eventEmitter.emit('order.paid', { orderId });
 
     return {
       success: true,

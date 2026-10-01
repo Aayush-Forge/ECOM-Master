@@ -215,11 +215,13 @@ function CheckoutPage() {
 
       const items = displayItems.map(i => ({
         productId: i.product_id || i.productId || i.id,
+        variationId: i.variation_id || i.variationId || undefined,
         quantity: Number(i.quantity || 1),
       }))
 
       const order = await createOrder({
         items,
+        email: form.email ? form.email.trim() : undefined,
         shippingAddress: address,
         billingAddress: address,
         couponCode: appliedCoupon?.name || (couponCode ? couponCode.trim() : undefined),

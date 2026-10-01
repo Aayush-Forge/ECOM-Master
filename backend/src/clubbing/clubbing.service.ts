@@ -151,7 +151,7 @@ export class ClubbingService {
 
   async getActiveRules() {
     const now = new Date();
-    return this.prisma.clubbingRule.findMany({
+    const rules = await this.prisma.clubbingRule.findMany({
       where: {
         isActive: true,
         OR: [
@@ -170,6 +170,10 @@ export class ClubbingService {
         },
       },
     });
+
+    return rules.filter(
+      (rule) => rule.usageLimit == null || rule.usageCount < rule.usageLimit,
+    );
   }
 
   async deleteRule(id: string) {

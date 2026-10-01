@@ -21,9 +21,12 @@ function normalizeStoreProduct(p) {
   const compareAt = salePrice !== null ? basePrice : 0
   const inStock = p.stockQuantity !== undefined ? p.stockQuantity > 0 : (p.stock_status === 'instock' || p.stock_status === undefined)
 
+  const isVariable = p.productType === 'variable' || p.type === 'variable'
+
   return {
     ...p,
     id: p.id,
+    type: isVariable ? 'variable' : (p.type || 'simple'),
     name: p.title || p.name || 'Untitled Product',
     slug: p.slug,
     price: currentPrice,

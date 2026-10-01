@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsEmail,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -17,6 +18,10 @@ export class OrderItemInputDto {
   @IsNumber()
   @Min(1)
   quantity!: number;
+
+  @IsString()
+  @IsOptional()
+  variationId?: string;
 }
 
 export class OrderAddressInputDto {
@@ -57,6 +62,10 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   customerId?: string;
+
+  @IsEmail()
+  @IsOptional()
+  email?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

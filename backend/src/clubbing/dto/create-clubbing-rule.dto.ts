@@ -53,6 +53,11 @@ export class CreateClubbingRuleDto {
   @IsOptional()
   endsAt?: string;
 
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  usageLimit?: number;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

@@ -56,6 +56,11 @@ export class UpdateClubbingRuleDto {
   @IsOptional()
   endsAt?: string | null;
 
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  usageLimit?: number | null;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

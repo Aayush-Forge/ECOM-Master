@@ -15,6 +15,11 @@ enum ProductStatus {
   archived
 }
 
+enum ProductType {
+  simple
+  variable
+}
+
 enum ClubbingRuleType {
   fixed_price_bundle
   percentage_off_bundle
@@ -87,6 +92,10 @@ model Product {
   images           String[]
   customFields     Json          @map("custom_fields")
   stockQuantity    Int           @map("stock_quantity")
+  productType      ProductType   @default(simple) @map("product_type")
+  attributes       Json?
+  variations       Json?
+  version          Int           @default(1)
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
@@ -125,6 +134,8 @@ model ClubbingRule {
   applicableCategoryId String?               @map("applicable_category_id") @db.Uuid
   startsAt             DateTime?             @map("starts_at")
   endsAt               DateTime?             @map("ends_at")
+  usageLimit           Int?                  @map("usage_limit")
+  usageCount           Int                   @default(0) @map("usage_count")
   isActive             Boolean               @default(true) @map("is_active")
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
@@ -191,6 +202,7 @@ model Order {
   shippingTotal Decimal     @map("shipping_total")
   grandTotal    Decimal     @map("grand_total")
   couponCode    String?     @map("coupon_code")
+  email         String?
   currency      String      @default("INR")
   placedAt      DateTime?   @map("placed_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
@@ -215,8 +227,10 @@ model OrderItem {
   titleSnapshot     String  @map("title_snapshot")
   skuSnapshot       String  @map("sku_snapshot")
   unitPriceSnapshot Decimal @map("unit_price_snapshot")
-  quantity          Int
-  lineTotal         Decimal @map("line_total")
+  quantity           Int
+  lineTotal          Decimal  @map("line_total")
+  variantId          String?  @map("variant_id")
+  attributesSnapshot Json?    @map("attributes_snapshot")
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -347,12 +361,15 @@ model EmailTemplate {
 }
 
 model NotificationLog {
-  id          String             @id @default(uuid()) @db.Uuid
-  orderId     String?            @map("order_id") @db.Uuid
-  userId      String?            @map("user_id") @db.Uuid
-  templateKey String             @map("template_key")
-  sentAt      DateTime           @default(now()) @map("sent_at")
-  status      NotificationStatus
+  id             String             @id @default(uuid()) @db.Uuid
+  idempotencyKey String             @unique @map("idempotency_key")
+  orderId        String?            @map("order_id") @db.Uuid
+  userId         String?            @map("user_id") @db.Uuid
+  recipient      String?
+  templateKey    String             @map("template_key")
+  sentAt         DateTime           @default(now()) @map("sent_at")
+  status         NotificationStatus
+  error          String?
 
   order Order? @relation(fields: [orderId], references: [id])
   user  User?  @relation(fields: [userId], references: [id])

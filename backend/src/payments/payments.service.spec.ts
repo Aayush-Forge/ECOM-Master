@@ -8,14 +8,20 @@ import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaymentsService } from './payments.service.js';
 import { RazorpayService } from './razorpay.service.js';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RAZORPAY_CONFIG } from './razorpay.config.js';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
   let razorpayService: RazorpayService;
   let prismaService: any;
+  let eventEmitter: any;
 
   beforeEach(async () => {
+    eventEmitter = {
+      emit: jest.fn(),
+    };
+
     prismaService = {
       order: {
         findUnique: jest.fn(),
@@ -41,6 +47,7 @@ describe('PaymentsService', () => {
         PaymentsService,
         { provide: PrismaService, useValue: prismaService },
         { provide: RazorpayService, useValue: mockRazorpayService },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 

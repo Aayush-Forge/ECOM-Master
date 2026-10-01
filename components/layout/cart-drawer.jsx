@@ -46,7 +46,7 @@ export default function CartDrawer() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-midnight line-clamp-2">{item.name}</p>
                       {item.attrs?.length > 0 && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{item.attrs.map(a => `${a.name}: ${a.option}`).join(' · ')}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{item.attrs.map(a => `${a.name}: ${a.option || a.value}`).join(' · ')}</p>
                       )}
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center border border-stone-200 rounded-full bg-stone-50">

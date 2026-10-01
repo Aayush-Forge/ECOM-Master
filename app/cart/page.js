@@ -45,7 +45,7 @@ function CartPage() {
                       <div className="flex-1">
                         <Link href={`/products/${item.slug}`} className="font-medium text-midnight hover:text-saffron-600 line-clamp-2">{item.name}</Link>
                         {item.attrs?.length > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1">{item.attrs.map(a => `${a.name}: ${a.option}`).join(' · ')}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{item.attrs.map(a => `${a.name}: ${a.option || a.value}`).join(' · ')}</p>
                         )}
                         <div className="flex flex-wrap items-baseline gap-1.5 mt-1">
                           <span className="text-sm text-muted-foreground">₹{item.price} each</span>

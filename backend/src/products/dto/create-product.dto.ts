@@ -9,13 +9,16 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateNested,
 } from 'class-validator';
-import { ProductStatus } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { ProductStatus, ProductType } from '@prisma/client';
+import { AttributeDto, VariationDto } from './variation.dto';
 
 export class CreateProductDto {
   @IsString()
-  @IsNotEmpty()
-  sku!: string;
+  @IsOptional()
+  sku?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -34,7 +37,8 @@ export class CreateProductDto {
   shortDescription?: string;
 
   @IsNumber()
-  basePrice!: number;
+  @IsOptional()
+  basePrice?: number;
 
   @IsNumber()
   @IsOptional()
@@ -80,4 +84,20 @@ export class CreateProductDto {
   @Min(0)
   @IsOptional()
   stockQuantity?: number;
+
+  @IsEnum(ProductType)
+  @IsOptional()
+  productType?: ProductType;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttributeDto)
+  @IsOptional()
+  attributes?: AttributeDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => VariationDto)
+  @IsOptional()
+  variations?: VariationDto[];
 }

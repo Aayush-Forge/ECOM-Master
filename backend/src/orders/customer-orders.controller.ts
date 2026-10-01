@@ -24,9 +24,25 @@ export class CustomerOrdersController {
   @Public()
   createOrder(
     @Body() dto: CreateOrderDto,
-    @Req() req: { user?: { userId: string } },
+    @Req() req: any,
   ) {
-    return this.ordersService.createOrder(dto, req.user?.userId);
+    let customerId = req.user?.userId || dto.customerId;
+    const authHeader = req.headers?.authorization;
+    if (!customerId && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.slice(7);
+        const payloadPart = token.split('.')[1];
+        if (payloadPart) {
+          const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString('utf8'));
+          if (payload?.sub) {
+            customerId = payload.sub;
+          }
+        }
+      } catch {
+        // Fall back to guest order if token is unparseable
+      }
+    }
+    return this.ordersService.createOrder(dto, customerId);
   }
 
   @Post('track')
