@@ -63,21 +63,8 @@ const createdOrderIds = new Set();
 
 async function cleanup(adminToken) {
   console.log('\n--- Running Guaranteed Cleanup ---');
-  const headers = { Authorization: `Bearer ${adminToken}` };
 
-  for (const prodId of createdProductIds) {
-    try {
-      await fetch(`${BASE_URL}/admin/delete-products/${prodId}`, {
-        method: 'DELETE',
-        headers,
-      });
-      console.log(`Cleaned up test product: ${prodId}`);
-    } catch (e) {
-      console.warn(`Failed to cleanup product ${prodId}:`, e.message);
-    }
-  }
-
-  // Attempt direct DB cleanup for any created test orders if pg is available
+  // Attempt direct DB cleanup for any created test orders first so products can be deleted
   if (createdOrderIds.size > 0) {
     try {
       const { Client } = require('pg');
@@ -94,6 +81,20 @@ async function cleanup(adminToken) {
       await client.end();
     } catch {
       // Non-fatal if order cleanup via direct DB is unavailable
+    }
+  }
+
+  const headers = { Authorization: `Bearer ${adminToken}` };
+
+  for (const prodId of createdProductIds) {
+    try {
+      await fetch(`${BASE_URL}/admin/delete-products/${prodId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      console.log(`Cleaned up test product: ${prodId}`);
+    } catch (e) {
+      console.warn(`Failed to cleanup product ${prodId}:`, e.message);
     }
   }
 }

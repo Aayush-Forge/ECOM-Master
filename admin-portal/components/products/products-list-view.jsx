@@ -43,6 +43,7 @@ export default function ProductsListView({ basePath = '/products' }) {
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('active')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState(null)
@@ -130,7 +131,10 @@ export default function ProductsListView({ basePath = '/products' }) {
       p.categoryDetails?.id === categoryFilter ||
       p.category?.toLowerCase() === categoryFilter.toLowerCase() ||
       p.categoryDetails?.slug?.toLowerCase() === categoryFilter.toLowerCase()
-    return matchesSearch && matchesCategory
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (p.status || 'active').toLowerCase() === statusFilter.toLowerCase()
+    return matchesSearch && matchesCategory && matchesStatus
   })
 
   return (
@@ -195,13 +199,25 @@ export default function ProductsListView({ basePath = '/products' }) {
             ))}
           </SelectContent>
         </Select>
-        {(searchQuery || categoryFilter !== 'all') && (
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-36 bg-white border-stone-200 font-inter text-sm">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent className="bg-white">
+            <SelectItem value="active">Active Only</SelectItem>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="draft">Drafts</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+        {(searchQuery || categoryFilter !== 'all' || statusFilter !== 'active') && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
               setSearchQuery('')
               setCategoryFilter('all')
+              setStatusFilter('active')
             }}
             className="text-stone-500 hover:text-stone-900 font-inter text-xs"
           >
@@ -226,6 +242,7 @@ export default function ProductsListView({ basePath = '/products' }) {
                 <TableHead className="font-semibold text-stone-700">Title</TableHead>
                 <TableHead className="font-semibold text-stone-700">SKU</TableHead>
                 <TableHead className="font-semibold text-stone-700">Category</TableHead>
+                <TableHead className="font-semibold text-stone-700">Status</TableHead>
                 <TableHead className="font-semibold text-stone-700">Stock Status</TableHead>
                 <TableHead className="text-right font-semibold text-stone-700">Price</TableHead>
                 <TableHead className="text-right font-semibold text-stone-700">Actions</TableHead>
@@ -296,6 +313,20 @@ export default function ProductsListView({ basePath = '/products' }) {
                       <TableCell>
                         <Badge variant="outline" className="capitalize font-inter text-xs bg-stone-100 text-stone-800 border-stone-200">
                           {product.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`capitalize font-inter text-xs ${
+                            product.status === 'active'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : product.status === 'draft'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-stone-100 text-stone-600 border-stone-200'
+                          }`}
+                        >
+                          {product.status || 'active'}
                         </Badge>
                       </TableCell>
                       <TableCell>
