@@ -178,8 +178,10 @@ export class ProductsController {
   findAll(
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
+    @Query('admin') admin?: string,
   ) {
-    return this.productsService.findAll(page, perPage, false);
+    const isAdmin = admin === 'true' || admin === '1';
+    return this.productsService.findAll(page, perPage, isAdmin);
   }
 
   @Public()

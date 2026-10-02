@@ -32,16 +32,7 @@ const nextConfig = {
     ],
   },
 
-  webpack(config, { dev }) {
-    if (dev) {
-      config.watchOptions = {
-        poll: 2000,
-        aggregateTimeout: 300,
-        ignored: ['**/node_modules'],
-      };
-    }
-    return config;
-  },
+
 
   async headers() {
     return [

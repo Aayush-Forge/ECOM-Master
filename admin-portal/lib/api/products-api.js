@@ -66,6 +66,7 @@ export function getAdminProductByIdSync(id) {
 
 export async function getAdminProducts(params = {}) {
   const query = new URLSearchParams();
+  query.set('admin', 'true');
   if (params.page) query.set('page', params.page);
   if (params.perPage || params.per_page) {
     query.set('per_page', params.perPage || params.per_page);

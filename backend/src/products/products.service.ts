@@ -455,16 +455,17 @@ export class ProductsService {
   }
 
   async findAll(page = 1, perPage = 20, isAdmin = false) {
+    const whereClause = isAdmin ? {} : { status: ProductStatus.active };
     const [data, total] = await this.prismaService.$transaction([
       this.prismaService.product.findMany({
-        where: { status: ProductStatus.active },
+        where: whereClause,
         include: { category: true },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * perPage,
         take: perPage,
       }),
       this.prismaService.product.count({
-        where: { status: ProductStatus.active },
+        where: whereClause,
       }),
     ]);
     return {
@@ -492,12 +493,23 @@ export class ProductsService {
   }
 
   async remove(id: string) {
+    const existing = await this.prismaService.product.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException('Product not found');
+    }
+
     try {
       return await this.prismaService.product.delete({
         where: { id },
       });
     } catch {
-      throw new NotFoundException('Product not found');
+      // If product is referenced by historical orders, soft-archive instead of failing with 500
+      return await this.prismaService.product.update({
+        where: { id },
+        data: { status: ProductStatus.archived },
+      });
     }
   }
 

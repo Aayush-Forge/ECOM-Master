@@ -30,7 +30,6 @@ export class AuthController {
   }
 
   @Patch('change-password')
-  @Roles(ROLES.CUSTOMER)
   changePassword(
     @Req() req: { user: { userId: string } },
     @Body() body: { currentPassword: string; newPassword: string },
