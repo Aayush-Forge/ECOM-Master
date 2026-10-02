@@ -8,6 +8,14 @@ export function middleware(request) {
     return new NextResponse(null, { status: 404 })
   }
 
+  // Suspended customer auth routes: redirect to guest tracking or homepage
+  if (pathname.startsWith('/account')) {
+    return NextResponse.redirect(new URL('/track-order', request.url))
+  }
+  if (pathname === '/login' || pathname === '/register') {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
   return NextResponse.next()
 }
 

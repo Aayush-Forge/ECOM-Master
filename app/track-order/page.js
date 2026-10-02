@@ -243,7 +243,7 @@ function TrackOrderContent() {
                 <div className="text-sm font-inter">
                   <p className="font-bold text-rose-950">Order Verification Failed</p>
                   <p className="text-rose-700 mt-1 leading-relaxed text-xs">{error}</p>
-                  <div className="mt-3 flex items-center gap-3">
+                  <div className="mt-3">
                     <Button
                       variant="outline"
                       size="sm"
@@ -252,16 +252,6 @@ function TrackOrderContent() {
                     >
                       Try Again
                     </Button>
-                    {isAuthenticated && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                        className="h-8 text-xs text-saffron hover:text-saffron-dark font-semibold p-0"
-                      >
-                        <Link href="/account/orders">View My Orders &rarr;</Link>
-                      </Button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -466,7 +456,7 @@ function TrackOrderContent() {
               </div>
 
               {/* Footer Action */}
-              <div className="mt-8 pt-4 border-t border-stone-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="mt-8 pt-4 border-t border-stone-100 flex items-center justify-start">
                 <Button
                   onClick={handleReset}
                   variant="outline"
@@ -475,19 +465,6 @@ function TrackOrderContent() {
                 >
                   <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Track Another Order
                 </Button>
-
-                {isAuthenticated && (
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
-                    className="text-saffron hover:text-saffron-dark font-inter text-xs font-semibold"
-                  >
-                    <Link href="/account/orders">
-                      View All Orders in Account &rarr;
-                    </Link>
-                  </Button>
-                )}
               </div>
             </div>
           </div>
