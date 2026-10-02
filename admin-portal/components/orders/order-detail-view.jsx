@@ -30,6 +30,9 @@ import { ArrowLeft, Truck, Package, CreditCard, RefreshCw, AlertCircle } from 'l
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 
+const STOREFRONT_URL =
+  process.env.NEXT_PUBLIC_STOREFRONT_URL || 'http://localhost:3000'
+
 export default function OrderDetailView() {
   const { user } = useAuth()
   const params = useParams()
@@ -171,7 +174,7 @@ export default function OrderDetailView() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild className="border-stone-300 text-stone-700 font-inter text-xs">
-            <Link href={`/track-order?orderId=${order.id}`} target="_blank" rel="noopener noreferrer">
+            <Link href={`${STOREFRONT_URL}/track-order?orderId=${order.id}`} target="_blank" rel="noopener noreferrer">
               <Truck className="w-3.5 h-3.5 mr-1 text-stone-500" /> Open Tracking Page
             </Link>
           </Button>
