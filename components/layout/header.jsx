@@ -3,10 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ShoppingBag, Menu, Search, X, ChevronDown, LogIn, User, LogOut } from 'lucide-react'
+import { ShoppingBag, Menu, Search, X, ChevronDown } from 'lucide-react'
 import { useCart } from '@/lib/cart-context'
-import { useAuth } from '@/lib/auth-context'
-import { ROLE_HOME_ROUTES, getRoleLabel } from '@/lib/roles'
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet'
 import CartDrawer from '@/components/layout/cart-drawer'
 import { cn } from '@/lib/utils'
@@ -32,7 +30,6 @@ function Logo() {
 
 export default function Header() {
   const { totalItems, openDrawer } = useCart()
-  const { user, isAuthenticated, logout } = useAuth()
   const [bumping, setBumping] = useState(false)
   const [open, setOpen] = useState(false)
   
@@ -68,8 +65,6 @@ export default function Header() {
       setSearchValue('')
     }
   }
-
-  const dashboardHref = user ? '/account' : '/login'
 
   return (
     <>
@@ -213,34 +208,6 @@ export default function Header() {
                         </Link>
                       </div>
 
-                      {/* Mobile: Login/Dashboard link */}
-                      <div className="border-b border-stone-100 pb-5">
-                        {isAuthenticated ? (
-                          <>
-                            <Link 
-                              href={dashboardHref}
-                              onClick={() => setOpen(false)}
-                              className="block text-base font-body font-medium tracking-[0.2em] uppercase text-midnight hover:text-saffron-600 transition-colors"
-                            >
-                              My Account
-                            </Link>
-                            <button
-                              onClick={() => { logout(); setOpen(false); }}
-                              className="block mt-4 text-sm font-body tracking-[0.12em] text-red-600 hover:text-red-700 transition-colors"
-                            >
-                              Sign Out
-                            </button>
-                          </>
-                        ) : (
-                          <Link 
-                            href="/login"
-                            onClick={() => setOpen(false)}
-                            className="block text-base font-body font-medium tracking-[0.2em] uppercase text-midnight hover:text-saffron-600 transition-colors"
-                          >
-                            Sign In
-                          </Link>
-                        )}
-                      </div>
                     </nav>
 
                     {/* Bottom ritual statement */}
@@ -259,36 +226,8 @@ export default function Header() {
               <Logo />
             </div>
 
-            {/* Column 3: Utility Actions (Login/User, Search & Cart) aligned discreetly right */}
+            {/* Column 3: Utility Actions (Search & Cart) aligned discreetly right */}
             <div className="flex justify-end items-center gap-3 h-full">
-
-              {/* Login / User Button */}
-              {isAuthenticated ? (
-                <div className="hidden md:flex items-center gap-2">
-                  <Link
-                    href={dashboardHref}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:text-saffron hover:border-saffron/30 transition-all text-xs font-medium"
-                  >
-                    <User className="w-3.5 h-3.5" />
-                    <span className="hidden lg:inline max-w-[80px] truncate">{user?.firstName || user?.name || 'Account'}</span>
-                  </Link>
-                  <button
-                    onClick={logout}
-                    className="p-2 rounded-full transition-all hover:bg-stone-100 text-stone-500 hover:text-red-500"
-                    aria-label="Sign out"
-                  >
-                    <LogOut className="w-4 h-4 stroke-[1.5]" />
-                  </button>
-                </div>
-              ) : (
-                <Link
-                  href="/login"
-                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-saffron/10 border border-saffron/20 text-saffron hover:bg-saffron hover:text-white transition-all text-xs font-semibold"
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  Login
-                </Link>
-              )}
 
               {/* Search Toggle */}
               <button
