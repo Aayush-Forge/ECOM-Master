@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { RefundWebhookDto } from './dto/refund-webhook.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -14,5 +15,10 @@ export class OrdersController {
   @Get(':id')
   getOrder(@Param('id') id: string) {
     return this.ordersService.getOrder(id);
+  }
+
+  @Post('webhook/refund')
+  handleRefundWebhook(@Body() dto: RefundWebhookDto) {
+    return this.ordersService.handleRefundWebhook(dto);
   }
 }

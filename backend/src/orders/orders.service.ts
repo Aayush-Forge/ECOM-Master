@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { RefundWebhookDto } from './dto/refund-webhook.dto';
 import { OrderStatus } from '../generated/prisma';
 
 @Injectable()
@@ -24,7 +25,6 @@ export class OrdersService {
     const productMap = new Map(products.map((p) => [p.id, p]));
     let subtotal = 0;
 
-    // Snapshot title, SKU, and unit price into order items
     const orderItemsData = dto.items.map((item) => {
       const product = productMap.get(item.productId)!;
       const unitPrice = Number(product.salePrice ?? product.basePrice);
@@ -66,5 +66,32 @@ export class OrdersService {
     });
     if (!order) throw new NotFoundException('Order not found');
     return order;
+  }
+
+  async handleRefundWebhook(dto: RefundWebhookDto) {
+    if (dto.event !== 'refund.processed') {
+      return { status: 'ignored', message: `Unhandled event type: ${dto.event}` };
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${dto.orderId} not found`);
+    }
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: dto.orderId },
+      data: {
+        status: OrderStatus.refunded,
+      },
+    });
+
+    return {
+      status: 'success',
+      message: `Order ${dto.orderId} updated to refunded status`,
+      order: updatedOrder,
+    };
   }
 }
