@@ -59,6 +59,7 @@ export async function getDiscountById(id) {
 export async function createDiscount(data) {
   const payload = {
     name: data.name,
+    code: data.code !== undefined && data.code !== '' ? data.code : undefined,
     description: data.description || undefined,
     type: data.type,
     requiredQuantity: Number(data.requiredQuantity || 2),
@@ -92,6 +93,7 @@ export async function createDiscount(data) {
 export async function updateDiscount(id, data) {
   const payload = {
     name: data.name,
+    code: data.code !== undefined ? (data.code !== '' && data.code !== null ? data.code : null) : undefined,
     description: data.description !== undefined ? data.description : undefined,
     type: data.type,
     requiredQuantity: data.requiredQuantity !== undefined ? Number(data.requiredQuantity) : undefined,

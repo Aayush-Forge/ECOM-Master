@@ -437,26 +437,41 @@ export default function DiscountsListView({ basePath = '/discounts' }) {
                           />
                         </TableCell>
 
-                        {/* Code */}
+                        {/* Code / Trigger Mode */}
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-1.5 group">
-                            <Link
-                              href={`${basePath}/${discount.id}/edit`}
-                              className="font-mono text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {discount.name}
-                            </Link>
-                            <button
-                              onClick={() => copyToClipboard(discount.name)}
-                              title="Copy coupon code"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-stone-400 hover:text-stone-700"
-                            >
-                              {copiedCode === discount.name ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 group">
+                              <Link
+                                href={`${basePath}/${discount.id}/edit`}
+                                className="font-semibold text-stone-900 hover:text-stone-700 hover:underline text-sm"
+                              >
+                                {discount.name}
+                              </Link>
+                              {discount.code && (
+                                <button
+                                  onClick={() => copyToClipboard(discount.code)}
+                                  title="Copy coupon code"
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-stone-400 hover:text-stone-700"
+                                >
+                                  {copiedCode === discount.code ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
                               )}
-                            </button>
+                            </div>
+                            <div>
+                              {discount.code ? (
+                                <Badge variant="outline" className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 border-blue-200 uppercase">
+                                  Code: {discount.code}
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-[11px] font-medium text-stone-600 bg-stone-100 border-stone-200">
+                                  Automatic
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
 

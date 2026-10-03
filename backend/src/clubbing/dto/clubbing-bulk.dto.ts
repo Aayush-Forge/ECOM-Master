@@ -34,4 +34,8 @@ export class CalculateDiscountDto {
   @ValidateNested({ each: true })
   @Type(() => CartItemDiscountInputDto)
   cartItems!: CartItemDiscountInputDto[];
+
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

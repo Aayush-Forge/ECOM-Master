@@ -20,6 +20,10 @@ export class UpdateClubbingRuleDto {
 
   @IsString()
   @IsOptional()
+  code?: string;
+
+  @IsString()
+  @IsOptional()
   description?: string | null;
 
   @IsEnum(ClubbingRuleType)

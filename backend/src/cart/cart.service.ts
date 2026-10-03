@@ -45,9 +45,9 @@ export class CartService {
     };
   }
 
-  async getCart(cartId: string, cartToken?: string, user?: { userId: string }) {
+  async getCart(cartId: string, cartToken?: string, user?: { userId: string }, couponCode?: string) {
     const cart = await this.validateAccess(cartId, cartToken, user);
-    return this.buildCartResponse(cart);
+    return this.buildCartResponse(cart, couponCode);
   }
 
   async addItem(
@@ -224,7 +224,7 @@ export class CartService {
     return cart;
   }
 
-  private async buildCartResponse(cart: any) {
+  private async buildCartResponse(cart: any, couponCode?: string) {
     const cartItems = Array.isArray(cart.items) ? cart.items : [];
 
     const pricingItemsInput = cartItems.map((ci: any) => ({
@@ -235,7 +235,7 @@ export class CartService {
 
     const pricingResult = await this.pricingService.calculatePricing(
       pricingItemsInput,
-      { throwOnError: false },
+      { throwOnError: false, couponCode },
     );
 
     const computedMap = new Map<string, any>();
@@ -280,6 +280,7 @@ export class CartService {
       shippingTotal: pricingResult.shippingTotal,
       taxTotal: pricingResult.taxTotal,
       grandTotal: pricingResult.grandTotal,
+      appliedCouponCode: pricingResult.appliedCouponCode || null,
       createdAt: cart.createdAt,
       updatedAt: cart.updatedAt,
     };

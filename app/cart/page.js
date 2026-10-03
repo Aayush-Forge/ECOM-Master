@@ -1,12 +1,14 @@
 'use client'
-
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Minus, Plus, Trash2, ShoppingBag, ShieldCheck, Truck, Flame, Sparkles } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingBag, ShieldCheck, Truck, Flame, Sparkles, Tag, Check, X } from 'lucide-react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useCart } from '@/lib/cart-context'
+import { toast } from 'sonner'
 
 function CartPage() {
   const {
@@ -17,10 +19,42 @@ function CartPage() {
     discountTotal,
     shippingTotal,
     grandTotal,
+    appliedCouponCode,
+    applyCoupon,
+    removeCoupon,
     hasIssues,
     hydrated,
     cartKey,
   } = useCart()
+
+  const [inputCode, setInputCode] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState('')
+
+  const handleApply = async () => {
+    if (!inputCode.trim()) return
+    setCouponLoading(true)
+    setCouponError('')
+    try {
+      await applyCoupon(inputCode)
+      toast.success(`Coupon "${inputCode.trim().toUpperCase()}" applied!`)
+      setInputCode('')
+    } catch (err) {
+      const msg = err.message || 'Failed to apply coupon'
+      setCouponError(msg)
+      toast.error(msg)
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const handleRemove = async () => {
+    try {
+      await removeCoupon()
+      toast.info('Coupon removed')
+      setCouponError('')
+    } catch {}
+  }
 
   return (
     <main className="bg-transparent min-h-screen relative z-10">
@@ -127,11 +161,54 @@ function CartPage() {
                       <div>
                         <h2 className="font-display text-xl text-maroon-500 font-bold">Order Summary</h2>
                       </div>
+                      {/* Coupon Code Section */}
+                      <div className="border-t border-b border-stone-200 py-3 my-2">
+                        {!appliedCouponCode ? (
+                          <div className="space-y-1.5">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter coupon code"
+                                value={inputCode}
+                                onChange={(e) => {
+                                  setInputCode(e.target.value.toUpperCase())
+                                  setCouponError('')
+                                }}
+                                className="bg-stone-50 border-stone-200 text-xs h-9 uppercase"
+                              />
+                              <Button
+                                onClick={handleApply}
+                                disabled={couponLoading || !inputCode.trim()}
+                                className="bg-maroon-500 hover:bg-maroon-600 text-white text-xs h-9 px-4 shrink-0"
+                              >
+                                {couponLoading ? '...' : 'Apply'}
+                              </Button>
+                            </div>
+                            {couponError && (
+                              <p className="text-xs text-rose-600 font-medium">{couponError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-center justify-between text-xs text-emerald-800">
+                            <div className="flex items-center gap-1.5">
+                              <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="font-semibold font-mono">{appliedCouponCode}</span>
+                              <span className="text-emerald-600">applied</span>
+                            </div>
+                            <button
+                              onClick={handleRemove}
+                              className="text-rose-600 hover:text-rose-800 text-xs font-semibold p-1 hover:underline"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between"><span>Subtotal</span><span className="font-medium">₹{subtotal.toFixed(0)}</span></div>
                         {discountTotal > 0 && (
                           <div className="flex justify-between text-emerald-600 font-medium">
-                            <span>Bundle & Offers Discount</span>
+                            <span>{appliedCouponCode ? `Coupon (${appliedCouponCode}) & Offers` : 'Bundle & Offers Discount'}</span>
                             <span>-₹{discountTotal.toFixed(0)}</span>
                           </div>
                         )}

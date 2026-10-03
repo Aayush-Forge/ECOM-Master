@@ -47,9 +47,15 @@ const discountSchema = z
     name: z
       .string()
       .trim()
-      .min(1, 'Coupon code / name is required.')
-      .max(50, 'Code cannot exceed 50 characters.')
-      .regex(/^[A-Za-z0-9_-]+$/, 'Coupon code can only contain letters, numbers, hyphens, and underscores.'),
+      .min(1, 'Discount rule name is required.')
+      .max(100, 'Name cannot exceed 100 characters.'),
+    code: z
+      .string()
+      .trim()
+      .max(40, 'Code cannot exceed 40 characters.')
+      .regex(/^[A-Za-z0-9_-]*$/, 'Coupon code can only contain letters, numbers, hyphens, and underscores.')
+      .optional()
+      .or(z.literal('')),
     description: z.string().trim().max(250, 'Description cannot exceed 250 characters.').optional(),
     type: z.enum(['fixed_price_bundle', 'percentage_off_bundle']),
     discountValue: z.coerce
@@ -109,6 +115,7 @@ export default function DiscountFormView({ basePath = '/discounts', isEdit = fal
     mode: 'onChange',
     defaultValues: {
       name: '',
+      code: '',
       description: '',
       type: 'percentage_off_bundle',
       discountValue: '',
@@ -148,6 +155,7 @@ export default function DiscountFormView({ basePath = '/discounts', isEdit = fal
           if (discount) {
             form.reset({
               name: discount.name || '',
+              code: discount.code || '',
               description: discount.description || '',
               type: discount.type || 'percentage_off_bundle',
               discountValue:
@@ -179,8 +187,10 @@ export default function DiscountFormView({ basePath = '/discounts', isEdit = fal
   async function onSubmit(values) {
     setSubmitting(true)
     try {
+      const trimmedCode = values.code ? values.code.toUpperCase().trim() : undefined
       const payload = {
-        name: values.name.toUpperCase().trim(),
+        name: values.name.trim(),
+        code: trimmedCode || undefined,
         description: values.description?.trim() || undefined,
         type: values.type,
         requiredQuantity: Number(values.requiredQuantity || 1),
@@ -196,15 +206,19 @@ export default function DiscountFormView({ basePath = '/discounts', isEdit = fal
 
       if (isEdit) {
         await updateDiscount(discountId, payload)
-        toast.success(`Coupon "${payload.name}" updated successfully`)
+        toast.success(`Discount "${payload.name}" updated successfully`)
       } else {
         await createDiscount(payload)
-        toast.success(`Coupon "${payload.name}" created successfully`)
+        toast.success(`Discount "${payload.name}" created successfully`)
       }
       router.push(basePath)
     } catch (error) {
       console.error(error)
-      toast.error(error?.message || (isEdit ? 'Failed to update coupon' : 'Failed to create coupon'))
+      const errorMsg = error?.message || (isEdit ? 'Failed to update discount' : 'Failed to create discount')
+      toast.error(errorMsg)
+      if (errorMsg.toLowerCase().includes('already in use') || errorMsg.toLowerCase().includes('unique') || errorMsg.toLowerCase().includes('conflict')) {
+        form.setError('code', { message: errorMsg })
+      }
     } finally {
       setSubmitting(false)
     }
@@ -261,30 +275,55 @@ export default function DiscountFormView({ basePath = '/discounts', isEdit = fal
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Main WooCommerce Style Code & Title Banner */}
-          <div className="bg-white p-5 rounded-lg border border-stone-200 shadow-2xs space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-semibold uppercase tracking-wider text-stone-700">
-                    Coupon Code
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g. FESTIVE20, START10, FREESHIP"
-                      className="font-mono text-lg font-bold tracking-wide uppercase bg-stone-50/50 border-stone-300 focus:bg-white"
-                      {...field}
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/\s+/g, ''))}
-                    />
-                  </FormControl>
-                  <FormDescription className="text-xs text-stone-500">
-                    Customers enter this code at checkout to claim the discount.
-                  </FormDescription>
-                  <FormMessage className="text-xs text-rose-600 font-medium" />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold uppercase tracking-wider text-stone-700">
+                      Rule Name / Title
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. Festival Season Bundle 2026"
+                        className="text-sm bg-white border-stone-300"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs text-stone-500">
+                      Internal title for this discount rule.
+                    </FormDescription>
+                    <FormMessage className="text-xs text-rose-600 font-medium" />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold uppercase tracking-wider text-stone-700">
+                      Coupon Code (Optional)
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. FESTIVE20, START10 (leave blank for automatic)"
+                        className="font-mono text-base font-bold tracking-wide uppercase bg-stone-50/50 border-stone-300 focus:bg-white"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs text-stone-500">
+                      Leave blank for an automatic discount. If set, customer must enter this code.
+                    </FormDescription>
+                    <FormMessage className="text-xs text-rose-600 font-medium" />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

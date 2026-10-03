@@ -128,20 +128,26 @@ function CheckoutPage() {
   useEffect(() => {
     if (!displayItems || displayItems.length === 0) {
       setAutoDiscount(0)
+      setCouponDiscount(0)
       return
     }
 
     let active = true
-    calculateCartDiscount(displayItems)
+    const activeCode = appliedCoupon || ''
+    calculateCartDiscount(displayItems, activeCode)
       .then(res => {
         if (active && res && typeof res.discountTotal === 'number') {
-          setAutoDiscount(res.discountTotal)
+          if (activeCode) {
+            setCouponDiscount(res.discountTotal)
+          } else {
+            setAutoDiscount(res.discountTotal)
+          }
         }
       })
       .catch(() => {})
 
     return () => { active = false }
-  }, [displayItems])
+  }, [displayItems, appliedCoupon])
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim()
@@ -150,36 +156,38 @@ function CheckoutPage() {
     setCouponError('')
 
     try {
-      const rules = await getAllDiscounts()
-      const match = (rules || []).find(r =>
-        r.isActive && (r.name?.toLowerCase() === code.toLowerCase() || r.id === code)
-      )
-
-      if (!match) {
-        setCouponError('Invalid or expired coupon code.')
-        toast.error('Invalid or expired coupon code.')
+      const res = await calculateCartDiscount(displayItems, code)
+      if (!res.appliedCouponCode) {
+        setCouponError('Coupon code is not applicable to the items in your order.')
+        toast.error('Coupon code is not applicable.')
         return
       }
 
-      setAppliedCoupon(match)
-      if (match.percentageOff) {
-        setCouponDiscount((displaySubtotal * Number(match.percentageOff)) / 100)
-      } else if (match.fixedPrice) {
-        setCouponDiscount(Math.min(Number(match.fixedPrice), displaySubtotal))
-      } else {
-        setCouponDiscount(0)
-      }
-      toast.success(`Coupon "${match.name}" applied!`)
-    } catch {
-      setCouponError('Could not validate coupon. Please try again.')
-      toast.error('Could not validate coupon.')
+      setAppliedCoupon(res.appliedCouponCode)
+      setCouponDiscount(res.discountTotal)
+      toast.success(`Coupon "${res.appliedCouponCode}" applied!`)
+    } catch (err) {
+      const msg = err.message || 'Invalid or expired coupon code.'
+      setCouponError(msg)
+      toast.error(msg)
     } finally {
       setValidatingCoupon(false)
     }
   }
 
+  const handleRemoveCoupon = async () => {
+    setAppliedCoupon(null)
+    setCouponDiscount(0)
+    setCouponCode('')
+    setCouponError('')
+    try {
+      const res = await calculateCartDiscount(displayItems)
+      setAutoDiscount(res?.discountTotal || 0)
+    } catch {}
+  }
+
   const shippingCharge = (displaySubtotal >= 499 || displaySubtotal === 0) ? 0 : 49
-  const totalDiscount = Math.min(displaySubtotal, Math.max(autoDiscount, couponDiscount))
+  const totalDiscount = Math.min(displaySubtotal, appliedCoupon ? couponDiscount : autoDiscount)
   const finalTotal = Math.max(0, displaySubtotal - totalDiscount + shippingCharge)
 
   useEffect(() => {
@@ -255,7 +263,7 @@ function CheckoutPage() {
         email: form.email ? form.email.trim() : undefined,
         shippingAddress: address,
         billingAddress: address,
-        couponCode: appliedCoupon?.name || (couponCode ? couponCode.trim() : undefined),
+        couponCode: appliedCoupon || (couponCode && couponCode.trim() ? couponCode.trim() : undefined),
         cartId: !isBuyNow && cartId ? cartId : undefined,
         cartToken: !isBuyNow && cartToken ? cartToken : undefined,
       })
@@ -581,15 +589,11 @@ function CheckoutPage() {
                     ) : (
                       <div className="bg-emerald-50/50 border border-emerald-200/60 rounded-xl p-3 flex justify-between items-center text-xs text-emerald-800">
                         <div>
-                          <p className="font-semibold text-emerald-700">Coupon applied: {appliedCoupon.name}</p>
+                          <p className="font-semibold text-emerald-700">Coupon applied: {appliedCoupon}</p>
                           <p className="text-[10px] text-emerald-600">₹{totalDiscount.toFixed(0)} discount applied to order</p>
                         </div>
                         <Button
-                          onClick={() => {
-                            setAppliedCoupon(null)
-                            setCouponDiscount(0)
-                            setCouponCode('')
-                          }}
+                          onClick={handleRemoveCoupon}
                           variant="ghost"
                           className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-1.5 h-auto text-[11px] font-semibold"
                         >

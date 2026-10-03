@@ -649,10 +649,11 @@ export class PaymentsService implements OnModuleInit {
         });
 
         if (payment.order?.couponCode && payment.order.couponCode.trim()) {
+          const targetCode = payment.order.couponCode.trim();
           await tx.$executeRaw`
             UPDATE "clubbing_rules"
             SET "usage_count" = GREATEST(0, "usage_count" - 1)
-            WHERE LOWER("name") = LOWER(${payment.order.couponCode.trim()})
+            WHERE (LOWER("code") = LOWER(${targetCode}) OR LOWER("name") = LOWER(${targetCode}))
           `;
         }
 

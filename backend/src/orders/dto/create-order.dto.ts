@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -80,6 +81,7 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   couponCode?: string;
 
   @IsOptional()

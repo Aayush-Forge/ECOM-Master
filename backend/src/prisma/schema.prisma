@@ -131,6 +131,7 @@ model ClubbingRule {
   name                 String
   description          String?
   type                 ClubbingRuleType
+  code                 String?               @unique
   requiredQuantity     Int                   @map("required_quantity")
   fixedPrice           Decimal?              @map("fixed_price") @db.Decimal(10, 2)
   percentageOff        Decimal?              @map("percentage_off") @db.Decimal(5, 2)

@@ -79,7 +79,10 @@ export class ClubbingController {
   @Post('calculate')
   @Public()
   calculateDiscount(@Body() body: CalculateDiscountDto) {
-    return this.clubbingService.calculateCartDiscount(body.cartItems || []);
+    return this.clubbingService.calculateCartDiscount(
+      body.cartItems || [],
+      body.couponCode,
+    );
   }
 }
 

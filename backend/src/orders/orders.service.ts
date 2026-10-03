@@ -45,7 +45,7 @@ export class OrdersService {
         variationId: item.variationId || null,
         quantity: item.quantity,
       })),
-      { throwOnError: true },
+      { throwOnError: true, couponCode: dto.couponCode },
     );
 
     const orderItemsData = pricing.items.map((item) => ({
@@ -149,12 +149,12 @@ export class OrdersService {
         });
       }
 
-      if (dto.couponCode && dto.couponCode.trim()) {
-        const trimmedCode = dto.couponCode.trim();
+      if (pricing.appliedCouponCode || (dto.couponCode && dto.couponCode.trim())) {
+        const targetCode = (pricing.appliedCouponCode || dto.couponCode)!.trim();
         const updated = await tx.$executeRaw`
           UPDATE "clubbing_rules"
           SET "usage_count" = "usage_count" + 1
-          WHERE LOWER("name") = LOWER(${trimmedCode})
+          WHERE (LOWER("code") = LOWER(${targetCode}) OR LOWER("name") = LOWER(${targetCode}))
             AND ("usage_limit" IS NULL OR "usage_count" < "usage_limit")
             AND "is_active" = true
         `;
@@ -363,10 +363,11 @@ export class OrdersService {
       });
 
       if (toStatus === OrderStatus.cancelled && order.couponCode && order.couponCode.trim()) {
+        const targetCode = order.couponCode.trim();
         await tx.$executeRaw`
           UPDATE "clubbing_rules"
           SET "usage_count" = GREATEST(0, "usage_count" - 1)
-          WHERE LOWER("name") = LOWER(${order.couponCode.trim()})
+          WHERE (LOWER("code") = LOWER(${targetCode}) OR LOWER("name") = LOWER(${targetCode}))
         `;
       }
 

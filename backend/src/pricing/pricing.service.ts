@@ -42,10 +42,13 @@ export interface PricingCalculationResult {
   shippingTotal: number;
   taxTotal: number;
   grandTotal: number;
+  appliedCouponCode?: string | null;
+  appliedRuleId?: string | null;
 }
 
 export interface PricingCalculationOptions {
   throwOnError?: boolean;
+  couponCode?: string | null;
 }
 
 @Injectable()
@@ -266,10 +269,21 @@ export class PricingService {
     }
 
     let discountTotal = 0;
+    let appliedCouponCode: string | null = null;
+    let appliedRuleId: string | null = null;
+
     try {
-      const discountRes = await this.clubbingService.calculateCartDiscount(discountInputItems);
+      const discountRes = await this.clubbingService.calculateCartDiscount(
+        discountInputItems,
+        options.couponCode || undefined,
+      );
       discountTotal = Number(discountRes?.discountTotal || 0);
-    } catch {
+      appliedCouponCode = discountRes?.appliedCouponCode || null;
+      appliedRuleId = discountRes?.appliedRuleId || null;
+    } catch (err) {
+      if (throwOnError) {
+        throw err;
+      }
       discountTotal = 0;
     }
 
@@ -284,6 +298,8 @@ export class PricingService {
       shippingTotal,
       taxTotal,
       grandTotal,
+      appliedCouponCode,
+      appliedRuleId,
     };
   }
 }

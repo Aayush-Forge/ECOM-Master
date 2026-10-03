@@ -19,6 +19,10 @@ export class CreateClubbingRuleDto {
 
   @IsString()
   @IsOptional()
+  code?: string;
+
+  @IsString()
+  @IsOptional()
   description?: string;
 
   @IsEnum(ClubbingRuleType)

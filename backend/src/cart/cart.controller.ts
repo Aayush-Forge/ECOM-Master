@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -33,9 +34,10 @@ export class CartController {
   getCart(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Headers('x-cart-token') cartToken?: string,
+    @Query('couponCode') couponCode?: string,
     @Req() req?: any,
   ) {
-    return this.cartService.getCart(id, cartToken, req?.user);
+    return this.cartService.getCart(id, cartToken, req?.user, couponCode);
   }
 
   @Post(':id/items')
