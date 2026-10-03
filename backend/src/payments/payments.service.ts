@@ -144,6 +144,12 @@ export class PaymentsService implements OnModuleInit {
       };
     }
 
+    if (order.status !== OrderStatus.payment_pending) {
+      throw new BadRequestException(
+        `Order is in status '${order.status}', expected 'payment_pending'`,
+      );
+    }
+
     if (process.env.NODE_ENV === 'production' && !RAZORPAY_CONFIG.keySecret) {
       throw new ServiceUnavailableException('Payment gateway credentials missing in production');
     }
@@ -196,6 +202,12 @@ export class PaymentsService implements OnModuleInit {
       });
     });
 
+    this.eventEmitter.emit('order.status_changed', {
+      orderId,
+      fromStatus: order.status,
+      toStatus: OrderStatus.paid,
+      changedBySystem: 'Razorpay Verification',
+    });
     this.eventEmitter.emit('order.paid', { orderId });
 
     return {
@@ -370,6 +382,26 @@ export class PaymentsService implements OnModuleInit {
       return;
     }
 
+    if (paymentEntity?.amount !== undefined) {
+      const expectedAmountPaise = Math.round(Number(payment.order.grandTotal) * 100);
+      const receivedAmountPaise = Number(paymentEntity.amount);
+      if (receivedAmountPaise !== expectedAmountPaise) {
+        this.logger.error(
+          `Payment amount mismatch for order ${payment.orderId}: expected ${expectedAmountPaise} paise, received ${receivedAmountPaise} paise`,
+        );
+        throw new BadRequestException('Payment amount mismatch');
+      }
+    }
+
+    if (paymentEntity?.currency && payment.order.currency) {
+      if (paymentEntity.currency.toUpperCase() !== payment.order.currency.toUpperCase()) {
+        this.logger.error(
+          `Payment currency mismatch for order ${payment.orderId}: expected ${payment.order.currency}, received ${paymentEntity.currency}`,
+        );
+        throw new BadRequestException('Payment currency mismatch');
+      }
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
@@ -408,6 +440,12 @@ export class PaymentsService implements OnModuleInit {
       });
     });
 
+    this.eventEmitter.emit('order.status_changed', {
+      orderId: payment.orderId,
+      fromStatus: payment.order?.status,
+      toStatus: OrderStatus.paid,
+      changedBySystem: 'Razorpay Webhook',
+    });
     this.eventEmitter.emit('order.paid', { orderId: payment.orderId });
   }
 
@@ -492,6 +530,12 @@ export class PaymentsService implements OnModuleInit {
       });
     });
 
+    this.eventEmitter.emit('order.status_changed', {
+      orderId: payment.orderId,
+      fromStatus: payment.order?.status,
+      toStatus: OrderStatus.refunded,
+      changedBySystem: 'Razorpay Webhook Refund',
+    });
     this.eventEmitter.emit('order.refunded', {
       orderId: payment.orderId,
       refundId: razorpayRefundId,
