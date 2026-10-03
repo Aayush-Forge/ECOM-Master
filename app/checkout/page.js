@@ -4,10 +4,18 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Lock, ChevronLeft, Loader2, ShieldCheck, CreditCard } from 'lucide-react'
+import { Lock, ChevronLeft, Loader2, ShieldCheck, CreditCard, Smartphone, CheckCircle2 } from 'lucide-react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -47,6 +55,9 @@ function CheckoutPage() {
   const [initDone, setInitDone] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [stage, setStage] = useState('')
+  const [mockPaymentModal, setMockPaymentModal] = useState(null)
+  const [selectedMethod, setSelectedMethod] = useState('upi')
+  const [mockPaying, setMockPaying] = useState(false)
 
   const [form, setForm] = useState({
     first_name: '',
@@ -225,7 +236,6 @@ function CheckoutPage() {
         shippingAddress: address,
         billingAddress: address,
         couponCode: appliedCoupon?.name || (couponCode ? couponCode.trim() : undefined),
-        shippingTotal: shippingCharge,
       })
 
       if (!order || !order.id) {
@@ -235,24 +245,24 @@ function CheckoutPage() {
         return
       }
 
+      try {
+        sessionStorage.setItem('sd_guest_order_phone', form.phone);
+        sessionStorage.setItem('sd_guest_order_number', order.orderNumber);
+        sessionStorage.setItem('sd_last_order', JSON.stringify({ orderNumber: order.orderNumber, phone: form.phone, orderId: order.id }));
+      } catch {}
+
       setStage('opening')
       const session = await createPaymentSession(order.id)
 
       if (session.isMock || !session.keyId || session.keyId === 'rzp_test_mock') {
-        setStage('verifying')
-        const verified = await verifyPaymentSession({
-          orderId: order.id,
-          razorpayOrderId: session.razorpayOrderId || `order_mock_${Date.now()}`,
-          razorpayPaymentId: `pay_mock_${Date.now()}`,
-          razorpaySignature: 'mock_signature',
+        setSubmitting(false)
+        setStage('')
+        setMockPaymentModal({
+          order,
+          session,
+          amount: Math.round(Number(session.amount || order.grandTotal || finalTotal)),
         })
-        if (verified && verified.success) {
-          if (!isBuyNow) clearCart()
-          else sessionStorage.removeItem('sd_buynow_item')
-          toast.success('Order placed successfully!')
-          router.push(`/order-confirmation?orderId=${order.id}`)
-          return
-        }
+        return
       }
 
       const ok = await loadRazorpayScript()
@@ -293,7 +303,7 @@ function CheckoutPage() {
             }
             if (!isBuyNow) clearCart()
             else sessionStorage.removeItem('sd_buynow_item')
-            router.push(`/order-confirmation?orderId=${order.id}`)
+            router.push(`/order-confirmation?orderId=${order.id}&orderNumber=${order.orderNumber || ''}`)
           } catch (e) {
             console.error(e)
             toast.error('Could not verify payment. Please contact support.')
@@ -323,6 +333,37 @@ function CheckoutPage() {
       setSubmitting(false)
       setStage('')
     }
+  }
+
+  const handleConfirmMockPayment = async () => {
+    if (!mockPaymentModal) return
+    setMockPaying(true)
+    try {
+      const verified = await verifyPaymentSession({
+        orderId: mockPaymentModal.order.id,
+        razorpayOrderId: mockPaymentModal.session.razorpayOrderId || `order_mock_${Date.now()}`,
+        razorpayPaymentId: `pay_mock_${Date.now()}`,
+        razorpaySignature: 'mock_signature',
+      })
+      if (verified && verified.success) {
+        if (!isBuyNow) clearCart()
+        else sessionStorage.removeItem('sd_buynow_item')
+        toast.success('Payment completed successfully!')
+        router.push(`/order-confirmation?orderId=${mockPaymentModal.order.id}&orderNumber=${mockPaymentModal.order.orderNumber || ''}`)
+      } else {
+        toast.error('Payment verification failed.')
+        setMockPaying(false)
+      }
+    } catch (e) {
+      console.error(e)
+      toast.error('Payment processing failed. Please try again.')
+      setMockPaying(false)
+    }
+  }
+
+  const handleCancelMockPayment = () => {
+    toast.info('Payment was cancelled. Your order remains pending.')
+    setMockPaymentModal(null)
   }
 
   if (!hydrated || !initDone || displayItems.length === 0) {
@@ -581,6 +622,102 @@ function CheckoutPage() {
           </div>
         </div>
       </div>
+      {mockPaymentModal && (
+        <Dialog open={true} onOpenChange={(open) => !open && handleCancelMockPayment()}>
+          <DialogContent className="sm:max-w-md bg-white border border-stone-200 shadow-2xl p-6">
+            <DialogHeader>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 uppercase tracking-wide">
+                  Test Gateway
+                </span>
+              </div>
+              <DialogTitle className="text-xl font-display text-maroon-700">
+                Complete Payment
+              </DialogTitle>
+              <DialogDescription className="text-stone-600 text-sm">
+                Choose a payment method to complete order #{mockPaymentModal.order.orderNumber || mockPaymentModal.order.id.slice(0, 8)}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 my-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs uppercase font-medium text-stone-500 tracking-wider">Amount Due</span>
+                <span className="text-2xl font-bold font-display text-maroon-600">
+                  ₹{mockPaymentModal.amount}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 my-2">
+              <label
+                onClick={() => setSelectedMethod('upi')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedMethod === 'upi'
+                    ? 'border-saffron-500 bg-saffron-50/50 shadow-sm'
+                    : 'border-stone-200 hover:border-stone-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${selectedMethod === 'upi' ? 'bg-saffron-500 text-white' : 'bg-stone-100 text-stone-600'}`}>
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-stone-800">UPI / QR Code</p>
+                    <p className="text-xs text-stone-500">Google Pay, PhonePe, Paytm, BHIM</p>
+                  </div>
+                </div>
+                {selectedMethod === 'upi' && <CheckCircle2 className="w-5 h-5 text-saffron-600" />}
+              </label>
+
+              <label
+                onClick={() => setSelectedMethod('card')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedMethod === 'card'
+                    ? 'border-saffron-500 bg-saffron-50/50 shadow-sm'
+                    : 'border-stone-200 hover:border-stone-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${selectedMethod === 'card' ? 'bg-saffron-500 text-white' : 'bg-stone-100 text-stone-600'}`}>
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-stone-800">Credit / Debit Card</p>
+                    <p className="text-xs text-stone-500">Visa, Mastercard, RuPay</p>
+                  </div>
+                </div>
+                {selectedMethod === 'card' && <CheckCircle2 className="w-5 h-5 text-saffron-600" />}
+              </label>
+            </div>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={handleCancelMockPayment}
+                disabled={mockPaying}
+                className="w-full sm:w-auto border-stone-200 text-stone-600 hover:bg-stone-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmMockPayment}
+                disabled={mockPaying}
+                className="w-full sm:flex-1 bg-[#6B1024] hover:bg-[#4D0013] text-white font-semibold py-2.5"
+              >
+                {mockPaying ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Authorizing...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Lock className="w-4 h-4" /> Pay ₹{mockPaymentModal.amount}
+                  </span>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       <Footer />
     </main>
   )

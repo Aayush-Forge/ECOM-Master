@@ -277,9 +277,9 @@ export default function OrderDetailView() {
                   <p className="text-sm font-semibold text-stone-800 mb-2 flex items-center gap-2">
                     Current Status: <Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge>
                   </p>
-                  {!hasRole(user, 'editor') ? (
+                  {!hasRole(user, 'read_only') ? (
                     <div className="p-3 bg-stone-50 border border-stone-200 rounded-md text-xs text-stone-500 font-medium mt-3">
-                      Status updates require editor or administrator privileges.
+                      Status updates require staff privileges.
                     </div>
                   ) : validTransitions.length > 0 ? (
                     <div className="flex items-center gap-3 w-full max-w-sm mt-4">

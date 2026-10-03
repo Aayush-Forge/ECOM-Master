@@ -9,38 +9,75 @@ import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getOrderById } from '@/lib/api/orders'
+import { getOrderById, trackOrder } from '@/lib/api/orders'
 
 function Confirmation() {
   const params = useSearchParams()
   const orderId = params.get('orderId') || params.get('order_id') || params.get('order')
+  const orderNumberParam = params.get('orderNumber') || params.get('order_number')
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
+  const [inputOrderNumber, setInputOrderNumber] = useState(orderNumberParam || '')
+  const [inputPhone, setInputPhone] = useState('')
+  const [submittingLookup, setSubmittingLookup] = useState(false)
+
+  const loadViaTrack = async (orderNum, phoneNum) => {
+    if (!orderNum || !phoneNum) return false
+    try {
+      const data = await trackOrder({ orderNumber: orderNum, phone: phoneNum })
+      if (data) {
+        setOrder(data)
+        setErrorMsg('')
+        try {
+          sessionStorage.setItem('sd_guest_order_number', data.orderNumber || orderNum)
+          sessionStorage.setItem('sd_guest_order_phone', phoneNum)
+        } catch {}
+        return true
+      }
+    } catch (err) {
+      console.error(err)
+      setErrorMsg(err.message || 'Could not find order with provided details')
+    }
+    return false
+  }
 
   useEffect(() => {
-    if (!orderId) {
+    let orderNum = orderNumberParam || ''
+    let phoneNum = ''
+
+    try {
+      const savedNum = sessionStorage.getItem('sd_guest_order_number')
+      const savedPhone = sessionStorage.getItem('sd_guest_order_phone')
+      if (savedNum) orderNum = orderNum || savedNum
+      if (savedPhone) phoneNum = savedPhone
+
+      const rawLast = sessionStorage.getItem('sd_last_order')
+      if (rawLast) {
+        const parsed = JSON.parse(rawLast)
+        if (parsed.orderNumber) orderNum = orderNum || parsed.orderNumber
+        if (parsed.phone) phoneNum = phoneNum || parsed.phone
+      }
+    } catch {}
+
+    if (orderNum && phoneNum) {
+      loadViaTrack(orderNum, phoneNum).finally(() => setLoading(false))
+    } else {
       setLoading(false)
-      setErrorMsg('Order ID missing')
+    }
+  }, [orderNumberParam])
+
+  const handleManualLookup = async (e) => {
+    e.preventDefault()
+    if (!inputOrderNumber.trim() || !inputPhone.trim()) {
+      setErrorMsg('Please enter both Order Number and Phone Number')
       return
     }
-
-    getOrderById(orderId)
-      .then((data) => {
-        if (!data) {
-          setErrorMsg('Order not found')
-        } else {
-          setOrder(data)
-        }
-      })
-      .catch((err) => {
-        console.error(err)
-        setErrorMsg(err.message || 'Could not load order details')
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [orderId])
+    setSubmittingLookup(true)
+    setErrorMsg('')
+    await loadViaTrack(inputOrderNumber.trim(), inputPhone.trim())
+    setSubmittingLookup(false)
+  }
 
   return (
     <main className="bg-transparent min-h-screen relative overflow-hidden z-10">
@@ -152,10 +189,10 @@ function Confirmation() {
                 </div>
               )}
 
-              {order.customer?.email && (
+              {(order.email || order.customer?.email) && (
                 <div className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-stone-50 border border-stone-200">
                   <Mail className="w-4 h-4 text-saffron-600" />
-                  <p className="text-xs text-stone-700">Confirmation email sent to <strong>{order.customer.email}</strong></p>
+                  <p className="text-xs text-stone-700">Confirmation email sent to <strong>{order.email || order.customer.email}</strong></p>
                 </div>
               )}
 
@@ -165,10 +202,50 @@ function Confirmation() {
               </div>
             </div>
           ) : (
-            <div className="bg-white text-midnight rounded-2xl p-8 max-w-md mx-auto border border-stone-200 shadow-sm">
-              <AlertCircle className="w-10 h-10 mx-auto text-amber-600 mb-3" />
-              <p className="font-display text-lg mb-2">Order details unavailable</p>
-              <p className="text-sm text-muted-foreground">{errorMsg || 'We could not load your order details. Please contact support.'}</p>
+            <div className="bg-white text-midnight rounded-2xl p-8 max-w-md mx-auto border border-stone-200 shadow-sm text-left">
+              <div className="text-center mb-5">
+                <AlertCircle className="w-10 h-10 mx-auto text-saffron-600 mb-2" />
+                <h2 className="font-display text-xl text-stone-900">View Order Details</h2>
+                <p className="text-xs text-stone-500 mt-1">Enter your Order Number and Phone Number to display your confirmed order receipt.</p>
+              </div>
+
+              {errorMsg && (
+                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
+                  {errorMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleManualLookup} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">Order Number</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. SDO1001"
+                    value={inputOrderNumber}
+                    onChange={(e) => setInputOrderNumber(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="10-digit phone number"
+                    value={inputPhone}
+                    onChange={(e) => setInputPhone(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={submittingLookup}
+                  className="w-full bg-[#FF6B00] hover:bg-[#e05e00] text-white font-semibold py-2 rounded-lg text-sm mt-2"
+                >
+                  {submittingLookup ? 'Loading...' : 'Find My Order'}
+                </Button>
+              </form>
             </div>
           )}
 
