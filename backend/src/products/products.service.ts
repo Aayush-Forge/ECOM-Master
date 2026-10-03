@@ -540,6 +540,8 @@ export class ProductsService {
       if (validStatuses.includes(filters.status as ProductStatus)) {
         whereConditions.push({ status: filters.status as ProductStatus });
       }
+    } else {
+      whereConditions.push({ status: { not: ProductStatus.archived } });
     }
 
     if (filters?.category && filters.category !== 'all') {
@@ -670,11 +672,26 @@ export class ProductsService {
 
     let result;
     try {
-      result = await this.prismaService.product.delete({
-        where: { id },
+      result = await this.prismaService.$transaction(async (tx) => {
+        // Clean up uncommitted cart items and bundle associations
+        await tx.cartItem.deleteMany({ where: { productId: id } });
+        await tx.clubbingRuleProduct.deleteMany({ where: { productId: id } });
+
+        // Check if product is part of historical order items
+        const orderItemCount = await tx.orderItem.count({ where: { productId: id } });
+        if (orderItemCount > 0) {
+          return tx.product.update({
+            where: { id },
+            data: { status: ProductStatus.archived },
+          });
+        }
+
+        return tx.product.delete({
+          where: { id },
+        });
       });
-    } catch {
-      // If product is referenced by historical orders, soft-archive instead of failing with 500
+    } catch (error: any) {
+      console.error('Failed to hard delete product, soft-archiving:', error);
       result = await this.prismaService.product.update({
         where: { id },
         data: { status: ProductStatus.archived },
