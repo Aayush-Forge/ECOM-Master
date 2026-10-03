@@ -10,6 +10,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ClubbingService } from '../clubbing/clubbing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
+import * as crypto from 'crypto';
+import { CartStatus } from '@prisma/client';
+import { PricingService } from '../pricing/pricing.service';
+
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.payment_pending]: [OrderStatus.paid, OrderStatus.cancelled],
   [OrderStatus.paid]: [OrderStatus.processing, OrderStatus.cancelled],
@@ -27,6 +31,7 @@ export class OrdersService {
     private readonly prismaService: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly clubbingService: ClubbingService,
+    private readonly pricingService: PricingService,
   ) {}
 
   async createOrder(dto: CreateOrderDto, customerId?: string) {
@@ -34,126 +39,55 @@ export class OrdersService {
       throw new BadRequestException('Order must contain at least one item');
     }
 
-    const productIds = dto.items.map((item) => item.productId);
-    const products = await this.prismaService.product.findMany({
-      where: { id: { in: productIds } },
-    });
+    const pricing = await this.pricingService.calculatePricing(
+      dto.items.map((item) => ({
+        productId: item.productId,
+        variationId: item.variationId || null,
+        quantity: item.quantity,
+      })),
+      { throwOnError: true },
+    );
 
-    if (products.length !== productIds.length) {
-      throw new NotFoundException('One or more products were not found');
-    }
+    const orderItemsData = pricing.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variationId,
+      attributesSnapshot: item.attributesSnapshot,
+      titleSnapshot: item.titleSnapshot,
+      skuSnapshot: item.skuSnapshot,
+      unitPriceSnapshot: item.unitPrice,
+      quantity: item.quantity,
+      lineTotal: item.lineTotal,
+    }));
 
-    const productMap = new Map(products.map((p) => [p.id, p]));
-    let subtotal = 0;
+    const subtotal = pricing.subtotal;
+    const discountTotal = pricing.discountTotal;
+    const shippingTotal = pricing.shippingTotal;
+    const grandTotal = pricing.grandTotal;
 
-    const discountInputItems: { productId: string; quantity: number; price: number }[] = [];
-
-    const orderItemsData = dto.items.map((item) => {
-      const product = productMap.get(item.productId)!;
-      let unitPrice = Number(product.salePrice ?? product.basePrice);
-      let skuSnapshot = product.sku;
-      let titleSnapshot = product.title;
-      let variantId: string | null = null;
-      let attributesSnapshot: any = null;
-
-      const isVariable = product.productType === ProductType.variable;
-
-      if (isVariable) {
-        if (!item.variationId) {
-          throw new BadRequestException(
-            `Variation ID is required for variable product "${product.title}"`,
-          );
+    let validCartToConvert: string | null = null;
+    if (dto.cartId && dto.cartToken) {
+      try {
+        const cart = await this.prismaService.cart.findUnique({
+          where: { id: dto.cartId },
+        });
+        if (cart && cart.status === CartStatus.active) {
+          const hashedProvided = crypto
+            .createHash('sha256')
+            .update(dto.cartToken)
+            .digest('hex');
+          const expectedBuf = Buffer.from(cart.sessionToken, 'utf8');
+          const providedBuf = Buffer.from(hashedProvided, 'utf8');
+          if (
+            expectedBuf.length === providedBuf.length &&
+            crypto.timingSafeEqual(expectedBuf, providedBuf)
+          ) {
+            validCartToConvert = cart.id;
+          }
         }
-
-        const variations = Array.isArray(product.variations)
-          ? (product.variations as any[])
-          : [];
-        const variant = variations.find((v: any) => String(v.id) === String(item.variationId));
-
-        if (!variant || variant.isActive === false) {
-          throw new BadRequestException(
-            `Active variation "${item.variationId}" not found for product "${product.title}"`,
-          );
-        }
-
-        // Unit price comes strictly from the variation's effective price, never the client
-        const regPrice = Number(variant.regularPrice);
-        const salePrice =
-          variant.salePrice !== undefined && variant.salePrice !== null
-            ? Number(variant.salePrice)
-            : null;
-        unitPrice = salePrice !== null && salePrice < regPrice ? salePrice : regPrice;
-
-        skuSnapshot = String(variant.sku);
-        variantId = String(variant.id);
-        attributesSnapshot = variant.attributes || [];
-
-        const attrLabels = (variant.attributes || [])
-          .map((a: any) => a.option || a.value)
-          .filter(Boolean)
-          .join(', ');
-        titleSnapshot = attrLabels ? `${product.title} - ${attrLabels}` : product.title;
-
-        // Stock validation (check only, no decrement)
-        if (
-          variant.stockQuantity !== null &&
-          variant.stockQuantity !== undefined &&
-          item.quantity > variant.stockQuantity
-        ) {
-          throw new BadRequestException(
-            `Insufficient stock for variation "${variant.sku || variant.id}"`,
-          );
-        }
-      } else {
-        // Simple product
-        if (item.variationId) {
-          throw new BadRequestException(
-            `Variation ID cannot be specified for simple product "${product.title}"`,
-          );
-        }
-
-        if (
-          product.stockQuantity !== null &&
-          product.stockQuantity !== undefined &&
-          item.quantity > product.stockQuantity
-        ) {
-          throw new BadRequestException(
-            `Insufficient stock for product "${product.title}"`,
-          );
-        }
+      } catch {
+        // An invalid or missing cart token must never block guest checkout (ignore it)
       }
-
-      const lineTotal = unitPrice * item.quantity;
-      subtotal += lineTotal;
-
-      discountInputItems.push({
-        productId: product.id,
-        quantity: item.quantity,
-        price: unitPrice,
-      });
-
-      return {
-        productId: product.id,
-        variantId,
-        attributesSnapshot,
-        titleSnapshot,
-        skuSnapshot,
-        unitPriceSnapshot: unitPrice,
-        quantity: item.quantity,
-        lineTotal,
-      };
-    });
-
-    let discountTotal = 0;
-    try {
-      const discountRes = await this.clubbingService.calculateCartDiscount(discountInputItems);
-      discountTotal = Number(discountRes.discountTotal || 0);
-    } catch {
-      discountTotal = 0;
     }
-
-    const shippingTotal = subtotal >= 499 || subtotal === 0 ? 0 : 49;
-    const grandTotal = Math.max(0, subtotal - discountTotal + shippingTotal);
 
     const orderNumber = await this.generateOrderNumber();
     const effectiveCustomerId = customerId || null;
@@ -208,6 +142,13 @@ export class OrdersService {
     }
 
     const order = await this.prismaService.$transaction(async (tx) => {
+      if (validCartToConvert) {
+        await tx.cart.update({
+          where: { id: validCartToConvert },
+          data: { status: CartStatus.converted },
+        });
+      }
+
       if (dto.couponCode && dto.couponCode.trim()) {
         const trimmedCode = dto.couponCode.trim();
         const updated = await tx.$executeRaw`

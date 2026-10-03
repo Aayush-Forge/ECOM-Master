@@ -17,6 +17,8 @@ import { AddressesModule } from './addresses/addresses.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { PricingModule } from './pricing/pricing.module';
+import { CartModule } from './cart/cart.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -44,6 +46,8 @@ import { RolesGuard } from './auth/guards/roles.guard';
     PaymentsModule,
     NotificationsModule,
     AnalyticsModule,
+    PricingModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [

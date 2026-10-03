@@ -5,6 +5,7 @@ import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClubbingService } from '../clubbing/clubbing.service';
 import { OrdersService } from './orders.service';
+import { PricingService } from '../pricing/pricing.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -34,6 +35,7 @@ describe('OrdersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        PricingService,
         { provide: PrismaService, useValue: prismaService },
         { provide: EventEmitter2, useValue: eventEmitter },
         {

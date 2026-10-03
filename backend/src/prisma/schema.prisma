@@ -180,12 +180,14 @@ model CartItem {
   id                String  @id @default(uuid()) @db.Uuid
   cartId            String  @map("cart_id") @db.Uuid
   productId         String  @map("product_id") @db.Uuid
+  variationId       String? @map("variation_id")
   quantity          Int
   unitPriceSnapshot Decimal @map("unit_price_snapshot")
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 
+  @@unique([cartId, productId, variationId])
   @@index([cartId])
   @@index([productId])
   @@map("cart_items")

@@ -6,8 +6,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuditLogsModule } from '../audit/audit-logs.module';
 import { ClubbingModule } from '../clubbing/clubbing.module';
 
+import { PricingModule } from '../pricing/pricing.module';
+
 @Module({
-  imports: [PrismaModule, AuditLogsModule, ClubbingModule],
+  imports: [PrismaModule, AuditLogsModule, ClubbingModule, PricingModule],
   controllers: [OrdersController, CustomerOrdersController],
   providers: [OrdersService],
   exports: [OrdersService],
