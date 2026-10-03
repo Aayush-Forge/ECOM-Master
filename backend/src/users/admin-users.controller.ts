@@ -8,6 +8,8 @@ import {
   Param,
   Patch,
   Post,
+  Req,
+  UseInterceptors,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from '@prisma/client';
@@ -15,6 +17,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStaffUserDto, UpdateUserRoleDto } from './dto/admin-users.dto';
+import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
+import { AuditLog } from '../audit/decorators/audit-log.decorator';
 
 const USER_SELECT_FIELDS = {
   id: true,
@@ -36,6 +40,7 @@ const USER_SELECT_FIELDS = {
  */
 @Controller('admin/users')
 @Roles(ROLES.ADMIN)
+@UseInterceptors(AuditLogInterceptor)
 export class AdminUsersController {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -55,6 +60,7 @@ export class AdminUsersController {
    * This is the only way to create admin/editor/read_only accounts.
    */
   @Post()
+  @AuditLog('user.created')
   async createUser(
     @Body() body: CreateStaffUserDto,
   ) {
@@ -88,9 +94,11 @@ export class AdminUsersController {
    * PATCH /admin/users/:id/role — Update a user's role.
    */
   @Patch(':id/role')
+  @AuditLog('user.role_changed')
   async updateUserRole(
     @Param('id') id: string,
     @Body() body: UpdateUserRoleDto,
+    @Req() req: any,
   ) {
     const validRoles = Object.values(UserRole) as string[];
     if (!validRoles.includes(body.role)) {
@@ -103,6 +111,8 @@ export class AdminUsersController {
     if (!existingUser) {
       throw new NotFoundException('User not found');
     }
+
+    req.beforeValue = { id: existingUser.id, role: existingUser.role, email: existingUser.email };
 
     return this.prisma.user.update({
       where: { id },

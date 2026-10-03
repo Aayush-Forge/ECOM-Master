@@ -307,6 +307,7 @@ model PaymentWebhookEvent {
   payment         Payment?             @relation(fields: [paymentId], references: [id])
   paymentId       String?              @db.Uuid
 
+  @@index([paymentId])
   @@map("payment_webhook_events")
 }
 
@@ -394,5 +395,6 @@ model AuditLog {
   @@index([userId])
   @@index([actionType])
   @@index([timestamp])
+  @@index([entityType, entityId])
   @@map("audit_logs")
 }

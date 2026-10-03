@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -17,7 +18,7 @@ export class CategoriesService {
         where: { id: createCategoryDto.parentId },
       });
       if (!parent) {
-        throw new NotFoundException('Parent category not found');
+        throw new BadRequestException('Parent category not found');
       }
     }
 
@@ -29,8 +30,11 @@ export class CategoriesService {
           parentId: createCategoryDto.parentId,
         },
       });
-    } catch {
-      throw new ConflictException('Slug already exists');
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException('Slug already exists');
+      }
+      throw error;
     }
   }
 
@@ -53,16 +57,38 @@ export class CategoriesService {
   }
 
   async update(id: string, updateCategoryDto: UpdateCategoryDto) {
-    if (updateCategoryDto.parentId) {
+    if (updateCategoryDto.parentId !== undefined && updateCategoryDto.parentId !== null) {
       if (updateCategoryDto.parentId === id) {
-        throw new ConflictException('A category cannot be its own parent');
+        throw new BadRequestException('A category cannot be its own parent');
       }
 
       const parent = await this.prismaService.category.findUnique({
         where: { id: updateCategoryDto.parentId },
       });
       if (!parent) {
-        throw new NotFoundException('Parent category not found');
+        throw new BadRequestException('Parent category not found');
+      }
+
+      // Walk upward with visited set and depth cap to detect circular reference
+      const visited = new Set<string>([id]);
+      let currentParentId: string | null = parent.parentId;
+      let depth = 0;
+      const MAX_DEPTH = 50;
+
+      while (currentParentId && depth < MAX_DEPTH) {
+        if (visited.has(currentParentId)) {
+          throw new BadRequestException('Circular category parent relationship detected');
+        }
+        visited.add(currentParentId);
+
+        const ancestor = await this.prismaService.category.findUnique({
+          where: { id: currentParentId },
+          select: { parentId: true },
+        });
+
+        if (!ancestor) break;
+        currentParentId = ancestor.parentId;
+        depth++;
       }
     }
 
@@ -75,8 +101,14 @@ export class CategoriesService {
           parentId: updateCategoryDto.parentId,
         },
       });
-    } catch {
-      throw new NotFoundException('Category not found');
+    } catch (error: any) {
+      if (error?.code === 'P2025') {
+        throw new NotFoundException('Category not found');
+      }
+      if (error?.code === 'P2002') {
+        throw new ConflictException('Category slug already exists');
+      }
+      throw error;
     }
   }
 
@@ -85,8 +117,14 @@ export class CategoriesService {
       return await this.prismaService.category.delete({
         where: { id },
       });
-    } catch {
-      throw new NotFoundException('Category not found');
+    } catch (error: any) {
+      if (error?.code === 'P2025') {
+        throw new NotFoundException('Category not found');
+      }
+      if (error?.code === 'P2003') {
+        throw new ConflictException('Cannot delete category with associated products or child categories');
+      }
+      throw error;
     }
   }
 }

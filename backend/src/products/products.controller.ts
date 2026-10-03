@@ -213,13 +213,17 @@ export class ProductsController {
 
   @Patch('admin/update-products/:id')
   @Roles(ROLES.EDITOR)
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productsService.update(id, updateProductDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateProductDto: UpdateProductDto,
+    @Req() req: any,
+  ) {
+    return this.productsService.update(id, updateProductDto, req?.user);
   }
 
   @Delete('admin/delete-products/:id')
   @Roles(ROLES.EDITOR)
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.productsService.remove(id, req?.user);
   }
 }

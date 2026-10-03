@@ -193,7 +193,11 @@ export class ProductsService {
     });
   }
 
-  async update(id: string, updateProductDto: UpdateProductDto) {
+  async update(
+    id: string,
+    updateProductDto: UpdateProductDto,
+    currentUser?: { userId?: string; role?: string },
+  ) {
     if (updateProductDto.categoryId) {
       const category = await this.prismaService.category.findUnique({
         where: { id: updateProductDto.categoryId },
@@ -411,8 +415,8 @@ export class ProductsService {
 
             if (JSON.stringify(beforeSnap) !== JSON.stringify(afterSnap)) {
               await this.auditLogsService.createLog({
-                userId: 'system',
-                userRole: 'admin',
+                userId: currentUser?.userId || 'system',
+                userRole: currentUser?.role || 'admin',
                 actionType: 'PRODUCT_VARIATION_UPDATE',
                 entityType: 'product',
                 entityId: id,
@@ -421,6 +425,39 @@ export class ProductsService {
               });
             }
           }
+        }
+      }
+
+      if (!isVariable && this.auditLogsService) {
+        const priceChanged =
+          (updateProductDto.basePrice !== undefined && Number(updateProductDto.basePrice) !== Number(existing.basePrice)) ||
+          (updateProductDto.salePrice !== undefined && Number(updateProductDto.salePrice) !== Number(existing.salePrice));
+        const stockChanged =
+          updateProductDto.stockQuantity !== undefined && Number(updateProductDto.stockQuantity) !== existing.stockQuantity;
+
+        if (priceChanged || stockChanged) {
+          await this.auditLogsService.createLog({
+            userId: currentUser?.userId || 'system',
+            userRole: currentUser?.role || 'admin',
+            actionType:
+              priceChanged && stockChanged
+                ? 'PRODUCT_PRICE_STOCK_UPDATE'
+                : priceChanged
+                  ? 'PRODUCT_PRICE_UPDATE'
+                  : 'PRODUCT_STOCK_UPDATE',
+            entityType: 'product',
+            entityId: id,
+            beforeValue: {
+              basePrice: existing.basePrice,
+              salePrice: existing.salePrice,
+              stockQuantity: existing.stockQuantity,
+            },
+            afterValue: {
+              basePrice: finalBasePrice,
+              salePrice: updateProductDto.salePrice !== undefined ? updateProductDto.salePrice : existing.salePrice,
+              stockQuantity: finalStockQuantity,
+            },
+          });
         }
       }
 
@@ -498,7 +535,7 @@ export class ProductsService {
     return this.transformProductResponse(product, isAdmin);
   }
 
-  async remove(id: string) {
+  async remove(id: string, currentUser?: { userId?: string; role?: string }) {
     const existing = await this.prismaService.product.findUnique({
       where: { id },
     });
@@ -506,17 +543,38 @@ export class ProductsService {
       throw new NotFoundException('Product not found');
     }
 
+    let result;
     try {
-      return await this.prismaService.product.delete({
+      result = await this.prismaService.product.delete({
         where: { id },
       });
     } catch {
       // If product is referenced by historical orders, soft-archive instead of failing with 500
-      return await this.prismaService.product.update({
+      result = await this.prismaService.product.update({
         where: { id },
         data: { status: ProductStatus.archived },
       });
     }
+
+    if (this.auditLogsService) {
+      await this.auditLogsService.createLog({
+        userId: currentUser?.userId || 'system',
+        userRole: currentUser?.role || 'admin',
+        actionType: 'PRODUCT_DELETE',
+        entityType: 'product',
+        entityId: id,
+        beforeValue: {
+          id: existing.id,
+          title: existing.title,
+          sku: existing.sku,
+          status: existing.status,
+          basePrice: existing.basePrice,
+        },
+        afterValue: null,
+      });
+    }
+
+    return result;
   }
 
   async generateSku(parentSku?: string, variantIndex?: number): Promise<string> {
