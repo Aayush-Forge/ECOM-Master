@@ -519,6 +519,14 @@ export class PaymentsService implements OnModuleInit {
       include: { order: true },
     });
 
+    if (!payment) {
+      await this.prisma.paymentWebhookEvent.update({
+        where: { id: webhookRecordId },
+        data: { status: PaymentWebhookStatus.processed, processedAt: new Date() },
+      });
+      return;
+    }
+
     // If order is already cancelled, don't re-cancel or release coupon again (idempotent)
     if (payment.order?.status === OrderStatus.cancelled) {
       await this.prisma.paymentWebhookEvent.update({

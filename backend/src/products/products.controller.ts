@@ -25,7 +25,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { DeleteProductImageDto } from './dto/delete-product-image.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { ROLES, ROLE_HIERARCHY } from '../auth/roles.constants';
+import { ROLES, ROLE_RANKS } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { R2Service } from '../r2/r2.service';
@@ -186,7 +186,7 @@ export class ProductsController {
     @Query('admin') admin?: string,
   ) {
     const userRole = req?.user?.role;
-    const isEditorOrAbove = userRole && (ROLE_HIERARCHY[userRole as ROLES] >= ROLE_HIERARCHY[ROLES.EDITOR]);
+    const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
     const isAdmin = (admin === 'true' || admin === '1') && Boolean(isEditorOrAbove);
     return this.productsService.findAll(page, perPage, isAdmin);
   }
@@ -200,7 +200,7 @@ export class ProductsController {
     @Query('admin') admin?: string,
   ) {
     const userRole = req?.user?.role;
-    const isEditorOrAbove = userRole && (ROLE_HIERARCHY[userRole as ROLES] >= ROLE_HIERARCHY[ROLES.EDITOR]);
+    const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
     const isAdmin = (admin === 'true' || admin === '1') && Boolean(isEditorOrAbove);
     return this.productsService.findOne(id, isAdmin);
   }
