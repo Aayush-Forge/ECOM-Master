@@ -62,8 +62,9 @@ describe('OrdersController', () => {
     const mockList = { data: [{ id: 'ord_1' }], meta: { total: 1 } };
     ordersService.getAllOrders = jest.fn().mockResolvedValue(mockList);
 
-    const result = await controller.getAllOrders('paid', 1, 20, 'test');
-    expect(ordersService.getAllOrders).toHaveBeenCalledWith('paid', 1, 20, 'test');
+    const query = { status: 'paid', page: 1, per_page: 20, search: 'test' } as any;
+    const result = await controller.getAllOrders(query);
+    expect(ordersService.getAllOrders).toHaveBeenCalledWith('paid', 1, 20, 'test', undefined, undefined);
     expect(result).toBe(mockList);
   });
 });

@@ -77,6 +77,7 @@ describe('OrdersService', () => {
             id: 'p1',
             title: 'Sandalwood Incense',
             sku: 'INC-001',
+            status: 'active',
             basePrice: 200,
             salePrice: 150,
           },
