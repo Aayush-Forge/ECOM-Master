@@ -53,6 +53,11 @@ function normalizeProduct(p) {
       'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300',
     attributes: Array.isArray(p.attributes) ? p.attributes : [],
     variationsData: Array.isArray(p.variationsData) ? p.variationsData : [],
+    metaTitle: p.metaTitle || '',
+    metaDescription: p.metaDescription || '',
+    metaKeywords: p.metaKeywords || '',
+    customFields: p.customFields || {},
+    slug: p.slug || '',
   };
 }
 
@@ -71,6 +76,10 @@ export async function getAdminProducts(params = {}) {
   if (params.perPage || params.per_page) {
     query.set('per_page', params.perPage || params.per_page);
   }
+  if (params.search) query.set('search', params.search);
+  if (params.category && params.category !== 'all') query.set('category', params.category);
+  if (params.status && params.status !== 'all') query.set('status', params.status);
+
   const url = `${BACKEND_URL}/all-products${query.toString() ? `?${query.toString()}` : ''}`;
 
   const res = await fetch(url, {
@@ -87,7 +96,13 @@ export async function getAdminProducts(params = {}) {
 
   const result = await res.json();
   const list = Array.isArray(result) ? result : result.data || [];
-  return list.map(normalizeProduct);
+  const normalized = list.map(normalizeProduct);
+  normalized.meta = result.meta || {
+    page: Number(params.page || 1),
+    per_page: Number(params.perPage || params.per_page || 20),
+    total: normalized.length,
+  };
+  return normalized;
 }
 
 export async function getAdminProductById(id) {
@@ -187,6 +202,9 @@ export async function createProduct(data) {
     status: data.status || 'active',
     productType: isVariable ? 'variable' : 'simple',
     customFields: data.customFields || {},
+    metaTitle: data.metaTitle ? data.metaTitle.trim() : undefined,
+    metaDescription: data.metaDescription ? data.metaDescription.trim() : undefined,
+    metaKeywords: data.metaKeywords ? data.metaKeywords.trim() : undefined,
   };
 
   if (isVariable) {
@@ -267,6 +285,15 @@ export async function updateProduct(id, data) {
   }
   if (data.customFields !== undefined) payload.customFields = data.customFields;
   if (data.productType !== undefined) payload.productType = data.productType;
+  if (data.metaTitle !== undefined) {
+    payload.metaTitle = data.metaTitle ? data.metaTitle.trim() : null;
+  }
+  if (data.metaDescription !== undefined) {
+    payload.metaDescription = data.metaDescription ? data.metaDescription.trim() : null;
+  }
+  if (data.metaKeywords !== undefined) {
+    payload.metaKeywords = data.metaKeywords ? data.metaKeywords.trim() : null;
+  }
 
   if (isVariable) {
     if (data.attributes !== undefined) payload.attributes = data.attributes;

@@ -34,16 +34,23 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Search, FilterX, RefreshCw, AlertTriangle, Download, Upload, FileText, CheckCircle2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, FilterX, RefreshCw, AlertTriangle, Download, Upload, FileText, CheckCircle2, Eye } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
+import { hasRole, ROLES } from '@/lib/roles'
 
 export default function ProductsListView({ basePath = '/products' }) {
+  const { user } = useAuth()
+  const canEdit = hasRole(user, ROLES.EDITOR)
   const [products, setProducts] = useState(() => getAdminProductsSync())
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('active')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [perPage] = useState(20)
+  const [meta, setMeta] = useState({ page: 1, per_page: 20, total: 0 })
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState(null)
@@ -77,7 +84,7 @@ export default function ProductsListView({ basePath = '/products' }) {
       const result = await importProductsCsv(importFile, updateExisting)
       setImportResult(result)
       toast.success(`Import complete: ${result.createdParents} created, ${result.updatedParents} updated`)
-      fetchProducts()
+      fetchProducts(page)
     } catch (err) {
       console.error(err)
       toast.error(err?.message || 'Failed to import CSV')
@@ -86,12 +93,21 @@ export default function ProductsListView({ basePath = '/products' }) {
     }
   }
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (targetPage = page) => {
     setLoading(true)
     setError(null)
     try {
-      const data = await getAdminProducts()
+      const data = await getAdminProducts({
+        page: targetPage,
+        perPage,
+        search: searchQuery.trim() || undefined,
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+      })
       setProducts(data || [])
+      if (data?.meta) {
+        setMeta(data.meta)
+      }
     } catch (err) {
       console.error('Failed to fetch products:', err)
       setError('Failed to load products. Please try again.')
@@ -101,11 +117,18 @@ export default function ProductsListView({ basePath = '/products' }) {
   }
 
   useEffect(() => {
-    fetchProducts()
     getProductCategories()
       .then((cats) => setCategories(cats || []))
       .catch((err) => console.error('Failed to load categories for filter:', err))
   }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts(1)
+      setPage(1)
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [searchQuery, categoryFilter, statusFilter])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -113,29 +136,15 @@ export default function ProductsListView({ basePath = '/products' }) {
       await deleteProduct(deleteTarget.id)
       toast.success(`Product "${deleteTarget.title}" deleted successfully`)
       setDeleteTarget(null)
-      fetchProducts()
+      fetchProducts(page)
     } catch (err) {
       console.error('Failed to delete product:', err)
-      toast.error(`Failed to delete "${deleteTarget.title}"`)
+      const msg = err?.response?.message || err?.message || `Failed to delete "${deleteTarget.title}"`
+      toast.error(msg)
     }
   }
 
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      !searchQuery.trim() ||
-      p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory =
-      categoryFilter === 'all' ||
-      p.categoryId === categoryFilter ||
-      p.categoryDetails?.id === categoryFilter ||
-      p.category?.toLowerCase() === categoryFilter.toLowerCase() ||
-      p.categoryDetails?.slug?.toLowerCase() === categoryFilter.toLowerCase()
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (p.status || 'active').toLowerCase() === statusFilter.toLowerCase()
-    return matchesSearch && matchesCategory && matchesStatus
-  })
+  const filteredProducts = products
 
   return (
     <div className="space-y-6">
@@ -154,24 +163,28 @@ export default function ProductsListView({ basePath = '/products' }) {
             {exporting ? 'Exporting...' : 'Export'}
           </Button>
 
-          <Button
-            variant="outline"
-            onClick={() => {
-              setImportFile(null)
-              setImportResult(null)
-              setImportDialogOpen(true)
-            }}
-            className="border-stone-300 bg-white text-stone-700 hover:text-stone-900 font-inter text-xs shadow-2xs"
-          >
-            <Upload className="h-3.5 w-3.5 mr-1.5 text-stone-500" />
-            Import
-          </Button>
+          {canEdit && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setImportFile(null)
+                  setImportResult(null)
+                  setImportDialogOpen(true)
+                }}
+                className="border-stone-300 bg-white text-stone-700 hover:text-stone-900 font-inter text-xs shadow-2xs"
+              >
+                <Upload className="h-3.5 w-3.5 mr-1.5 text-stone-500" />
+                Import
+              </Button>
 
-          <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs">
-            <Link href={`${basePath}/new`}>
-              <Plus className="h-4 w-4 mr-2" /> Add Product
-            </Link>
-          </Button>
+              <Button asChild className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs">
+                <Link href={`${basePath}/new`}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Product
+                </Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -349,19 +362,22 @@ export default function ProductsListView({ basePath = '/products' }) {
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-stone-600 hover:text-stone-900">
+                          <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-stone-600 hover:text-stone-900" title={canEdit ? 'Edit Product' : 'View Product'}>
                             <Link href={`${basePath}/${product.id}/edit`}>
-                              <Pencil className="h-4 w-4" />
+                              {canEdit ? <Pencil className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Link>
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteTarget(product)}
-                            className="h-8 w-8 text-stone-500 hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteTarget(product)}
+                              className="h-8 w-8 text-stone-500 hover:text-red-600"
+                              title="Delete Product"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -370,6 +386,54 @@ export default function ProductsListView({ basePath = '/products' }) {
               )}
             </TableBody>
           </Table>
+
+          {/* Server Pagination Controls */}
+          {meta.total > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-stone-200 bg-stone-50/50">
+              <p className="text-xs text-stone-500 font-inter">
+                Showing{' '}
+                <span className="font-semibold text-stone-800">
+                  {Math.min((page - 1) * perPage + 1, meta.total)}
+                </span>{' '}
+                to{' '}
+                <span className="font-semibold text-stone-800">
+                  {Math.min(page * perPage, meta.total)}
+                </span>{' '}
+                of <span className="font-semibold text-stone-800">{meta.total}</span> products
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1 || loading}
+                  onClick={() => {
+                    const prev = Math.max(1, page - 1)
+                    setPage(prev)
+                    fetchProducts(prev)
+                  }}
+                  className="h-8 px-3 text-xs border-stone-300 font-inter bg-white"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-stone-600 font-mono px-2">
+                  Page {page} of {Math.max(1, Math.ceil(meta.total / perPage))}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= Math.ceil(meta.total / perPage) || loading}
+                  onClick={() => {
+                    const next = page + 1
+                    setPage(next)
+                    fetchProducts(next)
+                  }}
+                  className="h-8 px-3 text-xs border-stone-300 font-inter bg-white"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

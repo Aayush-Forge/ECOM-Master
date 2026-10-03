@@ -104,4 +104,16 @@ export class UpdateProductDto {
   @IsInt()
   @IsOptional()
   version?: number;
+
+  @IsString()
+  @IsOptional()
+  metaTitle?: string;
+
+  @IsString()
+  @IsOptional()
+  metaDescription?: string;
+
+  @IsString()
+  @IsOptional()
+  metaKeywords?: string;
 }

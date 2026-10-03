@@ -95,6 +95,9 @@ model Product {
   productType      ProductType   @default(simple) @map("product_type")
   attributes       Json?
   variations       Json?
+  metaTitle        String?       @map("meta_title")
+  metaDescription  String?       @map("meta_description")
+  metaKeywords     String?       @map("meta_keywords")
   version          Int           @default(1)
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")

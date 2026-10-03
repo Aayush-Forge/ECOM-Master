@@ -186,13 +186,16 @@ export class ProductsController {
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
     @Query('admin') admin?: string,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+    @Query('status') status?: string,
   ) {
     const userRole = req?.user?.role;
     const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
     const isStaff = userRole && ['admin', 'editor', 'read_only'].includes(userRole);
     const hasAdminQuery = admin === 'true' || admin === '1';
     const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery) || Boolean(isStaff) || hasAdminQuery;
-    return this.productsService.findAll(page, perPage, isAdmin);
+    return this.productsService.findAll(page, perPage, isAdmin, { search, category, status });
   }
 
   @Public()

@@ -184,6 +184,9 @@ export class ProductsService {
             productType: createProductDto.productType ?? ProductType.simple,
             attributes: attributesData ? (attributesData as Prisma.InputJsonValue) : Prisma.JsonNull,
             variations: variationsData ? (variationsData as Prisma.InputJsonValue) : Prisma.JsonNull,
+            metaTitle: createProductDto.metaTitle ? sanitizeRichText(createProductDto.metaTitle) : null,
+            metaDescription: createProductDto.metaDescription ? sanitizeRichText(createProductDto.metaDescription) : null,
+            metaKeywords: createProductDto.metaKeywords ? sanitizeRichText(createProductDto.metaKeywords) : null,
             version: 1,
           },
         });
@@ -491,6 +494,15 @@ export class ProductsService {
       if (updateProductDto.customFields !== undefined) {
         dataToUpdate.customFields = updateProductDto.customFields as Prisma.InputJsonValue;
       }
+      if (updateProductDto.metaTitle !== undefined) {
+        dataToUpdate.metaTitle = updateProductDto.metaTitle ? sanitizeRichText(updateProductDto.metaTitle) : null;
+      }
+      if (updateProductDto.metaDescription !== undefined) {
+        dataToUpdate.metaDescription = updateProductDto.metaDescription ? sanitizeRichText(updateProductDto.metaDescription) : null;
+      }
+      if (updateProductDto.metaKeywords !== undefined) {
+        dataToUpdate.metaKeywords = updateProductDto.metaKeywords ? sanitizeRichText(updateProductDto.metaKeywords) : null;
+      }
 
       const updated = await tx.product.update({
         where: { id },
@@ -503,11 +515,54 @@ export class ProductsService {
     return result;
   }
 
-  async findAll(page = 1, perPage = 20, isAdmin = false) {
+  async findAll(
+    page = 1,
+    perPage = 20,
+    isAdmin = false,
+    filters?: { search?: string; category?: string; status?: string },
+  ) {
+    const whereConditions: any[] = [];
+
+    if (!isAdmin) {
+      whereConditions.push({ status: ProductStatus.active });
+    } else if (filters?.status && filters.status !== 'all') {
+      const validStatuses = Object.values(ProductStatus);
+      if (validStatuses.includes(filters.status as ProductStatus)) {
+        whereConditions.push({ status: filters.status as ProductStatus });
+      }
+    }
+
+    if (filters?.category && filters.category !== 'all') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(filters.category);
+      if (isUuid) {
+        whereConditions.push({ categoryId: filters.category });
+      } else {
+        whereConditions.push({
+          category: {
+            OR: [
+              { slug: filters.category },
+              { name: { contains: filters.category, mode: 'insensitive' } },
+            ],
+          },
+        });
+      }
+    }
+
+    if (filters?.search && filters.search.trim()) {
+      const term = filters.search.trim();
+      whereConditions.push({
+        OR: [
+          { title: { contains: term, mode: 'insensitive' } },
+          { sku: { contains: term, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    const whereClause = whereConditions.length > 0 ? { AND: whereConditions } : {};
+
     if (!isAdmin && this.cacheService) {
-      const cacheKey = `cache:products:list:p${page || 1}:l${perPage || 20}`;
+      const cacheKey = `cache:products:list:p${page || 1}:l${perPage || 20}:s${filters?.search || ''}:c${filters?.category || ''}`;
       return this.cacheService.getOrSet(cacheKey, 300, async () => {
-        const whereClause = { status: ProductStatus.active };
         const [data, total] = await this.prismaService.$transaction([
           this.prismaService.product.findMany({
             where: whereClause,
@@ -527,14 +582,13 @@ export class ProductsService {
       });
     }
 
-    const whereClause = isAdmin ? {} : { status: ProductStatus.active };
     const [data, total] = await this.prismaService.$transaction([
       this.prismaService.product.findMany({
         where: whereClause,
         include: { category: true },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * perPage,
-        take: perPage,
+        skip: ((page || 1) - 1) * (perPage || 20),
+        take: perPage || 20,
       }),
       this.prismaService.product.count({
         where: whereClause,
@@ -542,7 +596,7 @@ export class ProductsService {
     ]);
     return {
       data: data.map((p) => this.transformProductResponse(p, isAdmin)),
-      meta: { page, per_page: perPage, total },
+      meta: { page: page || 1, per_page: perPage || 20, total },
     };
   }
 

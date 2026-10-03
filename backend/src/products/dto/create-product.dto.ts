@@ -100,4 +100,16 @@ export class CreateProductDto {
   @Type(() => VariationDto)
   @IsOptional()
   variations?: VariationDto[];
+
+  @IsString()
+  @IsOptional()
+  metaTitle?: string;
+
+  @IsString()
+  @IsOptional()
+  metaDescription?: string;
+
+  @IsString()
+  @IsOptional()
+  metaKeywords?: string;
 }

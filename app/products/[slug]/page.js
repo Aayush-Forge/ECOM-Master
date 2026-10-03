@@ -102,14 +102,20 @@ export async function generateMetadata({ params }) {
       ? product.description.replace(/<[^>]*>/g, '').trim()
       : ''
 
+  const title = product.metaTitle || `${product.name} | SRIDATTAM — Premium Incense & Fragrance`
+  const description =
+    product.metaDescription ||
+    plainDesc.slice(0, 160) ||
+    'Handcrafted premium incense sticks, natural resins, and essential oils.'
+  const keywords = product.metaKeywords || undefined
+
   return {
-    title: `${product.name} | SRIDATTAM — Premium Incense & Fragrance`,
-    description:
-      plainDesc.slice(0, 160) ||
-      'Handcrafted premium incense sticks, natural resins, and essential oils.',
+    title,
+    description,
+    keywords,
     openGraph: {
-      title: product.name,
-      description: plainDesc.slice(0, 160),
+      title,
+      description,
       type: 'website',
       images: product.images?.[0] ? [{ url: product.images[0].src }] : [],
     },

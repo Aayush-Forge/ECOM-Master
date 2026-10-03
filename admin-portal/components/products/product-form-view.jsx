@@ -37,6 +37,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/lib/auth-context'
+import { hasRole, ROLES } from '@/lib/roles'
 import {
   Form,
   FormControl,
@@ -75,6 +77,7 @@ const productSchema = z
       .trim()
       .min(1, 'Title is required.')
       .max(150, 'Title cannot exceed 150 characters.'),
+    slug: z.string().trim().optional().or(z.literal('')),
     sku: z
       .string()
       .trim()
@@ -112,6 +115,9 @@ const productSchema = z
       )
       .optional()
       .or(z.literal('')),
+    metaTitle: z.string().trim().max(100, 'Meta title cannot exceed 100 characters.').optional().or(z.literal('')),
+    metaDescription: z.string().trim().max(300, 'Meta description cannot exceed 300 characters.').optional().or(z.literal('')),
+    metaKeywords: z.string().trim().max(200, 'Meta keywords cannot exceed 200 characters.').optional().or(z.literal('')),
     weight: optionalNumber('Weight', null),
     length: optionalNumber('Length', null),
     width: optionalNumber('Width', null),
@@ -147,6 +153,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
   const router = useRouter()
   const params = useParams()
   const productId = params?.id
+  const { user } = useAuth()
+  const canEdit = hasRole(user, ROLES.EDITOR)
   const [categories, setCategories] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(isEdit)
@@ -156,6 +164,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
   const [variations, setVariations] = useState([])
   const [productVersion, setProductVersion] = useState(undefined)
   const [loadedCustomFields, setLoadedCustomFields] = useState({})
+  const [customFieldEntries, setCustomFieldEntries] = useState([])
 
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
@@ -177,6 +186,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
     mode: 'onChange',
     defaultValues: {
       title: '',
+      slug: '',
       sku: '',
       price: '',
       salePrice: '',
@@ -186,6 +196,9 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       category: '',
       shortDescription: '',
       description: '',
+      metaTitle: '',
+      metaDescription: '',
+      metaKeywords: '',
       weight: '',
       length: '',
       width: '',
@@ -207,6 +220,11 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
           delete rawCf.attributes
           delete rawCf.variationsData
           setLoadedCustomFields(rawCf)
+          const entries = Object.entries(rawCf).map(([k, v]) => ({
+            key: k,
+            value: typeof v === 'object' ? JSON.stringify(v) : String(v),
+          }))
+          setCustomFieldEntries(entries)
 
           const isVar = product.productType === 'variable' || product.type === 'variable'
           setProductType(isVar ? 'variable' : 'simple')
@@ -259,6 +277,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
 
           form.reset({
             title: product.title || '',
+            slug: product.slug || '',
             sku: product.sku || '',
             price: product.basePrice ?? product.price ?? '',
             salePrice: product.salePrice ?? '',
@@ -268,6 +287,9 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
             category: product.categoryId || product.categoryDetails?.id || product.category || '',
             shortDescription: product.shortDescription || '',
             description: product.description || '',
+            metaTitle: product.metaTitle || '',
+            metaDescription: product.metaDescription || '',
+            metaKeywords: product.metaKeywords || '',
             weight: product.weight ?? '',
             length: product.length ?? '',
             width: product.width ?? '',
@@ -470,8 +492,22 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       delete customFields.attributes
       delete customFields.variationsData
 
+      customFieldEntries.forEach(({ key, value }) => {
+        if (key && key.trim()) {
+          try {
+            customFields[key.trim()] = JSON.parse(value)
+          } catch {
+            customFields[key.trim()] = value
+          }
+        }
+      })
+
       let payload = {
         ...values,
+        slug: values.slug?.trim() || undefined,
+        metaTitle: values.metaTitle?.trim() || undefined,
+        metaDescription: values.metaDescription?.trim() || undefined,
+        metaKeywords: values.metaKeywords?.trim() || undefined,
         images: cleanImages,
         customFields,
         productType,
@@ -744,17 +780,24 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
             </div>
 
             <div className="flex items-center gap-2 self-end sm:self-auto">
+              {!canEdit && (
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs py-1">
+                  Read-Only (Viewer)
+                </Badge>
+              )}
               <Button variant="outline" size="sm" className="h-9 px-4 text-xs font-semibold" asChild>
                 <Link href={basePath}>Discard</Link>
               </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={submitting}
-                className="h-9 px-5 bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-100 cursor-pointer disabled:cursor-not-allowed shadow-xs"
-              >
-                {submitting ? 'Saving...' : isEdit ? 'Update Product' : 'Save Product'}
-              </Button>
+              {canEdit && (
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={submitting}
+                  className="h-9 px-5 bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-100 cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                >
+                  {submitting ? 'Saving...' : isEdit ? 'Update Product' : 'Save Product'}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -968,6 +1011,20 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <FormField
                       control={form.control}
+                      name="slug"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs font-semibold text-stone-700">URL Slug</FormLabel>
+                          <FormControl>
+                            <Input placeholder="product-slug (auto if empty)" className="h-9 text-xs font-mono" {...field} />
+                          </FormControl>
+                          <FormMessage className="text-[11px] text-red-600 font-medium" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="sku"
                       render={({ field }) => (
                         <FormItem className="space-y-1">
@@ -997,32 +1054,36 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                         </FormItem>
                       )}
                     />
-
-                    <FormField
-                      control={form.control}
-                      name="category"
-                      render={({ field }) => (
-                        <FormItem className="space-y-1">
-                          <FormLabel className="text-xs font-semibold text-stone-700">Category *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="bg-white h-9 text-xs">
-                                <SelectValue placeholder="Select category" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {categories.map((cat) => (
-                                <SelectItem key={cat.id || cat} value={cat.id || cat} className="text-xs">
-                                  {(cat.name || cat).charAt(0).toUpperCase() + (cat.name || cat).slice(1)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage className="text-[11px] text-red-600 font-medium" />
-                        </FormItem>
-                      )}
-                    />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <FormLabel className="text-xs font-semibold text-stone-700">Category / Subcategory *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white h-9 text-xs">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories.map((cat) => {
+                              const parent = cat.parentId ? categories.find((c) => c.id === cat.parentId) : null
+                              const label = parent ? `${parent.name} → ${cat.name}` : cat.name
+                              return (
+                                <SelectItem key={cat.id || cat} value={cat.id || cat} className="text-xs">
+                                  {label}
+                                </SelectItem>
+                              )
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-[11px] text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -1137,6 +1198,121 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                       )}
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* SEO & Search Metadata Card */}
+              <Card className="border-stone-200 shadow-xs">
+                <CardContent className="p-4 space-y-3">
+                  <div className="border-b border-stone-100 pb-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 font-inter">SEO & Search Metadata</h3>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="metaTitle"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-xs font-semibold text-stone-700">Meta Title</FormLabel>
+                          <span className="text-[10px] text-stone-400 font-mono">{(field.value || '').length}/100</span>
+                        </div>
+                        <FormControl>
+                          <Input placeholder="SEO Title tag (defaults to product title)" maxLength={100} className="h-9 text-xs" {...field} />
+                        </FormControl>
+                        <FormMessage className="text-[11px] text-red-600" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="metaDescription"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-xs font-semibold text-stone-700">Meta Description</FormLabel>
+                          <span className="text-[10px] text-stone-400 font-mono">{(field.value || '').length}/300</span>
+                        </div>
+                        <FormControl>
+                          <Textarea rows={2} placeholder="Search engine snippet description..." maxLength={300} className="text-xs resize-none" {...field} />
+                        </FormControl>
+                        <FormMessage className="text-[11px] text-red-600" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="metaKeywords"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <FormLabel className="text-xs font-semibold text-stone-700">Meta Keywords</FormLabel>
+                        <FormControl>
+                          <Input placeholder="incense, agarbatti, organic (comma-separated)" maxLength={200} className="h-9 text-xs" {...field} />
+                        </FormControl>
+                        <FormMessage className="text-[11px] text-red-600" />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Flexible Custom Fields (JSONB) Card */}
+              <Card className="border-stone-200 shadow-xs">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 font-inter">Custom Attributes / Fields</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCustomFieldEntries((prev) => [...prev, { key: '', value: '' }])}
+                      className="h-7 px-2 text-[11px] text-stone-600 border-stone-200"
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Add Field
+                    </Button>
+                  </div>
+
+                  {customFieldEntries.length === 0 ? (
+                    <p className="text-[11px] text-stone-400 py-1 italic">No custom fields defined. Click &ldquo;Add Field&rdquo; to add key-value pairs.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {customFieldEntries.map((entry, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Input
+                            placeholder="Key (e.g. Origin)"
+                            value={entry.key}
+                            onChange={(e) => {
+                              const updated = [...customFieldEntries]
+                              updated[idx].key = e.target.value
+                              setCustomFieldEntries(updated)
+                            }}
+                            className="h-8 text-xs font-mono w-1/3"
+                          />
+                          <Input
+                            placeholder="Value (e.g. Mysore)"
+                            value={entry.value}
+                            onChange={(e) => {
+                              const updated = [...customFieldEntries]
+                              updated[idx].value = e.target.value
+                              setCustomFieldEntries(updated)
+                            }}
+                            className="h-8 text-xs w-2/3"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setCustomFieldEntries((prev) => prev.filter((_, i) => i !== idx))}
+                            className="h-8 w-8 text-stone-400 hover:text-red-600 shrink-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
