@@ -483,6 +483,37 @@ export class PaymentsService implements OnModuleInit {
       return;
     }
 
+    const refundAmountPaise = Number(refundEntity?.amount || 0);
+    const paidAmountPaise = Math.round(
+      Number(payment.amount || payment.order?.grandTotal || 0) * 100,
+    );
+    const isPartialRefund = refundAmountPaise > 0 && refundAmountPaise < paidAmountPaise;
+
+    if (isPartialRefund) {
+      const refundRupees = (refundAmountPaise / 100).toFixed(2);
+      await this.prisma.$transaction(async (tx) => {
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: payment.orderId,
+            fromStatus: payment.order?.status || OrderStatus.paid,
+            toStatus: payment.order?.status || OrderStatus.paid,
+            changedBySystem: 'Razorpay Webhook Refund',
+            note: `partial refund of Rs ${refundRupees} recorded (${razorpayRefundId || 'completed'})`,
+          },
+        });
+
+        await tx.paymentWebhookEvent.update({
+          where: { id: webhookRecordId },
+          data: {
+            status: PaymentWebhookStatus.processed,
+            processedAt: new Date(),
+            paymentId: payment.id,
+          },
+        });
+      });
+      return;
+    }
+
     if (payment.status === PaymentStatus.REFUNDED && payment.order?.status === OrderStatus.refunded) {
       await this.prisma.paymentWebhookEvent.update({
         where: { id: webhookRecordId },
