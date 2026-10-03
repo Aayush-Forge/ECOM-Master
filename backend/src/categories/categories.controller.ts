@@ -25,13 +25,13 @@ export class CategoriesController {
   }
 
   @Public()
-  @Get('admin/all-categories')
+  @Get(['admin/all-categories', 'categories'])
   findAll() {
     return this.categoriesService.findAll();
   }
 
   @Public()
-  @Get('admin/categories/:id')
+  @Get(['admin/categories/:id', 'categories/:id'])
   findOne(@Param('id') id: string) {
     return this.categoriesService.findOne(id);
   }

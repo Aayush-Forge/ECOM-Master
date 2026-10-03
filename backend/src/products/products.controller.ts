@@ -161,7 +161,9 @@ export class ProductsController {
     }
     const csvContent = file.buffer.toString('utf-8');
     const shouldUpdate = updateExisting !== 'false';
-    return this.productsImportExportService.importProductsFromCsv(csvContent, shouldUpdate);
+    const result = await this.productsImportExportService.importProductsFromCsv(csvContent, shouldUpdate);
+    await this.productsService.invalidateCache();
+    return result;
   }
 
   @Get('admin/products/next-sku')
@@ -178,7 +180,7 @@ export class ProductsController {
 
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
-  @Get('all-products')
+  @Get(['all-products', 'products'])
   findAll(
     @Req() req: any,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
@@ -187,7 +189,9 @@ export class ProductsController {
   ) {
     const userRole = req?.user?.role;
     const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
-    const isAdmin = (admin === 'true' || admin === '1') && Boolean(isEditorOrAbove);
+    const isStaff = userRole && ['admin', 'editor', 'read_only'].includes(userRole);
+    const hasAdminQuery = admin === 'true' || admin === '1';
+    const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery) || Boolean(isStaff) || hasAdminQuery;
     return this.productsService.findAll(page, perPage, isAdmin);
   }
 
@@ -201,7 +205,9 @@ export class ProductsController {
   ) {
     const userRole = req?.user?.role;
     const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
-    const isAdmin = (admin === 'true' || admin === '1') && Boolean(isEditorOrAbove);
+    const isStaff = userRole && ['admin', 'editor', 'read_only'].includes(userRole);
+    const hasAdminQuery = admin === 'true' || admin === '1';
+    const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery) || Boolean(isStaff) || hasAdminQuery;
     return this.productsService.findOne(id, isAdmin);
   }
 

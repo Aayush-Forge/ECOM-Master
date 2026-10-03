@@ -3,14 +3,26 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { CacheService } from '../redis/cache.service.js';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    @Optional() private readonly cacheService?: CacheService,
+  ) {}
+
+  async invalidateCache(): Promise<void> {
+    if (this.cacheService) {
+      await this.cacheService.invalidatePattern('cache:categories:*');
+      await this.cacheService.invalidatePattern('cache:products:*');
+    }
+  }
 
   async create(createCategoryDto: CreateCategoryDto) {
     if (createCategoryDto.parentId) {
@@ -23,13 +35,15 @@ export class CategoriesService {
     }
 
     try {
-      return await this.prismaService.category.create({
+      const created = await this.prismaService.category.create({
         data: {
           name: createCategoryDto.name,
           slug: createCategoryDto.slug,
           parentId: createCategoryDto.parentId,
         },
       });
+      await this.invalidateCache();
+      return created;
     } catch (error: any) {
       if (error?.code === 'P2002') {
         throw new ConflictException('Slug already exists');
@@ -39,12 +53,32 @@ export class CategoriesService {
   }
 
   async findAll() {
+    if (this.cacheService) {
+      return this.cacheService.getOrSet('cache:categories:all', 300, async () => {
+        return this.prismaService.category.findMany({
+          orderBy: { name: 'asc' },
+        });
+      });
+    }
+
     return this.prismaService.category.findMany({
       orderBy: { name: 'asc' },
     });
   }
 
   async findOne(id: string) {
+    if (this.cacheService) {
+      return this.cacheService.getOrSet(`cache:categories:item:${id}`, 300, async () => {
+        const category = await this.prismaService.category.findUnique({
+          where: { id },
+        });
+        if (!category) {
+          throw new NotFoundException('Category not found');
+        }
+        return category;
+      });
+    }
+
     const category = await this.prismaService.category.findUnique({
       where: { id },
     });
@@ -93,7 +127,7 @@ export class CategoriesService {
     }
 
     try {
-      return await this.prismaService.category.update({
+      const updated = await this.prismaService.category.update({
         where: { id },
         data: {
           name: updateCategoryDto.name,
@@ -101,6 +135,8 @@ export class CategoriesService {
           parentId: updateCategoryDto.parentId,
         },
       });
+      await this.invalidateCache();
+      return updated;
     } catch (error: any) {
       if (error?.code === 'P2025') {
         throw new NotFoundException('Category not found');
@@ -114,9 +150,11 @@ export class CategoriesService {
 
   async remove(id: string) {
     try {
-      return await this.prismaService.category.delete({
+      const deleted = await this.prismaService.category.delete({
         where: { id },
       });
+      await this.invalidateCache();
+      return deleted;
     } catch (error: any) {
       if (error?.code === 'P2025') {
         throw new NotFoundException('Category not found');

@@ -121,6 +121,39 @@ export class CacheService {
     await this._deleteKeys(Array.isArray(keys) ? keys : [keys]);
   }
 
+  /**
+   * Invalidates all keys matching a pattern (e.g. "cache:products:*").
+   * Uses non-blocking SCAN to find keys.
+   * Fails open if Redis throws.
+   */
+  async invalidatePattern(pattern: string): Promise<void> {
+    try {
+      let cursor = '0';
+      const keysToDelete: string[] = [];
+      do {
+        const [nextCursor, matchedKeys] = await this.redis.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          100,
+        );
+        cursor = nextCursor;
+        if (matchedKeys && matchedKeys.length > 0) {
+          keysToDelete.push(...matchedKeys);
+        }
+      } while (cursor !== '0');
+
+      if (keysToDelete.length > 0) {
+        await this._deleteKeys(keysToDelete);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Cache pattern invalidation failed for "${pattern}". Error: ${(err as Error).message}`,
+      );
+    }
+  }
+
   // ─── Private helpers ───────────────────────────────────────────────────────
 
   /**

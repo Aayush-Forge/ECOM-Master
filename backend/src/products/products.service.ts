@@ -12,6 +12,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, ProductStatus, ProductType } from '@prisma/client';
 import { AuditLogsService } from '../audit/audit-logs.service';
+import { CacheService } from '../redis/cache.service.js';
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: ['b', 'strong', 'i', 'em', 'ul', 'ol', 'li', 'p', 'br'],
@@ -27,8 +28,15 @@ export function sanitizeRichText(html?: string): string {
 export class ProductsService {
   constructor(
     private readonly prismaService: PrismaService,
+    @Optional() private readonly cacheService?: CacheService,
     @Optional() private readonly auditLogsService?: AuditLogsService,
   ) {}
+
+  async invalidateCache(): Promise<void> {
+    if (this.cacheService) {
+      await this.cacheService.invalidatePattern('cache:products:*');
+    }
+  }
 
   async create(createProductDto: CreateProductDto) {
     const category = await this.prismaService.category.findUnique({
@@ -46,7 +54,7 @@ export class ProductsService {
       }
     }
 
-    return await this.prismaService.$transaction(async (tx) => {
+    const result = await this.prismaService.$transaction(async (tx) => {
       // Transaction-level guard against concurrent duplicate SKU creations
       await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext('product_sku_lock'));`);
 
@@ -191,6 +199,8 @@ export class ProductsService {
         throw err;
       }
     });
+    await this.invalidateCache();
+    return result;
   }
 
   async update(
@@ -207,7 +217,7 @@ export class ProductsService {
       }
     }
 
-    return await this.prismaService.$transaction(async (tx) => {
+    const result = await this.prismaService.$transaction(async (tx) => {
       // Transaction-level guard against concurrent SKU / update conflicts
       await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext('product_sku_lock'));`);
 
@@ -489,9 +499,34 @@ export class ProductsService {
 
       return this.transformProductResponse(updated, true);
     });
+    await this.invalidateCache();
+    return result;
   }
 
   async findAll(page = 1, perPage = 20, isAdmin = false) {
+    if (!isAdmin && this.cacheService) {
+      const cacheKey = `cache:products:list:p${page || 1}:l${perPage || 20}`;
+      return this.cacheService.getOrSet(cacheKey, 300, async () => {
+        const whereClause = { status: ProductStatus.active };
+        const [data, total] = await this.prismaService.$transaction([
+          this.prismaService.product.findMany({
+            where: whereClause,
+            include: { category: true },
+            orderBy: { createdAt: 'desc' },
+            skip: ((page || 1) - 1) * (perPage || 20),
+            take: perPage || 20,
+          }),
+          this.prismaService.product.count({
+            where: whereClause,
+          }),
+        ]);
+        return {
+          data: data.map((p) => this.transformProductResponse(p, false)),
+          meta: { page: page || 1, per_page: perPage || 20, total },
+        };
+      });
+    }
+
     const whereClause = isAdmin ? {} : { status: ProductStatus.active };
     const [data, total] = await this.prismaService.$transaction([
       this.prismaService.product.findMany({
@@ -512,6 +547,32 @@ export class ProductsService {
   }
 
   async findOne(idOrSlug: string, isAdmin = false) {
+    if (!isAdmin && this.cacheService) {
+      const normalizedKey = idOrSlug.trim().toLowerCase();
+      const cacheKey = `cache:products:item:${normalizedKey}`;
+      return this.cacheService.getOrSet(cacheKey, 300, async () => {
+        const isUuid =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+        const baseWhere = isUuid
+          ? { OR: [{ id: idOrSlug }, { slug: idOrSlug }, { sku: idOrSlug }] }
+          : { OR: [{ slug: idOrSlug }, { sku: idOrSlug }] };
+
+        const where = { AND: [baseWhere, { status: ProductStatus.active }] };
+
+        const product = await this.prismaService.product.findFirst({
+          where,
+          include: { category: true },
+        });
+
+        if (!product) {
+          throw new NotFoundException('Product not found');
+        }
+
+        return this.transformProductResponse(product, false);
+      });
+    }
+
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrSlug);
 
@@ -574,6 +635,7 @@ export class ProductsService {
       });
     }
 
+    await this.invalidateCache();
     return result;
   }
 
