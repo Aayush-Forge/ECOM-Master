@@ -112,7 +112,9 @@ export class AdminUsersController {
       throw new NotFoundException('User not found');
     }
 
-    req.beforeValue = { id: existingUser.id, role: existingUser.role, email: existingUser.email };
+    if (req) {
+      req.beforeValue = { id: existingUser.id, role: existingUser.role, email: existingUser.email };
+    }
 
     return this.prisma.user.update({
       where: { id },

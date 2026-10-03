@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus } from '@prisma/client';
@@ -248,13 +248,26 @@ describe('OrdersService', () => {
       expect(num2).toBe('SDO1045');
     });
 
-    it('falls back safely to SDOXXXX pattern when queryRaw fails', async () => {
+    it('retries sequence creation if initial sequence query fails', async () => {
+      prismaService.$queryRawUnsafe
+        .mockRejectedValueOnce(new Error('relation order_number_seq does not exist'))
+        .mockResolvedValueOnce([{ nextval: 1001 }]);
+      prismaService.$executeRawUnsafe.mockResolvedValueOnce(1);
+
+      const num = await service.generateOrderNumber();
+      expect(num).toBe('SDO1001');
+      expect(prismaService.$executeRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('CREATE SEQUENCE IF NOT EXISTS order_number_seq'),
+      );
+    });
+
+    it('throws InternalServerErrorException when sequence retry also fails', async () => {
       prismaService.$queryRawUnsafe.mockRejectedValue(new Error('DB connection failed'));
       prismaService.$executeRawUnsafe.mockRejectedValue(new Error('Sequence creation failed'));
-      prismaService.order.count.mockResolvedValue(5);
 
-      const fallbackNum = await service.generateOrderNumber();
-      expect(fallbackNum).toMatch(/^SDO\d{4,}$/);
+      await expect(service.generateOrderNumber()).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 });

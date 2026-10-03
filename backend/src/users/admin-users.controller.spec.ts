@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminUsersController } from './admin-users.controller';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogsService } from '../audit/audit-logs.service';
 import { ROLES } from '../auth/roles.constants';
 
 describe('AdminUsersController', () => {
@@ -90,6 +91,12 @@ describe('AdminUsersController', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: {
+            createLog: jest.fn().mockResolvedValue({}),
+          },
         },
       ],
     }).compile();
