@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
@@ -15,7 +16,7 @@ import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { TrackOrderDto } from './dto/track-order.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { ROLES } from '../auth/roles.constants';
+import { ROLES, ROLE_RANKS } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
@@ -71,8 +72,33 @@ export class CustomerOrdersController {
 
   @Get(':id')
   @Public()
-  getOrder(@Param('id', new ParseUUIDPipe({ optional: true })) id: string) {
-    return this.ordersService.getOrderById(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  async getOrder(
+    @Param('id', new ParseUUIDPipe({ optional: true })) id: string,
+    @Req() req: any,
+  ) {
+    const user = req?.user;
+    if (!user) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const userRank = ROLE_RANKS[user.role] ?? 0;
+    const isStaff = userRank >= ROLE_RANKS[ROLES.READ_ONLY];
+
+    const order = await this.ordersService.getOrderById(id);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (isStaff) {
+      return order;
+    }
+
+    if (order.customerId && order.customerId === user.userId) {
+      return order;
+    }
+
+    throw new NotFoundException('Order not found');
   }
 }
 

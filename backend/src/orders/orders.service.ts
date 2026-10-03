@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -618,34 +619,31 @@ export class OrdersService {
   }
 
   async generateOrderNumber(): Promise<string> {
-    try {
+    const fetchNextVal = async () => {
       const result = await this.prismaService.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
-        `SELECT nextval('order_number_seq') AS nextval`
+        `SELECT nextval('order_number_seq') AS nextval`,
       );
       if (result?.[0]?.nextval != null) {
         return `SDO${result[0].nextval}`;
       }
+      throw new Error('Empty sequence value returned');
+    };
+
+    try {
+      return await fetchNextVal();
     } catch {
-      // Sequence may not exist yet or connection issue: ensure sequence exists and retry
+      // Retry once after ensuring sequence exists
       try {
         await this.prismaService.$executeRawUnsafe(
-          `CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1000 INCREMENT BY 1;`
+          `CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1000 INCREMENT BY 1;`,
         );
-        const result = await this.prismaService.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
-          `SELECT nextval('order_number_seq') AS nextval`
+        return await fetchNextVal();
+      } catch (retryError: any) {
+        throw new InternalServerErrorException(
+          `Failed to generate sequence-based order number: ${retryError?.message || 'Sequence error'}`,
         );
-        if (result?.[0]?.nextval != null) {
-          return `SDO${result[0].nextval}`;
-        }
-      } catch (retryError) {
-        console.error('Failed to generate sequence-based order number:', retryError);
       }
     }
-
-    // High-availability fallback preserving pattern SDOXXXX
-    const count = await this.prismaService.order.count();
-    const fallbackNumber = 1000 + count + Math.floor(Math.random() * 100);
-    return `SDO${fallbackNumber}`;
   }
 }
 

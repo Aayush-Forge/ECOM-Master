@@ -10,6 +10,7 @@ describe('PaymentsController', () => {
     const mockPaymentsService = {
       createSession: jest.fn(),
       verifyPayment: jest.fn(),
+      handleWebhook: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -81,5 +82,30 @@ describe('PaymentsController', () => {
     expect(paymentsService.getPaymentByOrderId).toHaveBeenCalledWith('ord_1');
     expect(result).toEqual(mockPmt);
   });
+
+  it('should delegate handleWebhook to paymentsService', async () => {
+    const mockPayload = { id: 'evt_1', event: 'payment.captured' };
+    const mockResult = { received: true, status: 'processed' };
+    (paymentsService.handleWebhook as jest.Mock).mockResolvedValue(mockResult);
+
+    const req = {
+      rawBody: Buffer.from(JSON.stringify(mockPayload)),
+      headers: { 'x-razorpay-signature': 'sig_mock_123' },
+    };
+
+    const result = await controller.handleWebhook(
+      req,
+      'sig_mock_123',
+      mockPayload,
+    );
+
+    expect(paymentsService.handleWebhook).toHaveBeenCalledWith(
+      mockPayload,
+      'sig_mock_123',
+      JSON.stringify(mockPayload),
+    );
+    expect(result).toEqual(mockResult);
+  });
 });
+
 

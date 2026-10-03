@@ -1,11 +1,14 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   ParseIntPipe,
   Post,
   Query,
+  Req,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -15,6 +18,7 @@ import { VerifyPaymentDto } from './dto/verify-payment.dto.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { ROLES } from '../auth/roles.constants.js';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('')
 @UsePipes(new ValidationPipe({ whitelist: true }))
@@ -31,6 +35,30 @@ export class PaymentsController {
   @Public()
   verify(@Body() dto: VerifyPaymentDto) {
     return this.paymentsService.verifyPayment(dto);
+  }
+
+  @Post('payments/webhook')
+  @Public()
+  @SkipThrottle()
+  handleWebhook(
+    @Req() req: any,
+    @Headers('x-razorpay-signature') signatureHeader?: string,
+    @Body() body?: any,
+  ) {
+    if (!req?.rawBody) {
+      throw new BadRequestException('Raw request body is required for webhook signature verification');
+    }
+    const signature = signatureHeader || req?.headers?.['x-razorpay-signature'] || '';
+    const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody.toString('utf8') : String(req.rawBody);
+    let payload = body;
+    if (!payload || typeof payload !== 'object') {
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        payload = {};
+      }
+    }
+    return this.paymentsService.handleWebhook(payload, signature, rawBody);
   }
 
   @Get('admin/payments')

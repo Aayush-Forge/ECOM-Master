@@ -1,4 +1,11 @@
 export const RAZORPAY_CONFIG = {
-  keyId: process.env.RAZORPAY_KEY_ID || '',
-  keySecret: process.env.RAZORPAY_KEY_SECRET || '',
-} as const;
+  get keyId() {
+    return process.env.RAZORPAY_KEY_ID || '';
+  },
+  get keySecret() {
+    return process.env.RAZORPAY_KEY_SECRET || '';
+  },
+  get webhookSecret() {
+    return process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET || '';
+  },
+};

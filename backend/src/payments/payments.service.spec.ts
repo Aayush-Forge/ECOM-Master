@@ -4,7 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, PaymentWebhookStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaymentsService } from './payments.service.js';
 import { RazorpayService } from './razorpay.service.js';
@@ -34,6 +34,11 @@ describe('PaymentsService', () => {
       },
       orderStatusHistory: {
         create: jest.fn(),
+      },
+      paymentWebhookEvent: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
       },
       $transaction: jest.fn(async (cb) => cb(prismaService)),
     };
@@ -228,6 +233,190 @@ describe('PaymentsService', () => {
         data: {
           status: OrderStatus.paid,
           placedAt: expect.any(Date),
+        },
+      });
+    });
+  });
+
+  describe('handleWebhook', () => {
+    it('should return already_processed if webhook event was previously processed', async () => {
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue({
+        id: 'evt_row_1',
+        razorpayEventId: 'evt_123',
+        status: PaymentWebhookStatus.processed,
+      });
+
+      const result = await service.handleWebhook({
+        id: 'evt_123',
+        event: 'payment.captured',
+      });
+
+      expect(result).toEqual({
+        received: true,
+        status: 'already_processed',
+        eventId: 'evt_123',
+      });
+      expect(prismaService.paymentWebhookEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('should process payment.captured event idempotently and transition order to paid', async () => {
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.paymentWebhookEvent.create.mockResolvedValue({
+        id: 'evt_row_1',
+        razorpayEventId: 'evt_cap_1',
+        status: PaymentWebhookStatus.received,
+      });
+
+      prismaService.payment.findFirst.mockResolvedValue({
+        id: 'pmt_1',
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_1',
+        status: PaymentStatus.CREATED,
+        order: {
+          id: 'order_1',
+          status: OrderStatus.payment_pending,
+        },
+      });
+
+      const payload = {
+        id: 'evt_cap_1',
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: 'pay_rzp_1',
+              order_id: 'order_rzp_1',
+              status: 'captured',
+              method: 'upi',
+            },
+          },
+        },
+      };
+
+      const result = await service.handleWebhook(payload);
+
+      expect(result).toEqual({
+        received: true,
+        status: 'processed',
+        eventId: 'evt_cap_1',
+        eventType: 'payment.captured',
+      });
+
+      expect(prismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pmt_1' },
+        data: {
+          razorpayPaymentId: 'pay_rzp_1',
+          status: PaymentStatus.CAPTURED,
+          method: 'upi',
+        },
+      });
+
+      expect(prismaService.order.update).toHaveBeenCalledWith({
+        where: { id: 'order_1' },
+        data: {
+          status: OrderStatus.paid,
+          placedAt: expect.any(Date),
+        },
+      });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith('order.paid', {
+        orderId: 'order_1',
+      });
+
+      expect(prismaService.paymentWebhookEvent.update).toHaveBeenCalledWith({
+        where: { id: 'evt_row_1' },
+        data: {
+          status: PaymentWebhookStatus.processed,
+          processedAt: expect.any(Date),
+          paymentId: 'pmt_1',
+        },
+      });
+    });
+
+    it('should process refund.processed webhook and transition order to refunded', async () => {
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.paymentWebhookEvent.create.mockResolvedValue({
+        id: 'evt_row_2',
+        razorpayEventId: 'evt_ref_1',
+        status: PaymentWebhookStatus.received,
+      });
+
+      prismaService.payment.findFirst.mockResolvedValue({
+        id: 'pmt_1',
+        orderId: 'order_1',
+        razorpayPaymentId: 'pay_rzp_1',
+        status: PaymentStatus.CAPTURED,
+        order: {
+          id: 'order_1',
+          status: OrderStatus.paid,
+        },
+      });
+
+      const payload = {
+        id: 'evt_ref_1',
+        event: 'refund.processed',
+        payload: {
+          refund: {
+            entity: {
+              id: 'rfnd_rzp_1',
+              payment_id: 'pay_rzp_1',
+              amount: 26000,
+              status: 'processed',
+            },
+          },
+          payment: {
+            entity: {
+              id: 'pay_rzp_1',
+              order_id: 'order_rzp_1',
+            },
+          },
+        },
+      };
+
+      const result = await service.handleWebhook(payload);
+
+      expect(result).toEqual({
+        received: true,
+        status: 'processed',
+        eventId: 'evt_ref_1',
+        eventType: 'refund.processed',
+      });
+
+      expect(prismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pmt_1' },
+        data: {
+          status: PaymentStatus.REFUNDED,
+        },
+      });
+
+      expect(prismaService.order.update).toHaveBeenCalledWith({
+        where: { id: 'order_1' },
+        data: {
+          status: OrderStatus.refunded,
+        },
+      });
+
+      expect(prismaService.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: 'order_1',
+          fromStatus: OrderStatus.paid,
+          toStatus: OrderStatus.refunded,
+          changedBySystem: 'Razorpay Webhook Refund',
+          note: expect.stringContaining('rfnd_rzp_1'),
+        },
+      });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith('order.refunded', {
+        orderId: 'order_1',
+        refundId: 'rfnd_rzp_1',
+      });
+
+      expect(prismaService.paymentWebhookEvent.update).toHaveBeenCalledWith({
+        where: { id: 'evt_row_2' },
+        data: {
+          status: PaymentWebhookStatus.processed,
+          processedAt: expect.any(Date),
+          paymentId: 'pmt_1',
         },
       });
     });
