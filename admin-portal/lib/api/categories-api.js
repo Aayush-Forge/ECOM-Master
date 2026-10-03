@@ -60,7 +60,7 @@ async function refreshAuthToken() {
  */
 export async function getAllCategories() {
   const res = await fetch(`${BACKEND_URL}/admin/all-categories`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) {

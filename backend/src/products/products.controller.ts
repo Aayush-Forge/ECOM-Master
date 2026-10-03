@@ -192,9 +192,8 @@ export class ProductsController {
   ) {
     const userRole = req?.user?.role;
     const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
-    const isStaff = userRole && ['admin', 'editor', 'read_only'].includes(userRole);
     const hasAdminQuery = admin === 'true' || admin === '1';
-    const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery) || Boolean(isStaff) || hasAdminQuery;
+    const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery);
     return this.productsService.findAll(page, perPage, isAdmin, { search, category, status });
   }
 
@@ -208,9 +207,8 @@ export class ProductsController {
   ) {
     const userRole = req?.user?.role;
     const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
-    const isStaff = userRole && ['admin', 'editor', 'read_only'].includes(userRole);
     const hasAdminQuery = admin === 'true' || admin === '1';
-    const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery) || Boolean(isStaff) || hasAdminQuery;
+    const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery);
     return this.productsService.findOne(id, isAdmin);
   }
 

@@ -130,7 +130,7 @@ export async function getAdminProductById(id) {
 
 export async function getProductCategories() {
   const res = await fetch(`${BACKEND_URL}/admin/all-categories`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) {

@@ -25,14 +25,26 @@ export class CategoriesController {
   }
 
   @Public()
-  @Get(['admin/all-categories', 'categories'])
+  @Get('categories')
   findAll() {
     return this.categoriesService.findAll();
   }
 
+  @Roles(ROLES.READ_ONLY)
+  @Get('admin/all-categories')
+  findAllAdmin() {
+    return this.categoriesService.findAll();
+  }
+
   @Public()
-  @Get(['admin/categories/:id', 'categories/:id'])
+  @Get('categories/:id')
   findOne(@Param('id') id: string) {
+    return this.categoriesService.findOne(id);
+  }
+
+  @Roles(ROLES.READ_ONLY)
+  @Get('admin/categories/:id')
+  findOneAdmin(@Param('id') id: string) {
     return this.categoriesService.findOne(id);
   }
 

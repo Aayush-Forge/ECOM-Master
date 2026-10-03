@@ -67,7 +67,7 @@ function ProductsContent() {
         if (!r.ok) throw new Error(`Products error: ${r.status}`)
         return r.json()
       }),
-      fetch(`${backendUrl}/admin/all-categories`).then(async (r) => {
+      fetch(`${backendUrl}/categories`).then(async (r) => {
         if (!r.ok) throw new Error(`Categories error: ${r.status}`)
         return r.json()
       }),
