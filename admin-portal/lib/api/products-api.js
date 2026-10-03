@@ -74,7 +74,7 @@ export async function getAdminProducts(params = {}) {
   const url = `${BACKEND_URL}/all-products${query.toString() ? `?${query.toString()}` : ''}`;
 
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) {

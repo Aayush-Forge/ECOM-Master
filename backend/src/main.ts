@@ -1,41 +1,57 @@
 import 'dotenv/config';
+import helmet from 'helmet';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  app.use(helmet());
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      const allowedPatterns = [
-        /^http:\/\/localhost(:\d+)?$/,
-        /^http:\/\/127\.0\.0\.1(:\d+)?$/,
-        /^http:\/\/admin\.localhost(:\d+)?$/,
-        /^https?:\/\/(.*?\.)?sridattam\.com(:\d+)?$/,
-      ];
-
-      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
-        return callback(null, true);
+      const allowedOrigins = new Set<string>();
+      if (process.env.FRONTEND_URL) {
+        allowedOrigins.add(process.env.FRONTEND_URL.replace(/\/+$/, ''));
       }
-      if (process.env.ADMIN_URL && origin === process.env.ADMIN_URL) {
-        return callback(null, true);
+      if (process.env.ADMIN_URL) {
+        allowedOrigins.add(process.env.ADMIN_URL.replace(/\/+$/, ''));
       }
 
-      const isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));
-      if (isAllowed || process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+        allowedOrigins.add('http://localhost:3000');
+        allowedOrigins.add('http://localhost:3001');
+        allowedOrigins.add('http://127.0.0.1:3000');
+        allowedOrigins.add('http://127.0.0.1:3001');
+      }
+
+      if (allowedOrigins.has(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   });
+
   const port = process.env.PORT ?? 5000;
   await app.listen(port);
   console.log(`Backend server running on http://localhost:${port}`);
 }
 bootstrap();
-

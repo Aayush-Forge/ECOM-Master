@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { JWT_CONFIG } from './jwt.config';
 
 @Module({
@@ -17,7 +18,7 @@ import { JWT_CONFIG } from './jwt.config';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, RolesGuard, JwtAuthGuard],
-  exports: [AuthService, RolesGuard, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, RolesGuard, JwtAuthGuard, OptionalJwtAuthGuard],
+  exports: [AuthService, RolesGuard, JwtAuthGuard, OptionalJwtAuthGuard],
 })
-export class AuthModule {}
+export class AuthModule {}

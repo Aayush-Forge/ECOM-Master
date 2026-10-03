@@ -151,11 +151,11 @@ export class OrdersService {
       discountTotal = 0;
     }
 
-    const shippingTotal = dto.shippingTotal !== undefined ? Number(dto.shippingTotal) : (subtotal >= 499 || subtotal === 0 ? 0 : 49);
+    const shippingTotal = subtotal >= 499 || subtotal === 0 ? 0 : 49;
     const grandTotal = Math.max(0, subtotal - discountTotal + shippingTotal);
 
     const orderNumber = await this.generateOrderNumber();
-    const effectiveCustomerId = customerId || dto.customerId || null;
+    const effectiveCustomerId = customerId || null;
 
     let orderEmail: string | null = null;
     if (!effectiveCustomerId) {

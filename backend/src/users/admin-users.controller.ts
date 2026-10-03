@@ -14,6 +14,7 @@ import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateStaffUserDto, UpdateUserRoleDto } from './dto/admin-users.dto';
 
 const USER_SELECT_FIELDS = {
   id: true,
@@ -55,14 +56,7 @@ export class AdminUsersController {
    */
   @Post()
   async createUser(
-    @Body()
-    body: {
-      email: string;
-      password: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-    },
+    @Body() body: CreateStaffUserDto,
   ) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: body.email },
@@ -96,7 +90,7 @@ export class AdminUsersController {
   @Patch(':id/role')
   async updateUserRole(
     @Param('id') id: string,
-    @Body() body: { role: string },
+    @Body() body: UpdateUserRoleDto,
   ) {
     const validRoles = Object.values(UserRole) as string[];
     if (!validRoles.includes(body.role)) {

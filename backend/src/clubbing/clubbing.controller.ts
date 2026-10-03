@@ -11,6 +11,7 @@ import {
 import { ClubbingService, CartItemDiscountInput } from './clubbing.service';
 import { CreateClubbingRuleDto } from './dto/create-clubbing-rule.dto';
 import { UpdateClubbingRuleDto } from './dto/update-clubbing-rule.dto';
+import { BulkIdsDto, BulkStatusDto, CalculateDiscountDto } from './dto/clubbing-bulk.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
@@ -64,20 +65,21 @@ export class ClubbingController {
   @Post('bulk-delete')
   @Roles(ROLES.EDITOR)
   @AuditLog('clubbing_rule.bulk_delete')
-  bulkDelete(@Body() body: { ids: string[] }) {
+  bulkDelete(@Body() body: BulkIdsDto) {
     return this.clubbingService.bulkDelete(body.ids || []);
   }
 
   @Post('bulk-status')
   @Roles(ROLES.EDITOR)
   @AuditLog('clubbing_rule.bulk_status')
-  bulkUpdateStatus(@Body() body: { ids: string[]; isActive: boolean }) {
+  bulkUpdateStatus(@Body() body: BulkStatusDto) {
     return this.clubbingService.bulkUpdateStatus(body.ids || [], body.isActive);
   }
 
   @Post('calculate')
   @Public()
-  calculateDiscount(@Body() body: { cartItems: CartItemDiscountInput[] }) {
+  calculateDiscount(@Body() body: CalculateDiscountDto) {
     return this.clubbingService.calculateCartDiscount(body.cartItems || []);
   }
 }
+

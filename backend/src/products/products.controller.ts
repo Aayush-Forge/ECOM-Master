@@ -10,8 +10,10 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   ServiceUnavailableException,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -23,8 +25,9 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { DeleteProductImageDto } from './dto/delete-product-image.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { ROLES } from '../auth/roles.constants';
+import { ROLES, ROLE_HIERARCHY } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { R2Service } from '../r2/r2.service';
 
 import { ProductsImportExportService } from './products-import-export.service';
@@ -174,23 +177,31 @@ export class ProductsController {
   }
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('all-products')
   findAll(
+    @Req() req: any,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
     @Query('admin') admin?: string,
   ) {
-    const isAdmin = admin === 'true' || admin === '1';
+    const userRole = req?.user?.role;
+    const isEditorOrAbove = userRole && (ROLE_HIERARCHY[userRole as ROLES] >= ROLE_HIERARCHY[ROLES.EDITOR]);
+    const isAdmin = (admin === 'true' || admin === '1') && Boolean(isEditorOrAbove);
     return this.productsService.findAll(page, perPage, isAdmin);
   }
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('products/:id')
   findOne(
+    @Req() req: any,
     @Param('id') id: string,
     @Query('admin') admin?: string,
   ) {
-    const isAdmin = admin === 'true' || admin === '1';
+    const userRole = req?.user?.role;
+    const isEditorOrAbove = userRole && (ROLE_HIERARCHY[userRole as ROLES] >= ROLE_HIERARCHY[ROLES.EDITOR]);
+    const isAdmin = (admin === 'true' || admin === '1') && Boolean(isEditorOrAbove);
     return this.productsService.findOne(id, isAdmin);
   }
 

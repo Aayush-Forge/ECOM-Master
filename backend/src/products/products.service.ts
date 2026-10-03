@@ -478,10 +478,16 @@ export class ProductsService {
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrSlug);
 
+    const baseWhere = isUuid
+      ? { OR: [{ id: idOrSlug }, { slug: idOrSlug }, { sku: idOrSlug }] }
+      : { OR: [{ slug: idOrSlug }, { sku: idOrSlug }] };
+
+    const where = isAdmin
+      ? baseWhere
+      : { AND: [baseWhere, { status: ProductStatus.active }] };
+
     const product = await this.prismaService.product.findFirst({
-      where: isUuid
-        ? { OR: [{ id: idOrSlug }, { slug: idOrSlug }, { sku: idOrSlug }] }
-        : { OR: [{ slug: idOrSlug }, { sku: idOrSlug }] },
+      where,
       include: { category: true },
     });
 

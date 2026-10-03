@@ -39,7 +39,7 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  @Roles(ROLES.EDITOR)
+  @Roles(ROLES.READ_ONLY)
   @AuditLog('order.status_changed')
   updateStatus(
     @Param('id') id: string,

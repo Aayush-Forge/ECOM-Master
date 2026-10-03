@@ -8,13 +8,16 @@ import {
   Post,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { TrackOrderDto } from './dto/track-order.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('orders')
 export class CustomerOrdersController {
@@ -22,26 +25,13 @@ export class CustomerOrdersController {
 
   @Post()
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   createOrder(
     @Body() dto: CreateOrderDto,
     @Req() req: any,
   ) {
-    let customerId = req.user?.userId || dto.customerId;
-    const authHeader = req.headers?.authorization;
-    if (!customerId && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.slice(7);
-        const payloadPart = token.split('.')[1];
-        if (payloadPart) {
-          const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString('utf8'));
-          if (payload?.sub) {
-            customerId = payload.sub;
-          }
-        }
-      } catch {
-        // Fall back to guest order if token is unparseable
-      }
-    }
+    const customerId = req.user?.userId || null;
     return this.ordersService.createOrder(dto, customerId);
   }
 
@@ -62,6 +52,7 @@ export class CustomerOrdersController {
   }
 
   @Get('me/by-number/:orderNumber')
+  @Roles(ROLES.CUSTOMER)
   getMyOrderByNumber(
     @Req() req: { user: { userId: string } },
     @Param('orderNumber') orderNumber: string,
@@ -70,6 +61,7 @@ export class CustomerOrdersController {
   }
 
   @Get('me/:id')
+  @Roles(ROLES.CUSTOMER)
   getMyOrderById(
     @Req() req: { user: { userId: string } },
     @Param('id', new ParseUUIDPipe({ optional: true })) id: string,
@@ -83,3 +75,4 @@ export class CustomerOrdersController {
     return this.ordersService.getOrderById(id);
   }
 }
+

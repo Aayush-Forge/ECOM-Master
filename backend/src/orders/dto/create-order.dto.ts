@@ -59,10 +59,6 @@ export class OrderAddressInputDto {
 }
 
 export class CreateOrderDto {
-  @IsString()
-  @IsOptional()
-  customerId?: string;
-
   @IsEmail()
   @IsOptional()
   email?: string;
@@ -85,8 +81,5 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   couponCode?: string;
-
-  @IsOptional()
-  @IsNumber()
-  shippingTotal?: number;
 }
+

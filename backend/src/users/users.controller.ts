@@ -10,6 +10,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 
+import { UpdateProfileDto } from './dto/update-profile.dto';
+
 const USER_PROFILE_FIELDS = {
   id: true,
   email: true,
@@ -40,12 +42,7 @@ export class UsersController {
   @Patch('me')
   async updateProfile(
     @Req() req: { user: { userId: string } },
-    @Body()
-    body: {
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-    },
+    @Body() body: UpdateProfileDto,
   ) {
     const data: { firstName?: string; lastName?: string; phone?: string } = {};
     if (typeof body.firstName === 'string') data.firstName = body.firstName.trim();
