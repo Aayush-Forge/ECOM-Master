@@ -692,8 +692,10 @@ export class PaymentsService implements OnModuleInit {
       this.prisma.payment.count({ where }),
     ]);
 
+    const sanitizedData = data.map(({ razorpaySignature, ...rest }) => rest);
+
     return {
-      data,
+      data: sanitizedData,
       meta: {
         total,
         page,
@@ -729,6 +731,7 @@ export class PaymentsService implements OnModuleInit {
       throw new NotFoundException(`No payment record found for order "${orderId}"`);
     }
 
-    return payment;
+    const { razorpaySignature, ...safePayment } = payment;
+    return safePayment;
   }
 }

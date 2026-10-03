@@ -65,24 +65,25 @@ async function refreshAuthToken() {
 
 function normalizePayment(pmt) {
   if (!pmt) return null;
-  const customer = pmt.order?.customer;
+  const { razorpaySignature: _sig, ...safePmt } = pmt;
+  const customer = safePmt.order?.customer;
   const shippingAddr =
-    pmt.order?.addresses?.find((a) => a.type === 'shipping') ||
-    pmt.order?.addresses?.[0];
+    safePmt.order?.addresses?.find((a) => a.type === 'shipping') ||
+    safePmt.order?.addresses?.[0];
   const customerName = customer
     ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email
     : (shippingAddr?.fullName || 'Guest Customer');
 
   return {
-    ...pmt,
-    id: pmt.id,
-    orderId: pmt.orderId || pmt.order?.id,
-    orderNumber: pmt.order?.orderNumber || `ORD-${pmt.orderId?.slice(0, 8) || '0000'}`,
+    ...safePmt,
+    id: safePmt.id,
+    orderId: safePmt.orderId || safePmt.order?.id,
+    orderNumber: safePmt.order?.orderNumber || `ORD-${safePmt.orderId?.slice(0, 8) || '0000'}`,
     customerName,
-    amount: Number(pmt.amount ?? 0),
-    method: pmt.method || 'Online Payment',
-    status: pmt.status || 'CREATED',
-    date: pmt.createdAt || new Date().toISOString(),
+    amount: Number(safePmt.amount ?? 0),
+    method: safePmt.method || 'Online Payment',
+    status: safePmt.status || 'CREATED',
+    date: safePmt.createdAt || new Date().toISOString(),
   };
 }
 
