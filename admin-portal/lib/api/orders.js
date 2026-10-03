@@ -123,7 +123,6 @@ function normalizeOrder(order) {
           pincode: shippingAddr.postalCode || shippingAddr.pincode || '',
           phone: shippingAddr.phone || '',
         }
-      : null,
     customer: order.customer
       ? {
           id: order.customer.id,
@@ -141,6 +140,13 @@ function normalizeOrder(order) {
             email: order.user.email,
           }
         : null,
+    statusHistory: (order.statusHistory || []).map((h) => ({
+      ...h,
+      changedAt: h.changedAt || h.createdAt || new Date().toISOString(),
+      author: h.changedByUser
+        ? `${h.changedByUser.firstName || ''} ${h.changedByUser.lastName || ''}`.trim() || h.changedByUser.email
+        : h.changedBySystem || 'System',
+    })),
   };
 }
 

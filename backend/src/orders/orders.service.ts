@@ -216,6 +216,16 @@ export class OrdersService {
         },
         addresses: true,
         statusHistory: {
+          include: {
+            changedByUser: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
           orderBy: { changedAt: 'desc' },
         },
       },
@@ -356,6 +366,16 @@ export class OrdersService {
           items: true,
           addresses: true,
           statusHistory: {
+            include: {
+              changedByUser: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
             orderBy: { changedAt: 'desc' },
           },
         },

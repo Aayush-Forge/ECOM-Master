@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FilterX, RefreshCw } from 'lucide-react'
 
-export function PaymentsListView({ basePath = '/staff/orders', title = 'Payment Records' }) {
+export function PaymentsListView({ basePath = '/orders', title = 'Payment Records' }) {
   const [payments, setPayments] = useState(() => getAllPaymentsSync())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)

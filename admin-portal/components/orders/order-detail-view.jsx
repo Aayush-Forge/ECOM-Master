@@ -26,7 +26,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { ArrowLeft, Truck, Package, CreditCard, RefreshCw, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Truck, Package, CreditCard, RefreshCw, AlertCircle, History } from 'lucide-react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -350,6 +350,53 @@ export default function OrderDetailView() {
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Status History Timeline */}
+          <Card className="bg-white border-stone-200 shadow-sm">
+            <CardHeader className="pb-3 border-b border-stone-100">
+              <CardTitle className="text-base flex items-center gap-2 text-stone-900 font-bold">
+                <History className="h-4 w-4 text-stone-500" />
+                Status History & Audit Trail
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {order.statusHistory && order.statusHistory.length > 0 ? (
+                <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-stone-200">
+                  {order.statusHistory.map((historyItem, idx) => (
+                    <div key={historyItem.id || idx} className="relative group">
+                      <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-saffron shadow-xs" />
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-stone-500">
+                            {historyItem.fromStatus ? `${historyItem.fromStatus} →` : 'Initial status:'}
+                          </span>
+                          <Badge variant="secondary" className={`text-xs capitalize ${getStatusColor(historyItem.toStatus)}`}>
+                            {historyItem.toStatus?.replace('_', ' ')}
+                          </Badge>
+                          <span className="text-xs text-stone-500">
+                            by <span className="font-medium text-stone-800">{historyItem.author || 'System'}</span>
+                          </span>
+                        </div>
+                        <time className="text-xs text-stone-400 whitespace-nowrap">
+                          {new Date(historyItem.changedAt).toLocaleString('en-IN', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })}
+                        </time>
+                      </div>
+                      {historyItem.note && (
+                        <p className="mt-1.5 text-xs text-stone-600 bg-stone-50 rounded p-2 border border-stone-100 italic">
+                          "{historyItem.note}"
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-stone-500 italic">No status transition history recorded yet.</p>
+              )}
             </CardContent>
           </Card>
 
