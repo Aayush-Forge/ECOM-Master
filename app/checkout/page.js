@@ -49,7 +49,16 @@ function loadRazorpayScript() {
 
 function CheckoutPage() {
   const router = useRouter()
-  const { items: cartItems, subtotal: cartSubtotal, clearCart, hydrated, cartKey } = useCart()
+  const {
+    items: cartItems,
+    subtotal: cartSubtotal,
+    clearCart,
+    hydrated,
+    cartKey,
+    cartId,
+    cartToken,
+    refreshCart,
+  } = useCart()
   const [isBuyNow, setIsBuyNow] = useState(false)
   const [buyNowItem, setBuyNowItem] = useState(null)
   const [initDone, setInitDone] = useState(false)
@@ -212,6 +221,17 @@ function CheckoutPage() {
     setStage('creating')
 
     try {
+      if (!isBuyNow) {
+        const freshCart = await refreshCart()
+        const itemsWithIssues = freshCart?.items?.filter(i => i.issues && i.issues.length > 0)
+        if (itemsWithIssues && itemsWithIssues.length > 0) {
+          toast.error('Some items in your cart have stock or availability issues. Please review your cart.')
+          setSubmitting(false)
+          setStage('')
+          return
+        }
+      }
+
       const fullName = `${form.first_name} ${form.last_name}`.trim()
       const address = {
         fullName,
@@ -236,6 +256,8 @@ function CheckoutPage() {
         shippingAddress: address,
         billingAddress: address,
         couponCode: appliedCoupon?.name || (couponCode ? couponCode.trim() : undefined),
+        cartId: !isBuyNow && cartId ? cartId : undefined,
+        cartToken: !isBuyNow && cartToken ? cartToken : undefined,
       })
 
       if (!order || !order.id) {
