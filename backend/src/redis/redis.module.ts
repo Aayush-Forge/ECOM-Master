@@ -33,6 +33,10 @@ import { CacheService } from './cache.service.js';
           host,
           port,
           password,
+          enableOfflineQueue: false,
+          maxRetriesPerRequest: 1,
+          connectTimeout: 1000,
+          commandTimeout: 1000,
           // Reconnect with exponential back-off, capped at 10 s.
           retryStrategy: (times: number) => {
             const delay = Math.min(times * 200, 10_000);
