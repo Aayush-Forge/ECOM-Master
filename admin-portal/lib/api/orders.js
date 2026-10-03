@@ -123,6 +123,7 @@ function normalizeOrder(order) {
           pincode: shippingAddr.postalCode || shippingAddr.pincode || '',
           phone: shippingAddr.phone || '',
         }
+      : null,
     customer: order.customer
       ? {
           id: order.customer.id,
@@ -332,6 +333,8 @@ export async function getAllOrders(filter = {}) {
     query.set('per_page', filter.perPage || filter.per_page);
   }
   if (filter.search) query.set('search', filter.search);
+  if (filter.dateFrom) query.set('dateFrom', filter.dateFrom);
+  if (filter.dateTo) query.set('dateTo', filter.dateTo);
 
   const url = `${BACKEND_URL}/admin/orders${query.toString() ? `?${query.toString()}` : ''}`;
   let headers = getAuthHeaders();

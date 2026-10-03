@@ -16,6 +16,8 @@ import { ROLES } from '../auth/roles.constants';
 import { AuditLog } from '../audit/decorators/audit-log.decorator';
 import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 
+import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
+
 @Controller('admin/orders')
 @UseInterceptors(AuditLogInterceptor)
 export class OrdersController {
@@ -23,13 +25,15 @@ export class OrdersController {
 
   @Get()
   @Roles(ROLES.READ_ONLY)
-  getAllOrders(
-    @Query('status') status?: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
-    @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
-    @Query('search') search?: string,
-  ) {
-    return this.ordersService.getAllOrders(status, page, perPage, search);
+  getAllOrders(@Query() query: GetOrdersQueryDto) {
+    return this.ordersService.getAllOrders(
+      query.status,
+      query.page,
+      query.per_page,
+      query.search,
+      query.dateFrom,
+      query.dateTo,
+    );
   }
 
   @Get(':id')

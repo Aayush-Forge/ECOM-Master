@@ -633,8 +633,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
     } catch (error) {
       console.error(error)
       if (error?.status === 409 || error?.response?.statusCode === 409) {
-        toast.error('Product was changed elsewhere, reload')
-        await loadData()
+        toast.error(error?.message || error?.response?.message || 'SKU or slug already exists')
       } else {
         toast.error(error?.message || (isEdit ? 'Failed to update product' : 'Failed to create product'))
       }

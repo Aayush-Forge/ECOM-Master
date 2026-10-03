@@ -504,12 +504,22 @@ export class ProductsService {
         dataToUpdate.metaKeywords = updateProductDto.metaKeywords ? sanitizeRichText(updateProductDto.metaKeywords) : null;
       }
 
-      const updated = await tx.product.update({
-        where: { id },
-        data: dataToUpdate,
-      });
+      try {
+        const updated = await tx.product.update({
+          where: { id },
+          data: dataToUpdate,
+        });
 
-      return this.transformProductResponse(updated, true);
+        return this.transformProductResponse(updated, true);
+      } catch (err: any) {
+        if (err instanceof ConflictException || err instanceof BadRequestException) {
+          throw err;
+        }
+        if (err.code === 'P2002') {
+          throw new ConflictException('SKU or slug already exists');
+        }
+        throw err;
+      }
     });
     await this.invalidateCache();
     return result;

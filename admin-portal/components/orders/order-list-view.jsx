@@ -17,6 +17,8 @@ export function OrderListView({ basePath = '/orders', title = 'Orders' }) {
   const [error, setError] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -25,6 +27,8 @@ export function OrderListView({ basePath = '/orders', title = 'Orders' }) {
       const data = await getAllOrders({
         status: statusFilter,
         search: searchTerm.trim() || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
       })
       setOrders(data || [])
     } catch (err) {
@@ -50,7 +54,7 @@ export function OrderListView({ basePath = '/orders', title = 'Orders' }) {
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('auth-change', handleAuth)
     }
-  }, [statusFilter])
+  }, [statusFilter, dateFrom, dateTo])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
@@ -111,6 +115,20 @@ export function OrderListView({ basePath = '/orders', title = 'Orders' }) {
               <SelectItem value="refunded">Refunded</SelectItem>
             </SelectContent>
           </Select>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-36 bg-white border-stone-200 text-xs h-9"
+            title="Date from"
+          />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-36 bg-white border-stone-200 text-xs h-9"
+            title="Date to"
+          />
           <Button onClick={fetchOrders} variant="outline" size="sm" className="h-9 px-3 border-stone-200">
             <RefreshCw className="w-3.5 h-3.5" />
           </Button>

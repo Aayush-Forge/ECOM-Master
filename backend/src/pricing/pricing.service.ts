@@ -25,12 +25,14 @@ export interface ComputedPricingItem {
   skuSnapshot: string;
   image: string | null;
   unitPrice: number;
+  regularPrice?: number;
   quantity: number;
   lineTotal: number;
   attributesSnapshot: any;
   stockAvailable: number | null;
   issues: PricingIssue[];
   product?: any;
+  variant?: any;
 }
 
 export interface PricingCalculationResult {
@@ -121,6 +123,8 @@ export class PricingService {
 
       const isVariable = product.productType === ProductType.variable;
       let unitPrice = 0;
+      let regularPrice = 0;
+      let matchedVariant: any = null;
       let skuSnapshot = product.sku || '';
       let titleSnapshot = product.title;
       let variantId: string | null = null;
@@ -155,12 +159,14 @@ export class PricingService {
             }
             issues.push({ reason: 'inactive', availableQuantity: 0 });
           } else {
+            matchedVariant = variant;
             const regPrice = Number(variant.regularPrice);
             const salePrice =
               variant.salePrice !== undefined && variant.salePrice !== null
                 ? Number(variant.salePrice)
                 : null;
             unitPrice = salePrice !== null && salePrice < regPrice ? salePrice : regPrice;
+            regularPrice = regPrice;
 
             skuSnapshot = String(variant.sku || product.sku);
             variantId = String(variant.id);
@@ -209,6 +215,7 @@ export class PricingService {
         }
 
         unitPrice = Number(product.salePrice ?? product.basePrice);
+        regularPrice = Number(product.basePrice ?? unitPrice);
 
         if (product.stockQuantity !== null && product.stockQuantity !== undefined) {
           stockAvailable = Number(product.stockQuantity);
@@ -247,12 +254,14 @@ export class PricingService {
         skuSnapshot,
         image,
         unitPrice,
+        regularPrice,
         quantity: item.quantity,
         lineTotal,
         attributesSnapshot,
         stockAvailable,
         issues,
         product,
+        variant: matchedVariant,
       });
     }
 

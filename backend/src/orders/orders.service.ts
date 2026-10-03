@@ -237,12 +237,33 @@ export class OrdersService {
     return order;
   }
 
-  async getAllOrders(status?: string, page = 1, perPage = 20, search?: string) {
+  async getAllOrders(
+    status?: string,
+    page = 1,
+    perPage = 20,
+    search?: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ) {
     const skip = (page - 1) * perPage;
     const where: any = {};
 
     if (status && status !== 'all') {
       where.status = status as OrderStatus;
+    }
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        if (dateTo.length <= 10) {
+          to.setUTCHours(23, 59, 59, 999);
+        }
+        where.createdAt.lte = to;
+      }
     }
 
     if (search && search.trim()) {
