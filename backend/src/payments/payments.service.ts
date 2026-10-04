@@ -14,6 +14,8 @@ import {
   PaymentStatus,
   WebhookEventStatus,
 } from '../generated/prisma/enums.js';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 interface RazorpayPaymentEntity {
   id: string;
@@ -23,7 +25,10 @@ interface RazorpayPaymentEntity {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue('payments') private readonly paymentsQueue: Queue,
+  ) {}
 
   // ---------------------------------------------------------------------
   // 1. Initiate: create a Razorpay order + local Payment row for an Order
@@ -156,8 +161,31 @@ export class PaymentsService {
       return;
     }
 
+    // jobId dedupes redeliveries that arrive while the job is still queued.
+    // Failed/completed jobs are removed so a later redelivery can re-enqueue.
+    await this.paymentsQueue.add(
+      'process-webhook-event',
+      { paymentWebhookEventId: event.id },
+      {
+        jobId: event.id,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+  }
+
+  async processQueuedWebhookEvent(paymentWebhookEventId: string) {
+    const event = await this.prisma.paymentWebhookEvent.findUniqueOrThrow({
+      where: { id: paymentWebhookEventId },
+    });
+    if (event.status === WebhookEventStatus.PROCESSED) {
+      return;
+    }
+
     try {
-      await this.processWebhookEvent(eventType, payload);
+      await this.processWebhookEvent(event.eventType, event.payload);
       await this.prisma.paymentWebhookEvent.update({
         where: { id: event.id },
         data: { status: WebhookEventStatus.PROCESSED, processedAt: new Date() },
