@@ -115,9 +115,6 @@ const productSchema = z
       )
       .optional()
       .or(z.literal('')),
-    metaTitle: z.string().trim().max(100, 'Meta title cannot exceed 100 characters.').optional().or(z.literal('')),
-    metaDescription: z.string().trim().max(300, 'Meta description cannot exceed 300 characters.').optional().or(z.literal('')),
-    metaKeywords: z.string().trim().max(200, 'Meta keywords cannot exceed 200 characters.').optional().or(z.literal('')),
     weight: optionalNumber('Weight', null),
     length: optionalNumber('Length', null),
     width: optionalNumber('Width', null),
@@ -196,9 +193,6 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       category: '',
       shortDescription: '',
       description: '',
-      metaTitle: '',
-      metaDescription: '',
-      metaKeywords: '',
       weight: '',
       length: '',
       width: '',
@@ -287,9 +281,6 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
             category: product.categoryId || product.categoryDetails?.id || product.category || '',
             shortDescription: product.shortDescription || '',
             description: product.description || '',
-            metaTitle: product.metaTitle || '',
-            metaDescription: product.metaDescription || '',
-            metaKeywords: product.metaKeywords || '',
             weight: product.weight ?? '',
             length: product.length ?? '',
             width: product.width ?? '',
@@ -505,9 +496,6 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       let payload = {
         ...values,
         slug: values.slug?.trim() || undefined,
-        metaTitle: values.metaTitle?.trim() || undefined,
-        metaDescription: values.metaDescription?.trim() || undefined,
-        metaKeywords: values.metaKeywords?.trim() || undefined,
         images: cleanImages,
         customFields,
         productType,
@@ -1197,63 +1185,6 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                       )}
                     />
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* SEO & Search Metadata Card */}
-              <Card className="border-stone-200 shadow-xs">
-                <CardContent className="p-4 space-y-3">
-                  <div className="border-b border-stone-100 pb-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 font-inter">SEO & Search Metadata</h3>
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="metaTitle"
-                    render={({ field }) => (
-                      <FormItem className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <FormLabel className="text-xs font-semibold text-stone-700">Meta Title</FormLabel>
-                          <span className="text-[10px] text-stone-400 font-mono">{(field.value || '').length}/100</span>
-                        </div>
-                        <FormControl>
-                          <Input placeholder="SEO Title tag (defaults to product title)" maxLength={100} className="h-9 text-xs" {...field} />
-                        </FormControl>
-                        <FormMessage className="text-[11px] text-red-600" />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="metaDescription"
-                    render={({ field }) => (
-                      <FormItem className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <FormLabel className="text-xs font-semibold text-stone-700">Meta Description</FormLabel>
-                          <span className="text-[10px] text-stone-400 font-mono">{(field.value || '').length}/300</span>
-                        </div>
-                        <FormControl>
-                          <Textarea rows={2} placeholder="Search engine snippet description..." maxLength={300} className="text-xs resize-none" {...field} />
-                        </FormControl>
-                        <FormMessage className="text-[11px] text-red-600" />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="metaKeywords"
-                    render={({ field }) => (
-                      <FormItem className="space-y-1">
-                        <FormLabel className="text-xs font-semibold text-stone-700">Meta Keywords</FormLabel>
-                        <FormControl>
-                          <Input placeholder="incense, agarbatti, organic (comma-separated)" maxLength={200} className="h-9 text-xs" {...field} />
-                        </FormControl>
-                        <FormMessage className="text-[11px] text-red-600" />
-                      </FormItem>
-                    )}
-                  />
                 </CardContent>
               </Card>
 
