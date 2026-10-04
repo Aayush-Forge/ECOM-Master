@@ -34,10 +34,9 @@ async function bootstrap() {
       }
 
       if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
-        allowedOrigins.add('http://localhost:3000');
-        allowedOrigins.add('http://localhost:3001');
-        allowedOrigins.add('http://127.0.0.1:3000');
-        allowedOrigins.add('http://127.0.0.1:3001');
+        if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+          return callback(null, true);
+        }
       }
 
       if (allowedOrigins.has(origin)) {
