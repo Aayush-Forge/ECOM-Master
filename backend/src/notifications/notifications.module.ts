@@ -5,6 +5,7 @@ import { NotificationsListener } from './notifications.listener.js';
 import { NotificationProcessor } from './notification-processor.js';
 import { EMAIL_PROVIDER } from './providers/email-provider.interface.js';
 import { ConsoleEmailProvider } from './providers/console-email.provider.js';
+import { SmtpEmailProvider } from './providers/smtp-email.provider.js';
 import { NOTIFICATION_PUBLISHER } from './publishers/notification-publisher.interface.js';
 import { InProcessPublisher } from './publishers/in-process.publisher.js';
 
@@ -14,9 +15,15 @@ import { InProcessPublisher } from './publishers/in-process.publisher.js';
     NotificationsService,
     NotificationsListener,
     NotificationProcessor,
+    ConsoleEmailProvider,
+    SmtpEmailProvider,
     {
       provide: EMAIL_PROVIDER,
-      useClass: ConsoleEmailProvider,
+      useFactory: (smtpProvider: SmtpEmailProvider, consoleProvider: ConsoleEmailProvider) => {
+        const configured = process.env.EMAIL_PROVIDER?.toLowerCase().trim();
+        return configured === 'smtp' ? smtpProvider : consoleProvider;
+      },
+      inject: [SmtpEmailProvider, ConsoleEmailProvider],
     },
     {
       provide: NOTIFICATION_PUBLISHER,
