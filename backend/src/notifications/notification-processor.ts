@@ -34,7 +34,7 @@ export class NotificationProcessor {
         this.logger.warn(
           `[NotificationProcessor] Order ${orderId} has no recipient for template "${templateKey}"`,
         );
-        await this.recordFailure(job, null, 'no_recipient', existing?.id);
+        await this.recordFailure(job, null, 'no email', existing?.id);
         return;
       }
 

@@ -37,7 +37,8 @@ export class NotificationsService {
         return;
       }
 
-      const recipient = (order.email || order.customer?.email)?.trim() || null;
+      // Per spec: Customer email = Order.email. Missing -> skip + NotificationLog status failed with error "no email". Don't invent.
+      const recipient = order.email?.trim() || null;
       const idempotencyKey = `order:${orderId}:${templateKey}`;
 
       // Check idempotency before publishing
@@ -52,17 +53,17 @@ export class NotificationsService {
         return;
       }
 
-      // If no recipient email found (e.g. missing guest email)
+      // If no recipient email found on Order
       if (!recipient) {
         this.logger.warn(
-          `[NotificationsService] Order ${orderId} has no recipient email; logging failed with reason 'no_recipient'`,
+          `[NotificationsService] Order ${orderId} has no email; logging failed with error 'no email'`,
         );
         if (existing) {
           await this.prisma.notificationLog.update({
             where: { id: existing.id },
             data: {
               status: NotificationStatus.failed,
-              error: 'no_recipient',
+              error: 'no email',
               recipient: null,
             },
           });
@@ -75,7 +76,7 @@ export class NotificationsService {
               recipient: null,
               templateKey,
               status: NotificationStatus.failed,
-              error: 'no_recipient',
+              error: 'no email',
             },
           });
         }

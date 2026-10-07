@@ -11,7 +11,13 @@ export class NotificationsListener {
   @OnEvent('order.created')
   async handleOrderCreated(payload: { orderId: string }): Promise<void> {
     try {
-      this.logger.log(`[NotificationsListener] Received order.created for order ${payload?.orderId}`);
+      if (!payload?.orderId) return;
+      this.logger.log(`[NotificationsListener] Received order.created for order ${payload.orderId}`);
+      // Send internal alert to admin/staff when a new order is placed
+      await this.notificationsService.dispatchInternalAlert(
+        payload.orderId,
+        'internal_new_order',
+      );
     } catch (err: any) {
       this.logger.error(`Error in handleOrderCreated: ${err?.message || err}`);
     }
