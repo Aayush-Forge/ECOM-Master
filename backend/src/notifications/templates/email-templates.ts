@@ -25,53 +25,76 @@ export function getBrandName(): string {
   return process.env.EMAIL_BRAND_NAME || 'Sridattam';
 }
 
-function renderBaseLayout(params: {
-  preheader: string;
-  heading: string;
-  bodyHtml: string;
-}): string {
+function renderHeaderHtml(): string {
   const brandName = getBrandName();
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(params.heading)}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f5; color: #18181b; }
-    .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e4e4e7; }
-    .header { background: #18181b; color: #ffffff; padding: 24px; text-align: center; }
-    .header h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px; }
-    .preheader { display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; }
-    .content { padding: 24px; font-size: 15px; line-height: 1.6; }
-    .footer { background: #fafafa; border-top: 1px solid #e4e4e7; padding: 16px 24px; text-align: center; font-size: 12px; color: #71717a; }
-    .item-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    .item-table th, .item-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #e4e4e7; font-size: 14px; }
-    .item-table th { font-weight: 600; color: #52525b; }
-    .totals { margin-top: 16px; border-top: 2px solid #e4e4e7; padding-top: 8px; }
-    .totals table { width: 100%; font-size: 14px; }
-    .totals td { padding: 4px 0; }
-    .totals .amount { text-align: right; }
-    .totals .grand-total { font-weight: 700; font-size: 16px; border-top: 1px solid #e4e4e7; padding-top: 8px; }
-    .badge { display: inline-block; padding: 3px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; background: #e4e4e7; }
-  </style>
-</head>
-<body>
-  <div class="preheader">${escapeHtml(params.preheader)}</div>
-  <div class="container">
-    <div class="header">
-      <h1>${escapeHtml(brandName)}</h1>
-    </div>
-    <div class="content">
-      <h2 style="margin-top: 0; font-size: 18px; color: #09090b;">${escapeHtml(params.heading)}</h2>
-      ${params.bodyHtml}
-    </div>
-    <div class="footer">
-      <p style="margin: 0;">&copy; ${new Date().getFullYear()} ${escapeHtml(brandName)}. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>`;
+  const logoUrl = process.env.EMAIL_LOGO_URL?.trim();
+
+  if (logoUrl && logoUrl.startsWith('https://')) {
+    return `<div style="text-align: center; padding: 24px 0 16px 0;">
+      <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(brandName)}" style="max-height: 48px; width: auto; border: 0; outline: none; display: inline-block;" />
+    </div>`;
+  }
+
+  return `<div style="text-align: center; padding: 24px 0 16px 0;">
+    <h1 style="margin: 0; font-family: 'Lora', Georgia, serif; font-size: 24px; font-weight: 700; color: #800020; letter-spacing: 0.5px;">${escapeHtml(brandName)}</h1>
+  </div>`;
+}
+
+function renderSupportLineHtml(): string {
+  const email = process.env.SUPPORT_EMAIL?.trim();
+  const phone = process.env.SUPPORT_PHONE?.trim();
+  if (!email && !phone) return '';
+
+  const parts: string[] = [];
+  if (email) {
+    parts.push(`Email: <a href="mailto:${escapeHtml(email)}" style="color: #FF6B00; text-decoration: none;">${escapeHtml(email)}</a>`);
+  }
+  if (phone) {
+    parts.push(`Phone: ${escapeHtml(phone)}`);
+  }
+
+  return `<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #E4E4E7; font-size: 13px; color: #71717A; font-family: 'Inter', -apple-system, sans-serif;">
+    Need help? ${parts.join(' | ')}
+  </div>`;
+}
+
+function renderSupportLineText(): string {
+  const email = process.env.SUPPORT_EMAIL?.trim();
+  const phone = process.env.SUPPORT_PHONE?.trim();
+  if (!email && !phone) return '';
+
+  const parts: string[] = [];
+  if (email) parts.push(`Email: ${email}`);
+  if (phone) parts.push(`Phone: ${phone}`);
+
+  return `\nNeed help? ${parts.join(' | ')}\n`;
+}
+
+type ProgressStep = 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered';
+const PROGRESS_STEPS: ProgressStep[] = ['Confirmed', 'Processing', 'Shipped', 'Delivered'];
+
+function renderProgressStripHtml(currentStep: ProgressStep): string {
+  const currentIndex = PROGRESS_STEPS.indexOf(currentStep);
+
+  const cells = PROGRESS_STEPS.map((step, idx) => {
+    const isCompletedOrCurrent = idx <= currentIndex;
+    const isCurrent = idx === currentIndex;
+    const bg = isCurrent ? '#FF6B00' : isCompletedOrCurrent ? '#FFF4E6' : '#F4F4F5';
+    const fg = isCurrent ? '#FFFFFF' : isCompletedOrCurrent ? '#B84600' : '#71717A';
+    const border = isCurrent ? '#FF6B00' : isCompletedOrCurrent ? '#FFE4C2' : '#E4E4E7';
+
+    return `<td width="25%" align="center" style="padding: 8px 4px; background-color: ${bg}; color: ${fg}; border: 1px solid ${border}; border-radius: 4px; font-size: 11px; font-weight: ${isCurrent ? '700' : '500'}; font-family: 'Inter', -apple-system, sans-serif;">
+      ${escapeHtml(step)}
+    </td>`;
+  }).join('');
+
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 16px 0 24px 0; border-collapse: separate; border-spacing: 4px;">
+    <tr>${cells}</tr>
+  </table>`;
+}
+
+function renderProgressStripText(currentStep: ProgressStep): string {
+  return `Progress: ` + PROGRESS_STEPS.map((s) => s === currentStep ? `[${s}]` : s).join(' > ') + `\n\n`;
 }
 
 function renderItemsTableHtml(items: any[]): string {
@@ -79,23 +102,26 @@ function renderItemsTableHtml(items: any[]): string {
   const rows = items
     .map(
       (item) => `
-    <tr>
-      <td>${escapeHtml(item.titleSnapshot || 'Item')}${item.skuSnapshot ? ` <span style="font-size:12px;color:#71717a;">(${escapeHtml(item.skuSnapshot)})</span>` : ''}</td>
-      <td style="text-align: center;">${escapeHtml(item.quantity)}</td>
-      <td style="text-align: right;">${escapeHtml(formatINR(item.unitPriceSnapshot))}</td>
-      <td style="text-align: right;">${escapeHtml(formatINR(item.lineTotal))}</td>
+    <tr style="border-bottom: 1px solid #E4E4E7;">
+      <td style="padding: 10px 12px; font-size: 13px; color: #0D0D0D; font-family: 'Inter', -apple-system, sans-serif;">
+        <div style="font-weight: 600;">${escapeHtml(item.titleSnapshot || item.title || 'Item')}</div>
+        ${item.skuSnapshot ? `<div style="font-size: 11px; color: #71717A;">SKU: ${escapeHtml(item.skuSnapshot)}</div>` : ''}
+      </td>
+      <td align="center" style="padding: 10px 8px; font-size: 13px; color: #52525B; font-family: 'Inter', -apple-system, sans-serif;">${escapeHtml(item.quantity)}</td>
+      <td align="right" style="padding: 10px 8px; font-size: 13px; color: #52525B; font-family: 'Inter', -apple-system, sans-serif;">${escapeHtml(formatINR(item.unitPriceSnapshot ?? item.unitPrice))}</td>
+      <td align="right" style="padding: 10px 12px; font-size: 13px; font-weight: 600; color: #0D0D0D; font-family: 'Inter', -apple-system, sans-serif;">${escapeHtml(formatINR(item.lineTotal))}</td>
     </tr>`,
     )
     .join('');
 
   return `
-  <table class="item-table">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 20px; border-collapse: collapse; border: 1px solid #E4E4E7; border-radius: 6px; overflow: hidden;">
     <thead>
-      <tr>
-        <th>Item</th>
-        <th style="text-align: center;">Qty</th>
-        <th style="text-align: right;">Price</th>
-        <th style="text-align: right;">Total</th>
+      <tr style="background-color: #FAFAFA; border-bottom: 1px solid #E4E4E7;">
+        <th align="left" style="padding: 10px 12px; font-size: 12px; font-weight: 600; color: #52525B; font-family: 'Inter', -apple-system, sans-serif;">Item</th>
+        <th align="center" style="padding: 10px 8px; font-size: 12px; font-weight: 600; color: #52525B; font-family: 'Inter', -apple-system, sans-serif;">Qty</th>
+        <th align="right" style="padding: 10px 8px; font-size: 12px; font-weight: 600; color: #52525B; font-family: 'Inter', -apple-system, sans-serif;">Price</th>
+        <th align="right" style="padding: 10px 12px; font-size: 12px; font-weight: 600; color: #52525B; font-family: 'Inter', -apple-system, sans-serif;">Total</th>
       </tr>
     </thead>
     <tbody>
@@ -104,173 +130,324 @@ function renderItemsTableHtml(items: any[]): string {
   </table>`;
 }
 
-function renderTotalsHtml(order: any): string {
-  return `
-  <div class="totals">
-    <table>
-      <tr>
-        <td>Subtotal</td>
-        <td class="amount">${escapeHtml(formatINR(order.subtotal))}</td>
-      </tr>
-      ${
-        order.discountTotal && Number(order.discountTotal) > 0
-          ? `<tr>
-        <td>Discount ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td>
-        <td class="amount" style="color: #16a34a;">-${escapeHtml(formatINR(order.discountTotal))}</td>
-      </tr>`
-          : ''
-      }
-      ${
-        order.shippingTotal && Number(order.shippingTotal) > 0
-          ? `<tr>
-        <td>Shipping</td>
-        <td class="amount">${escapeHtml(formatINR(order.shippingTotal))}</td>
-      </tr>`
-          : ''
-      }
-      ${
-        order.taxTotal && Number(order.taxTotal) > 0
-          ? `<tr>
-        <td>Tax</td>
-        <td class="amount">${escapeHtml(formatINR(order.taxTotal))}</td>
-      </tr>`
-          : ''
-      }
-      <tr class="grand-total">
-        <td>Total Paid</td>
-        <td class="amount">${escapeHtml(formatINR(order.grandTotal))}</td>
-      </tr>
-    </table>
-  </div>`;
+function renderItemsTableText(items: any[]): string {
+  if (!items || items.length === 0) return '';
+  return items
+    .map(
+      (item) =>
+        `- ${item.titleSnapshot || item.title || 'Item'}${item.skuSnapshot ? ` (${item.skuSnapshot})` : ''} x ${item.quantity}: ${formatINR(item.lineTotal)}`,
+    )
+    .join('\n') + '\n\n';
 }
 
-function renderAddressHtml(address: any): string {
-  if (!address) return '';
-  const parts = [
-    address.addressLine1,
-    address.addressLine2,
-    `${address.city}, ${address.state} ${address.postalCode}`,
-    address.country,
+function renderTotalsHtml(order: any): string {
+  const hasDiscount = order.discountTotal && Number(order.discountTotal) > 0;
+  const hasShipping = order.shippingTotal && Number(order.shippingTotal) > 0;
+  const hasTax = order.taxTotal && Number(order.taxTotal) > 0;
+
+  return `
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 14px; font-family: 'Inter', -apple-system, sans-serif;">
+    <tr>
+      <td style="padding: 4px 0; font-size: 13px; color: #71717A;">Subtotal</td>
+      <td align="right" style="padding: 4px 0; font-size: 13px; color: #0D0D0D;">${escapeHtml(formatINR(order.subtotal))}</td>
+    </tr>
+    ${
+      hasDiscount
+        ? `<tr>
+      <td style="padding: 4px 0; font-size: 13px; color: #71717A;">Discount ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td>
+      <td align="right" style="padding: 4px 0; font-size: 13px; color: #16A34A;">-${escapeHtml(formatINR(order.discountTotal))}</td>
+    </tr>`
+        : ''
+    }
+    ${
+      hasShipping
+        ? `<tr>
+      <td style="padding: 4px 0; font-size: 13px; color: #71717A;">Shipping</td>
+      <td align="right" style="padding: 4px 0; font-size: 13px; color: #0D0D0D;">${escapeHtml(formatINR(order.shippingTotal))}</td>
+    </tr>`
+        : ''
+    }
+    ${
+      hasTax
+        ? `<tr>
+      <td style="padding: 4px 0; font-size: 13px; color: #71717A;">Tax</td>
+      <td align="right" style="padding: 4px 0; font-size: 13px; color: #0D0D0D;">${escapeHtml(formatINR(order.taxTotal))}</td>
+    </tr>`
+        : ''
+    }
+    <tr>
+      <td style="padding: 8px 0 0 0; border-top: 1px solid #E4E4E7; font-size: 15px; font-weight: 700; color: #0D0D0D;">Total</td>
+      <td align="right" style="padding: 8px 0 0 0; border-top: 1px solid #E4E4E7; font-size: 15px; font-weight: 700; color: #0D0D0D;">${escapeHtml(formatINR(order.grandTotal))}</td>
+    </tr>
+  </table>`;
+}
+
+function renderTotalsText(order: any): string {
+  const parts: string[] = [`Subtotal: ${formatINR(order.subtotal)}`];
+  if (order.discountTotal && Number(order.discountTotal) > 0) {
+    parts.push(`Discount${order.couponCode ? ` (${order.couponCode})` : ''}: -${formatINR(order.discountTotal)}`);
+  }
+  if (order.shippingTotal && Number(order.shippingTotal) > 0) {
+    parts.push(`Shipping: ${formatINR(order.shippingTotal)}`);
+  }
+  if (order.taxTotal && Number(order.taxTotal) > 0) {
+    parts.push(`Tax: ${formatINR(order.taxTotal)}`);
+  }
+  parts.push(`Total: ${formatINR(order.grandTotal)}`);
+  return parts.join('\n') + '\n\n';
+}
+
+function renderShippingAddressHtml(order: any): string {
+  const addr = (order.addresses || []).find((a: any) => a.type === 'shipping') || order.addresses?.[0];
+  if (!addr) return '';
+
+  const addressLines = [
+    addr.addressLine1,
+    addr.addressLine2,
+    `${addr.city}, ${addr.state} ${addr.postalCode}`,
+    addr.country,
   ].filter(Boolean);
 
   return `
-  <div style="margin-top: 16px; padding: 12px; background: #fafafa; border-radius: 6px; font-size: 13px; line-height: 1.5;">
-    <strong>Delivery Address:</strong><br>
-    ${escapeHtml(address.fullName)}<br>
-    ${parts.map((p) => escapeHtml(p)).join('<br>')}<br>
-    Phone: ${escapeHtml(address.phone)}
+  <div style="margin-top: 20px; padding: 14px; background-color: #FAFAFA; border: 1px solid #E4E4E7; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #0D0D0D; font-family: 'Inter', -apple-system, sans-serif;">
+    <div style="font-weight: 600; margin-bottom: 4px; color: #52525B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Shipping Address</div>
+    <div>${escapeHtml(addr.fullName)}</div>
+    ${addressLines.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}
+    ${addr.phone ? `<div>Phone: ${escapeHtml(addr.phone)}</div>` : ''}
   </div>`;
 }
 
-// 1. order_confirmation (on order.paid)
+function renderShippingAddressText(order: any): string {
+  const addr = (order.addresses || []).find((a: any) => a.type === 'shipping') || order.addresses?.[0];
+  if (!addr) return '';
+
+  const parts = [
+    `Shipping Address:`,
+    addr.fullName,
+    addr.addressLine1,
+    addr.addressLine2,
+    `${addr.city}, ${addr.state} ${addr.postalCode}`,
+    addr.country,
+    addr.phone ? `Phone: ${addr.phone}` : null,
+  ].filter(Boolean);
+
+  return parts.join('\n') + '\n\n';
+}
+
+function renderSharedLayout(params: {
+  preheader: string;
+  heading: string;
+  bodyHtml: string;
+}): string {
+  const brandName = getBrandName();
+  const currentYear = new Date().getFullYear();
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>${escapeHtml(params.heading)}</title>
+  <style>
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; background-color: #F4F4F5; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F4F5; color: #0D0D0D;">
+  <div style="display: none; max-height: 0px; overflow: hidden; mso-hide: all;">
+    ${escapeHtml(params.preheader)}
+  </div>
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F4F4F5;">
+    <tr>
+      <td align="center" style="padding: 24px 12px;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 8px; border: 1px solid #E4E4E7; overflow: hidden;">
+          <tr>
+            <td style="padding: 24px 32px 16px 32px; text-align: center; border-bottom: 1px solid #F4F4F5;">
+              ${renderHeaderHtml()}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 32px 32px 32px; font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; line-height: 1.6; color: #0D0D0D;">
+              <h2 style="margin: 0 0 16px 0; font-family: 'Lora', Georgia, serif; font-size: 20px; font-weight: 700; color: #0D0D0D;">
+                ${escapeHtml(params.heading)}
+              </h2>
+              ${params.bodyHtml}
+              ${renderSupportLineHtml()}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 32px; background-color: #FAFAFA; border-top: 1px solid #E4E4E7; text-align: center; font-size: 12px; color: #71717A; font-family: 'Inter', -apple-system, sans-serif;">
+              <p style="margin: 0;">&copy; ${currentYear} ${escapeHtml(brandName)}. All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// 1. order_confirmation (order.paid, customer)
 export function renderOrderConfirmation(order: any): RenderedEmail {
   const brandName = getBrandName();
   const subject = `Order Confirmed: #${order.orderNumber}`;
-  const preheader = `Thank you for your order #${order.orderNumber}. We have received your payment.`;
+  const preheader = `Your order #${order.orderNumber} has been confirmed.`;
   const heading = `Order Confirmed`;
 
-  const shippingAddr = (order.addresses || []).find((a: any) => a.type === 'shipping');
-
   const bodyHtml = `
-    <p>Hi ${escapeHtml(order.customer?.firstName || 'there')},</p>
-    <p>Thank you for shopping with ${escapeHtml(brandName)}! We have received your payment for order <strong>#${escapeHtml(order.orderNumber)}</strong>.</p>
+    <p style="margin: 0 0 16px 0;">Your order <strong>#${escapeHtml(order.orderNumber)}</strong> has been confirmed.</p>
+    ${renderProgressStripHtml('Confirmed')}
     ${renderItemsTableHtml(order.items)}
     ${renderTotalsHtml(order)}
-    ${shippingAddr ? renderAddressHtml(shippingAddr) : ''}
-    <p style="margin-top: 20px;">We will notify you once your order is packed and dispatched.</p>
+    ${renderShippingAddressHtml(order)}
   `;
 
-  const text = `Hi ${order.customer?.firstName || 'there'},\n\n` +
-    `Thank you for shopping with ${brandName}!\n` +
-    `We have received your payment for order #${order.orderNumber}.\n\n` +
-    `Order Total: ${formatINR(order.grandTotal)}\n\n` +
-    `We will notify you once your order is dispatched.\n\n` +
+  const text = `${heading}\n\n` +
+    `Your order #${order.orderNumber} has been confirmed.\n\n` +
+    renderProgressStripText('Confirmed') +
+    `Order Summary:\n` +
+    renderItemsTableText(order.items) +
+    renderTotalsText(order) +
+    renderShippingAddressText(order) +
+    renderSupportLineText() +
     `Team ${brandName}`;
 
   return {
     subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
+    html: renderSharedLayout({ preheader, heading, bodyHtml }),
     text,
   };
 }
 
-// 2. status_processing (on order.processing)
+// 2. status_processing (customer)
 export function renderStatusProcessing(order: any): RenderedEmail {
   const brandName = getBrandName();
   const subject = `Order Processing: #${order.orderNumber}`;
-  const preheader = `Your order #${order.orderNumber} is now being processed.`;
+  const preheader = `Your order #${order.orderNumber} is now processing.`;
   const heading = `Order Processing`;
 
   const bodyHtml = `
-    <p>Hi ${escapeHtml(order.customer?.firstName || 'there')},</p>
-    <p>Great news! Your order <strong>#${escapeHtml(order.orderNumber)}</strong> is now being processed and prepared for shipping.</p>
-    <p>We will update you as soon as your package has been handed over to our shipping partner.</p>
+    <p style="margin: 0 0 16px 0;">Your order <strong>#${escapeHtml(order.orderNumber)}</strong> is now being processed.</p>
+    ${renderProgressStripHtml('Processing')}
+    ${renderItemsTableHtml(order.items)}
+    ${renderTotalsHtml(order)}
+    ${renderShippingAddressHtml(order)}
   `;
 
-  const text = `Hi ${order.customer?.firstName || 'there'},\n\n` +
-    `Your order #${order.orderNumber} is now being processed and prepared for shipping.\n\n` +
+  const text = `${heading}\n\n` +
+    `Your order #${order.orderNumber} is now being processed.\n\n` +
+    renderProgressStripText('Processing') +
+    `Order Summary:\n` +
+    renderItemsTableText(order.items) +
+    renderTotalsText(order) +
+    renderShippingAddressText(order) +
+    renderSupportLineText() +
     `Team ${brandName}`;
 
   return {
     subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
+    html: renderSharedLayout({ preheader, heading, bodyHtml }),
     text,
   };
 }
 
-// 3. status_shipped (on order.shipped)
+// 3. status_shipped (customer)
 export function renderStatusShipped(order: any): RenderedEmail {
   const brandName = getBrandName();
   const subject = `Order Shipped: #${order.orderNumber}`;
-  const preheader = `Your order #${order.orderNumber} is on its way.`;
-  const heading = `Your Order Has Shipped`;
+  const preheader = `Your order #${order.orderNumber} has shipped.`;
+  const heading = `Order Shipped`;
 
-  const shippingAddr = (order.addresses || []).find((a: any) => a.type === 'shipping');
+  const trackingUrl = order.trackingUrl?.trim();
+  const isHttps = trackingUrl && trackingUrl.startsWith('https://');
+
+  const trackingButtonHtml = isHttps
+    ? `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 20px 0 12px 0;">
+        <tr>
+          <td align="center" style="border-radius: 4px; background-color: #FF6B00;">
+            <a href="${escapeHtml(trackingUrl)}" target="_blank" rel="noopener noreferrer" style="font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; font-weight: 600; color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 4px; display: inline-block;">
+              Track shipment
+            </a>
+          </td>
+        </tr>
+      </table>`
+    : '';
+
+  const trackingNumberHtml = order.trackingNumber
+    ? `<p style="margin: 8px 0 16px 0; font-size: 13px; color: #71717A;">Tracking number: <strong style="color: #0D0D0D;">${escapeHtml(order.trackingNumber)}</strong></p>`
+    : '';
 
   const bodyHtml = `
-    <p>Hi ${escapeHtml(order.customer?.firstName || 'there')},</p>
-    <p>Your order <strong>#${escapeHtml(order.orderNumber)}</strong> is on its way!</p>
-    ${shippingAddr ? renderAddressHtml(shippingAddr) : ''}
-    <p style="margin-top: 16px;">It should arrive at your doorstep shortly.</p>
+    <p style="margin: 0 0 16px 0;">Your order <strong>#${escapeHtml(order.orderNumber)}</strong> has shipped.</p>
+    ${renderProgressStripHtml('Shipped')}
+    ${trackingButtonHtml}
+    ${trackingNumberHtml}
+    ${renderItemsTableHtml(order.items)}
+    ${renderTotalsHtml(order)}
+    ${renderShippingAddressHtml(order)}
   `;
 
-  const text = `Hi ${order.customer?.firstName || 'there'},\n\n` +
-    `Your order #${order.orderNumber} has been shipped!\n\n` +
+  const trackingText = [
+    trackingUrl ? `Tracking link: ${trackingUrl}` : null,
+    order.trackingNumber ? `Tracking number: ${order.trackingNumber}` : null,
+  ].filter(Boolean).join('\n');
+
+  const text = `${heading}\n\n` +
+    `Your order #${order.orderNumber} has shipped.\n\n` +
+    renderProgressStripText('Shipped') +
+    (trackingText ? `${trackingText}\n\n` : '') +
+    `Order Summary:\n` +
+    renderItemsTableText(order.items) +
+    renderTotalsText(order) +
+    renderShippingAddressText(order) +
+    renderSupportLineText() +
     `Team ${brandName}`;
 
   return {
     subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
+    html: renderSharedLayout({ preheader, heading, bodyHtml }),
     text,
   };
 }
 
-// 4. status_delivered (on order.delivered)
+// 4. status_delivered (customer)
 export function renderStatusDelivered(order: any): RenderedEmail {
   const brandName = getBrandName();
   const subject = `Order Delivered: #${order.orderNumber}`;
   const preheader = `Your order #${order.orderNumber} has been delivered.`;
-  const heading = `Delivered!`;
+  const heading = `Order Delivered`;
 
   const bodyHtml = `
-    <p>Hi ${escapeHtml(order.customer?.firstName || 'there')},</p>
-    <p>Your order <strong>#${escapeHtml(order.orderNumber)}</strong> has been marked as delivered.</p>
-    <p>We hope you enjoy your purchase! If you have any questions or feedback, please reach out to our team.</p>
+    <p style="margin: 0 0 16px 0;">Your order <strong>#${escapeHtml(order.orderNumber)}</strong> has been delivered.</p>
+    ${renderProgressStripHtml('Delivered')}
+    ${renderItemsTableHtml(order.items)}
+    ${renderTotalsHtml(order)}
+    ${renderShippingAddressHtml(order)}
   `;
 
-  const text = `Hi ${order.customer?.firstName || 'there'},\n\n` +
-    `Your order #${order.orderNumber} has been delivered.\n` +
-    `Thank you for shopping with ${brandName}!\n\n` +
+  const text = `${heading}\n\n` +
+    `Your order #${order.orderNumber} has been delivered.\n\n` +
+    renderProgressStripText('Delivered') +
+    `Order Summary:\n` +
+    renderItemsTableText(order.items) +
+    renderTotalsText(order) +
+    renderShippingAddressText(order) +
+    renderSupportLineText() +
     `Team ${brandName}`;
 
   return {
     subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
+    html: renderSharedLayout({ preheader, heading, bodyHtml }),
     text,
   };
 }
 
-// 5. order_cancelled (on order.cancelled)
+// 5. order_cancelled (customer)
 export function renderOrderCancelled(order: any): RenderedEmail {
   const brandName = getBrandName();
   const subject = `Order Cancelled: #${order.orderNumber}`;
@@ -278,23 +455,27 @@ export function renderOrderCancelled(order: any): RenderedEmail {
   const heading = `Order Cancelled`;
 
   const bodyHtml = `
-    <p>Hi ${escapeHtml(order.customer?.firstName || 'there')},</p>
-    <p>Your order <strong>#${escapeHtml(order.orderNumber)}</strong> has been cancelled.</p>
-    <p>If you did not request this cancellation or have questions about a refund, please contact support.</p>
+    <p style="margin: 0 0 16px 0;">Your order <strong>#${escapeHtml(order.orderNumber)}</strong> has been cancelled.</p>
+    ${renderItemsTableHtml(order.items)}
+    ${renderTotalsHtml(order)}
   `;
 
-  const text = `Hi ${order.customer?.firstName || 'there'},\n\n` +
+  const text = `${heading}\n\n` +
     `Your order #${order.orderNumber} has been cancelled.\n\n` +
+    `Order Summary:\n` +
+    renderItemsTableText(order.items) +
+    renderTotalsText(order) +
+    renderSupportLineText() +
     `Team ${brandName}`;
 
   return {
     subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
+    html: renderSharedLayout({ preheader, heading, bodyHtml }),
     text,
   };
 }
 
-// 7. refund_processed (on order.refunded)
+// 6. refund_processed (order.refunded, customer)
 export function renderRefundProcessed(order: any): RenderedEmail {
   const brandName = getBrandName();
   const subject = `Refund Processed: #${order.orderNumber}`;
@@ -302,52 +483,63 @@ export function renderRefundProcessed(order: any): RenderedEmail {
   const heading = `Refund Processed`;
 
   const bodyHtml = `
-    <p>Hi ${escapeHtml(order.customer?.firstName || 'there')},</p>
-    <p>A refund has been processed for your order <strong>#${escapeHtml(order.orderNumber)}</strong> for the amount of <strong>${escapeHtml(formatINR(order.grandTotal))}</strong>.</p>
-    <p>Depending on your bank or payment method, the funds should reflect in your account within 5-7 business days.</p>
-  `;
-
-  const text = `Hi ${order.customer?.firstName || 'there'},\n\n` +
-    `A refund of ${formatINR(order.grandTotal)} has been processed for order #${order.orderNumber}.\n` +
-    `Please allow 5-7 business days for the credit to reflect.\n\n` +
-    `Team ${brandName}`;
-
-  return {
-    subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
-    text,
-  };
-}
-
-// 8. internal_new_order (to INTERNAL_ALERT_EMAILS on order.paid)
-export function renderInternalNewOrder(order: any): RenderedEmail {
-  const brandName = getBrandName();
-  const subject = `[Internal Alert] New Order Received: #${order.orderNumber}`;
-  const preheader = `New order #${order.orderNumber} paid for ${formatINR(order.grandTotal)}.`;
-  const heading = `New Order Received`;
-
-  const customerName = `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() || 'Guest';
-  const customerEmail = order.customer?.email || 'N/A';
-
-  const bodyHtml = `
-    <p>A new order has been paid and confirmed on ${escapeHtml(brandName)}.</p>
-    <div style="background: #fafafa; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px;">
-      <strong>Order Number:</strong> #${escapeHtml(order.orderNumber)}<br>
-      <strong>Customer:</strong> ${escapeHtml(customerName)} (${escapeHtml(customerEmail)})<br>
-      <strong>Grand Total:</strong> ${escapeHtml(formatINR(order.grandTotal))}
-    </div>
+    <p style="margin: 0 0 16px 0;">A refund of <strong>${escapeHtml(formatINR(order.grandTotal))}</strong> has been processed for order <strong>#${escapeHtml(order.orderNumber)}</strong>.</p>
     ${renderItemsTableHtml(order.items)}
     ${renderTotalsHtml(order)}
   `;
 
-  const text = `[Internal Alert] New Order Received: #${order.orderNumber}\n\n` +
-    `Customer: ${customerName} (${customerEmail})\n` +
-    `Grand Total: ${formatINR(order.grandTotal)}\n\n` +
-    `Items: ${(order.items || []).map((i: any) => `${i.titleSnapshot} x ${i.quantity}`).join(', ')}`;
+  const text = `${heading}\n\n` +
+    `A refund of ${formatINR(order.grandTotal)} has been processed for order #${order.orderNumber}.\n\n` +
+    `Order Summary:\n` +
+    renderItemsTableText(order.items) +
+    renderTotalsText(order) +
+    renderSupportLineText() +
+    `Team ${brandName}`;
 
   return {
     subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
+    html: renderSharedLayout({ preheader, heading, bodyHtml }),
+    text,
+  };
+}
+
+// 7. internal_new_order (order.paid ONLY, to INTERNAL_ALERT_EMAILS)
+export function renderInternalNewOrder(order: any): RenderedEmail {
+  const brandName = getBrandName();
+  const subject = `[New Order] #${order.orderNumber} - ${formatINR(order.grandTotal)}`;
+  const preheader = `New order #${order.orderNumber} received for ${formatINR(order.grandTotal)}.`;
+  const heading = `New Order Received`;
+
+  const customerName = `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() || 'Guest';
+  const customerEmail = order.email || order.customer?.email || 'N/A';
+  const customerPhone = order.customer?.phone || (order.addresses?.[0]?.phone) || 'N/A';
+
+  const bodyHtml = `
+    <div style="background-color: #FAFAFA; border: 1px solid #E4E4E7; border-radius: 6px; padding: 14px; margin-bottom: 20px; font-size: 13px; font-family: 'Inter', -apple-system, sans-serif;">
+      <div style="margin-bottom: 4px;"><strong>Order:</strong> #${escapeHtml(order.orderNumber)}</div>
+      <div style="margin-bottom: 4px;"><strong>Customer:</strong> ${escapeHtml(customerName)} (${escapeHtml(customerEmail)})</div>
+      <div style="margin-bottom: 4px;"><strong>Phone:</strong> ${escapeHtml(customerPhone)}</div>
+      <div><strong>Total:</strong> ${escapeHtml(formatINR(order.grandTotal))}</div>
+    </div>
+    ${renderItemsTableHtml(order.items)}
+    ${renderTotalsHtml(order)}
+    ${renderShippingAddressHtml(order)}
+  `;
+
+  const text = `${heading}\n\n` +
+    `Order: #${order.orderNumber}\n` +
+    `Customer: ${customerName} (${customerEmail})\n` +
+    `Phone: ${customerPhone}\n` +
+    `Total: ${formatINR(order.grandTotal)}\n\n` +
+    `Order Summary:\n` +
+    renderItemsTableText(order.items) +
+    renderTotalsText(order) +
+    renderShippingAddressText(order) +
+    `Team ${brandName}`;
+
+  return {
+    subject,
+    html: renderSharedLayout({ preheader, heading, bodyHtml }),
     text,
   };
 }
