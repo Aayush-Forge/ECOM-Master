@@ -8,6 +8,8 @@ import { ConsoleEmailProvider } from './providers/console-email.provider.js';
 import { SmtpEmailProvider } from './providers/smtp-email.provider.js';
 import { NOTIFICATION_PUBLISHER } from './publishers/notification-publisher.interface.js';
 import { InProcessPublisher } from './publishers/in-process.publisher.js';
+import { BullMqPublisher } from './publishers/bullmq.publisher.js';
+import { NotificationWorker } from './workers/notification.worker.js';
 
 @Module({
   imports: [PrismaModule],
@@ -17,6 +19,9 @@ import { InProcessPublisher } from './publishers/in-process.publisher.js';
     NotificationProcessor,
     ConsoleEmailProvider,
     SmtpEmailProvider,
+    InProcessPublisher,
+    BullMqPublisher,
+    NotificationWorker,
     {
       provide: EMAIL_PROVIDER,
       useFactory: (smtpProvider: SmtpEmailProvider, consoleProvider: ConsoleEmailProvider) => {
@@ -27,7 +32,7 @@ import { InProcessPublisher } from './publishers/in-process.publisher.js';
     },
     {
       provide: NOTIFICATION_PUBLISHER,
-      useClass: InProcessPublisher,
+      useClass: BullMqPublisher,
     },
   ],
   exports: [NotificationsService, EMAIL_PROVIDER, NOTIFICATION_PUBLISHER],
