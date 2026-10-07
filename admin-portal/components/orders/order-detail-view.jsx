@@ -48,6 +48,8 @@ export default function OrderDetailView() {
   const [validTransitions, setValidTransitions] = useState([])
   const [selectedStatus, setSelectedStatus] = useState('')
   const [statusNote, setStatusNote] = useState('')
+  const [trackingUrl, setTrackingUrl] = useState('')
+  const [trackingNumber, setTrackingNumber] = useState('')
   
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
   const [refundDialogOpen, setRefundDialogOpen] = useState(false)
@@ -94,12 +96,45 @@ export default function OrderDetailView() {
       toast.error('A cancellation reason is required')
       return
     }
+    if (selectedStatus === 'shipped') {
+      const trimmedUrl = trackingUrl.trim()
+      if (!trimmedUrl) {
+        toast.error('Tracking URL is required when status is Shipped')
+        return
+      }
+      try {
+        const parsed = new URL(trimmedUrl)
+        if (parsed.protocol !== 'https:') {
+          toast.error('Tracking URL must be a valid https URL')
+          return
+        }
+      } catch {
+        toast.error('Tracking URL must be a valid https URL')
+        return
+      }
+      if (trimmedUrl.length > 500) {
+        toast.error('Tracking URL cannot exceed 500 characters')
+        return
+      }
+      if (trackingNumber.trim().length > 100) {
+        toast.error('Tracking number cannot exceed 100 characters')
+        return
+      }
+    }
     setUpdating(true)
     try {
-      await updateOrderStatus(orderId, selectedStatus, statusNote.trim() || undefined)
+      await updateOrderStatus(
+        orderId,
+        selectedStatus,
+        statusNote.trim() || undefined,
+        selectedStatus === 'shipped' ? trackingUrl.trim() : undefined,
+        selectedStatus === 'shipped' && trackingNumber.trim() ? trackingNumber.trim() : undefined,
+      )
       toast.success(`Status updated to ${selectedStatus}`)
       setStatusDialogOpen(false)
       setStatusNote('')
+      setTrackingUrl('')
+      setTrackingNumber('')
       await fetchOrderData()
     } catch (error) {
       console.error('Error updating status:', error)
@@ -274,9 +309,23 @@ export default function OrderDetailView() {
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row gap-4 items-center">
                 <div className="flex-1 w-full">
-                  <p className="text-sm font-semibold text-stone-800 mb-2 flex items-center gap-2">
-                    Current Status: <Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge>
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="text-sm font-semibold text-stone-800">Current Status:</span>
+                    <Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge>
+                    {order.trackingUrl && (
+                      <span className="text-xs text-stone-600 ml-2">
+                        Tracking:{' '}
+                        <a
+                          href={order.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#FF6B00] hover:underline font-medium inline-flex items-center gap-1"
+                        >
+                          {order.trackingNumber || 'View Tracking'}
+                        </a>
+                      </span>
+                    )}
+                  </div>
                   {!hasRole(user, 'read_only') ? (
                     <div className="p-3 bg-stone-50 border border-stone-200 rounded-md text-xs text-stone-500 font-medium mt-3">
                       Status updates require staff privileges.
@@ -309,32 +358,62 @@ export default function OrderDetailView() {
                               Change order #{order.orderNumber || order.id?.slice(0, 8)} status from <strong className="text-stone-900">{order.status}</strong> to <strong className="text-saffron">{selectedStatus}</strong>.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
-                          <div className="space-y-1.5 py-3">
-                            <label className="text-xs font-semibold text-stone-700">
-                              {selectedStatus === 'cancelled'
-                                ? 'Cancellation Reason *'
-                                : selectedStatus === 'shipped'
-                                ? 'Courier & Tracking / AWB Details (optional)'
-                                : 'Status Note / Remarks (optional)'}
-                            </label>
-                            <Input
-                              value={statusNote}
-                              onChange={(e) => setStatusNote(e.target.value)}
-                              placeholder={
-                                selectedStatus === 'cancelled'
-                                  ? 'e.g. Customer requested cancellation / Out of stock (required)'
-                                  : selectedStatus === 'shipped'
-                                  ? 'e.g. Delhivery - AWB 92837492'
-                                  : 'Optional remarks...'
-                              }
-                              className="bg-stone-50 border-stone-200 text-sm"
-                            />
+                          <div className="space-y-3 py-3">
+                            {selectedStatus === 'shipped' && (
+                              <>
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-semibold text-stone-700">
+                                    Tracking URL <span className="text-red-500">*</span>
+                                  </label>
+                                  <Input
+                                    value={trackingUrl}
+                                    onChange={(e) => setTrackingUrl(e.target.value)}
+                                    placeholder="https://example.com/track/123456"
+                                    maxLength={500}
+                                    className="bg-stone-50 border-stone-200 text-sm"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-semibold text-stone-700">
+                                    Tracking Number <span className="text-stone-400 font-normal">(optional)</span>
+                                  </label>
+                                  <Input
+                                    value={trackingNumber}
+                                    onChange={(e) => setTrackingNumber(e.target.value)}
+                                    placeholder="e.g. TRK987654321"
+                                    maxLength={100}
+                                    className="bg-stone-50 border-stone-200 text-sm"
+                                  />
+                                </div>
+                              </>
+                            )}
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-semibold text-stone-700">
+                                {selectedStatus === 'cancelled'
+                                  ? 'Cancellation Reason *'
+                                  : 'Status Note / Remarks (optional)'}
+                              </label>
+                              <Input
+                                value={statusNote}
+                                onChange={(e) => setStatusNote(e.target.value)}
+                                placeholder={
+                                  selectedStatus === 'cancelled'
+                                    ? 'e.g. Customer requested cancellation / Out of stock (required)'
+                                    : 'Optional remarks...'
+                                }
+                                className="bg-stone-50 border-stone-200 text-sm"
+                              />
+                            </div>
                           </div>
                           <AlertDialogFooter>
                             <AlertDialogCancel className="border-stone-300 text-stone-800">Cancel</AlertDialogCancel>
                             <AlertDialogAction 
                               onClick={handleUpdateStatus} 
-                              disabled={updating || (selectedStatus === 'cancelled' && !statusNote.trim())} 
+                              disabled={
+                                updating || 
+                                (selectedStatus === 'cancelled' && !statusNote.trim()) ||
+                                (selectedStatus === 'shipped' && !trackingUrl.trim())
+                              } 
                               className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold disabled:opacity-50"
                             >
                               {updating ? 'Updating...' : 'Confirm'}

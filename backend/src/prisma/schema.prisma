@@ -210,6 +210,8 @@ model Order {
   couponCode    String?     @map("coupon_code")
   email         String?
   currency      String      @default("INR")
+  trackingUrl   String?     @map("tracking_url")
+  trackingNumber String?    @map("tracking_number")
   placedAt      DateTime?   @map("placed_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   createdAt     DateTime    @default(now()) @map("created_at")

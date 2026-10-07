@@ -55,6 +55,8 @@ export class OrdersController {
       body.toStatus,
       body.note,
       req.user.userId,
+      body.trackingUrl,
+      body.trackingNumber,
     );
   }
 }

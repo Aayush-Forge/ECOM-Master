@@ -42,6 +42,19 @@ export class CustomerOrdersController {
     return this.ordersService.trackOrder(dto.orderNumber, dto.phone, dto.email);
   }
 
+  @Get('track')
+  @Public()
+  trackOrderGet(
+    @Query('orderNumber') orderNumber?: string,
+    @Query('phone') phone?: string,
+    @Query('email') email?: string,
+  ) {
+    if (!orderNumber || (!phone && !email)) {
+      throw new NotFoundException('Order not found');
+    }
+    return this.ordersService.trackOrder(orderNumber, phone || '', email);
+  }
+
   @Get('me')
   @Roles(ROLES.CUSTOMER)
   getMyOrders(

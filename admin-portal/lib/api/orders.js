@@ -272,12 +272,18 @@ export async function trackOrder({ orderNumber, phone, email }) {
  * Real call: PATCH /admin/orders/:id/status
  * Backend is the single source of truth for legal transitions.
  */
-export async function updateOrderStatus(orderId, toStatus, note) {
+export async function updateOrderStatus(orderId, toStatus, note, trackingUrl, trackingNumber) {
   let headers = getAuthHeaders();
+  const bodyPayload = {
+    toStatus,
+    note,
+    ...(trackingUrl ? { trackingUrl } : {}),
+    ...(trackingNumber ? { trackingNumber } : {}),
+  };
   let res = await fetch(`${BACKEND_URL}/admin/orders/${orderId}/status`, {
     method: 'PATCH',
     headers,
-    body: JSON.stringify({ toStatus, note }),
+    body: JSON.stringify(bodyPayload),
   });
 
   if (res.status === 401) {
@@ -287,7 +293,7 @@ export async function updateOrderStatus(orderId, toStatus, note) {
       res = await fetch(`${BACKEND_URL}/admin/orders/${orderId}/status`, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ toStatus, note }),
+        body: JSON.stringify(bodyPayload),
       });
     }
   }

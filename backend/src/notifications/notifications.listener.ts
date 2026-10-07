@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsService } from './notifications.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class NotificationsListener {
   private readonly logger = new Logger(NotificationsListener.name);
 
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @OnEvent('order.created')
   async handleOrderCreated(payload: { orderId: string }): Promise<void> {
@@ -62,6 +66,15 @@ export class NotificationsListener {
     try {
       if (!payload?.orderId) return;
       this.logger.log(`[NotificationsListener] Received order.shipped for order ${payload.orderId}`);
+      // Load tracking information directly from database (don't trust event payload)
+      const order = await this.prisma.order.findUnique({
+        where: { id: payload.orderId },
+        select: { id: true, trackingUrl: true, trackingNumber: true },
+      });
+      if (!order) {
+        this.logger.warn(`[NotificationsListener] Order ${payload.orderId} not found in DB on order.shipped`);
+        return;
+      }
       await this.notificationsService.dispatchCustomerNotification(
         payload.orderId,
         'status_shipped',

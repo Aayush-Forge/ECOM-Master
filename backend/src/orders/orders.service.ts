@@ -323,6 +323,8 @@ export class OrdersService {
     toStatus: OrderStatus,
     note: string | undefined,
     userId: string,
+    trackingUrl?: string,
+    trackingNumber?: string,
   ) {
     const order = await this.prismaService.order.findUnique({
       where: { id: orderId },
@@ -349,7 +351,47 @@ export class OrdersService {
       throw new BadRequestException('Note is required for cancellation');
     }
 
+    let cleanTrackingUrl: string | null = null;
+    let cleanTrackingNumber: string | null = null;
+
+    if (toStatus === OrderStatus.shipped) {
+      if (!trackingUrl || !trackingUrl.trim()) {
+        throw new BadRequestException('Tracking URL is required when status is shipped');
+      }
+      const trimmedUrl = trackingUrl.trim();
+      if (trimmedUrl.length > 500) {
+        throw new BadRequestException('Tracking URL cannot exceed 500 characters');
+      }
+      try {
+        const parsed = new URL(trimmedUrl);
+        if (parsed.protocol !== 'https:') {
+          throw new BadRequestException('Tracking URL must be a valid https URL');
+        }
+      } catch {
+        throw new BadRequestException('Tracking URL must be a valid https URL');
+      }
+      cleanTrackingUrl = trimmedUrl;
+
+      if (trackingNumber && trackingNumber.trim()) {
+        const trimmedNumber = trackingNumber.trim();
+        if (trimmedNumber.length > 100) {
+          throw new BadRequestException('Tracking number cannot exceed 100 characters');
+        }
+        cleanTrackingNumber = trimmedNumber;
+      }
+    } else {
+      if (trackingUrl || trackingNumber) {
+        throw new BadRequestException('Tracking fields can only be set when status is shipped');
+      }
+    }
+
     const fromStatus = order.status;
+
+    let historyNote = note ?? null;
+    if (cleanTrackingUrl) {
+      const trackingInfo = `Tracking: ${cleanTrackingUrl}${cleanTrackingNumber ? ` (${cleanTrackingNumber})` : ''}`;
+      historyNote = historyNote ? `${historyNote} | ${trackingInfo}` : trackingInfo;
+    }
 
     const updatedOrder = await this.prismaService.$transaction(async (tx) => {
       await tx.orderStatusHistory.create({
@@ -358,7 +400,7 @@ export class OrdersService {
           fromStatus,
           toStatus,
           changedById: userId,
-          note: note ?? null,
+          note: historyNote,
         },
       });
 
@@ -371,9 +413,15 @@ export class OrdersService {
         `;
       }
 
+      const updateData: any = { status: toStatus };
+      if (toStatus === OrderStatus.shipped) {
+        updateData.trackingUrl = cleanTrackingUrl;
+        updateData.trackingNumber = cleanTrackingNumber;
+      }
+
       return tx.order.update({
         where: { id: orderId },
-        data: { status: toStatus },
+        data: updateData,
         include: {
           customer: {
             select: {

@@ -1,4 +1,4 @@
-﻿import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { OrderStatus } from '@prisma/client';
 
 export class UpdateOrderStatusDto {
@@ -9,4 +9,14 @@ export class UpdateOrderStatusDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  trackingUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  trackingNumber?: string;
 }
