@@ -294,31 +294,6 @@ export function renderOrderCancelled(order: any): RenderedEmail {
   };
 }
 
-// 6. order_failed (on order.failed)
-export function renderOrderFailed(order: any): RenderedEmail {
-  const brandName = getBrandName();
-  const subject = `Payment Failed: #${order.orderNumber}`;
-  const preheader = `Payment for order #${order.orderNumber} could not be completed.`;
-  const heading = `Payment Failed`;
-
-  const bodyHtml = `
-    <p>Hi ${escapeHtml(order.customer?.firstName || 'there')},</p>
-    <p>We were unable to complete the payment for your order <strong>#${escapeHtml(order.orderNumber)}</strong>.</p>
-    <p>You can try placing the order again with an alternative payment method.</p>
-  `;
-
-  const text = `Hi ${order.customer?.firstName || 'there'},\n\n` +
-    `We were unable to complete the payment for your order #${order.orderNumber}.\n` +
-    `Please try again with another payment method.\n\n` +
-    `Team ${brandName}`;
-
-  return {
-    subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
-    text,
-  };
-}
-
 // 7. refund_processed (on order.refunded)
 export function renderRefundProcessed(order: any): RenderedEmail {
   const brandName = getBrandName();
@@ -377,36 +352,6 @@ export function renderInternalNewOrder(order: any): RenderedEmail {
   };
 }
 
-// 9. internal_payment_failed (to INTERNAL_ALERT_EMAILS on payment.failed)
-export function renderInternalPaymentFailed(order: any): RenderedEmail {
-  const brandName = getBrandName();
-  const subject = `[Internal Alert] Payment Failed: #${order.orderNumber}`;
-  const preheader = `Payment failed for order #${order.orderNumber}.`;
-  const heading = `Payment Failure Alert`;
-
-  const customerName = `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() || 'Guest';
-  const customerEmail = order.customer?.email || 'N/A';
-
-  const bodyHtml = `
-    <p>A payment attempt has failed for order <strong>#${escapeHtml(order.orderNumber)}</strong>.</p>
-    <div style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 12px; border-radius: 6px; font-size: 14px;">
-      <strong>Order Number:</strong> #${escapeHtml(order.orderNumber)}<br>
-      <strong>Customer:</strong> ${escapeHtml(customerName)} (${escapeHtml(customerEmail)})<br>
-      <strong>Amount:</strong> ${escapeHtml(formatINR(order.grandTotal))}
-    </div>
-  `;
-
-  const text = `[Internal Alert] Payment Failed: #${order.orderNumber}\n\n` +
-    `Customer: ${customerName} (${customerEmail})\n` +
-    `Amount: ${formatINR(order.grandTotal)}`;
-
-  return {
-    subject,
-    html: renderBaseLayout({ preheader, heading, bodyHtml }),
-    text,
-  };
-}
-
 export function renderEmailTemplate(templateKey: string, order: any): RenderedEmail {
   switch (templateKey) {
     case 'order_confirmation':
@@ -419,14 +364,10 @@ export function renderEmailTemplate(templateKey: string, order: any): RenderedEm
       return renderStatusDelivered(order);
     case 'order_cancelled':
       return renderOrderCancelled(order);
-    case 'order_failed':
-      return renderOrderFailed(order);
     case 'refund_processed':
       return renderRefundProcessed(order);
     case 'internal_new_order':
       return renderInternalNewOrder(order);
-    case 'internal_payment_failed':
-      return renderInternalPaymentFailed(order);
     default:
       throw new Error(`Unknown email template key: ${templateKey}`);
   }

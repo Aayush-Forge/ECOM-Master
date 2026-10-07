@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { OrderStatus } from '@prisma/client';
 import { NotificationsService } from './notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -17,11 +18,6 @@ export class NotificationsListener {
     try {
       if (!payload?.orderId) return;
       this.logger.log(`[NotificationsListener] Received order.created for order ${payload.orderId}`);
-      // Send internal alert to admin/staff when a new order is placed
-      await this.notificationsService.dispatchInternalAlert(
-        payload.orderId,
-        'internal_new_order',
-      );
     } catch (err: any) {
       this.logger.error(`Error in handleOrderCreated: ${err?.message || err}`);
     }
@@ -37,7 +33,7 @@ export class NotificationsListener {
         payload.orderId,
         'order_confirmation',
       );
-      // 2. Send internal alert to admin/staff
+      // 2. Send internal alert to admin/staff (order.paid ONLY)
       await this.notificationsService.dispatchInternalAlert(
         payload.orderId,
         'internal_new_order',
@@ -103,26 +99,27 @@ export class NotificationsListener {
     try {
       if (!payload?.orderId) return;
       this.logger.log(`[NotificationsListener] Received order.cancelled for order ${payload.orderId}`);
+
+      // Read fromStatus from the DB order_status_history, not the event payload.
+      const history = await this.prisma.orderStatusHistory.findFirst({
+        where: { orderId: payload.orderId, toStatus: OrderStatus.cancelled },
+        orderBy: { changedAt: 'desc' },
+      });
+
+      // Customer email ONLY when previous status was NOT payment_pending
+      if (!history || history.fromStatus === OrderStatus.payment_pending) {
+        this.logger.log(
+          `[NotificationsListener] Skipping order_cancelled email for order ${payload.orderId} because previous status was ${history?.fromStatus ?? 'none'} (payment_pending cancels send nothing)`,
+        );
+        return;
+      }
+
       await this.notificationsService.dispatchCustomerNotification(
         payload.orderId,
         'order_cancelled',
       );
     } catch (err: any) {
       this.logger.error(`Error in handleOrderCancelled: ${err?.message || err}`);
-    }
-  }
-
-  @OnEvent('order.failed')
-  async handleOrderFailed(payload: { orderId: string }): Promise<void> {
-    try {
-      if (!payload?.orderId) return;
-      this.logger.log(`[NotificationsListener] Received order.failed for order ${payload.orderId}`);
-      await this.notificationsService.dispatchCustomerNotification(
-        payload.orderId,
-        'order_failed',
-      );
-    } catch (err: any) {
-      this.logger.error(`Error in handleOrderFailed: ${err?.message || err}`);
     }
   }
 
@@ -137,20 +134,6 @@ export class NotificationsListener {
       );
     } catch (err: any) {
       this.logger.error(`Error in handleOrderRefunded: ${err?.message || err}`);
-    }
-  }
-
-  @OnEvent('payment.failed')
-  async handlePaymentFailed(payload: { orderId: string }): Promise<void> {
-    try {
-      if (!payload?.orderId) return;
-      this.logger.log(`[NotificationsListener] Received payment.failed for order ${payload.orderId}`);
-      await this.notificationsService.dispatchInternalAlert(
-        payload.orderId,
-        'internal_payment_failed',
-      );
-    } catch (err: any) {
-      this.logger.error(`Error in handlePaymentFailed: ${err?.message || err}`);
     }
   }
 }
