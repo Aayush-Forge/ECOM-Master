@@ -13,15 +13,6 @@ export class NotificationsListener {
     private readonly prisma: PrismaService,
   ) {}
 
-  @OnEvent('order.created')
-  async handleOrderCreated(payload: { orderId: string }): Promise<void> {
-    try {
-      if (!payload?.orderId) return;
-      this.logger.log(`[NotificationsListener] Received order.created for order ${payload.orderId}`);
-    } catch (err: any) {
-      this.logger.error(`Error in handleOrderCreated: ${err?.message || err}`);
-    }
-  }
 
   @OnEvent('order.paid')
   async handleOrderPaid(payload: { orderId: string }): Promise<void> {

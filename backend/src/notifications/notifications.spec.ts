@@ -31,7 +31,7 @@ describe('Notifications Module Unit Tests', () => {
       expect(formatINR(null)).toBe('₹0.00');
     });
 
-    it('should render all 9 templates with proper subjects and content', () => {
+    it('should render all 7 templates with proper subjects and content', () => {
       const mockOrder = {
         id: 'ord-123',
         orderNumber: 'ORD-2026-0001',
@@ -90,6 +90,55 @@ describe('Notifications Module Unit Tests', () => {
         expect(rendered.text).toBeDefined();
         expect(rendered.text).toContain('ORD-2026-0001');
       }
+    });
+
+    it('status_shipped renders https trackingUrl as button and escapes <script> in names/titles', () => {
+      const mockOrderWithScript = {
+        orderNumber: 'ORD-999',
+        trackingUrl: 'https://carrier.com/track/12345',
+        trackingNumber: 'TRK-999',
+        subtotal: 1000,
+        grandTotal: 1000,
+        customer: {
+          firstName: '<script>alert(1)</script>',
+          lastName: 'Smith',
+        },
+        items: [
+          {
+            titleSnapshot: '<script>malicious()</script>',
+            skuSnapshot: 'SKU-X',
+            quantity: 1,
+            unitPriceSnapshot: 1000,
+            lineTotal: 1000,
+          },
+        ],
+        addresses: [
+          {
+            type: 'shipping',
+            fullName: '<script>alert(2)</script>',
+            addressLine1: 'Street',
+            city: 'City',
+            state: 'State',
+            postalCode: '123456',
+            country: 'India',
+          },
+        ],
+      };
+
+      const rendered = renderEmailTemplate('status_shipped', mockOrderWithScript);
+      expect(rendered.html).toContain('href="https://carrier.com/track/12345"');
+      expect(rendered.html).toContain('Track shipment');
+      expect(rendered.html).not.toContain('<script>');
+      expect(rendered.html).toContain('&lt;script&gt;malicious()&lt;/script&gt;');
+      expect(rendered.html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
+
+      const mockInsecureOrder = {
+        ...mockOrderWithScript,
+        trackingUrl: 'http://insecure.com/track',
+      };
+      const insecureRendered = renderEmailTemplate('status_shipped', mockInsecureOrder);
+      expect(insecureRendered.html).not.toContain('href="http://insecure.com/track"');
+      expect(insecureRendered.html).not.toContain('Track shipment');
     });
   });
 
