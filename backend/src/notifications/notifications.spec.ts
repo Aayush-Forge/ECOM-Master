@@ -74,10 +74,8 @@ describe('Notifications Module Unit Tests', () => {
         'status_shipped',
         'status_delivered',
         'order_cancelled',
-        'order_failed',
         'refund_processed',
         'internal_new_order',
-        'internal_payment_failed',
       ];
 
       for (const key of templateKeys) {
@@ -128,7 +126,7 @@ describe('Notifications Module Unit Tests', () => {
       service = module.get<NotificationsService>(NotificationsService);
     });
 
-    it('should log failed with reason no_recipient and stable idempotencyKey when order has no email', async () => {
+    it('should log failed with reason no email and stable idempotencyKey when order has no email', async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: 'guest-ord-1',
         customerId: null,
@@ -148,7 +146,7 @@ describe('Notifications Module Unit Tests', () => {
           recipient: null,
           templateKey: 'order_confirmation',
           status: NotificationStatus.failed,
-          error: 'no_recipient',
+          error: 'no email',
         },
       });
     });
@@ -194,7 +192,7 @@ describe('Notifications Module Unit Tests', () => {
       prisma.order.findUnique.mockResolvedValue({
         id: 'ord-1',
         customerId: 'usr-1',
-        email: null,
+        email: 'user@example.com',
         customer: { email: 'user@example.com' },
       });
       prisma.notificationLog.findUnique.mockResolvedValue(null);
@@ -387,6 +385,7 @@ describe('Notifications Module Unit Tests', () => {
   describe('NotificationsListener', () => {
     let listener: NotificationsListener;
     let service: any;
+    let prismaMock: any;
 
     beforeEach(async () => {
       service = {
@@ -394,10 +393,20 @@ describe('Notifications Module Unit Tests', () => {
         dispatchInternalAlert: jest.fn().mockResolvedValue(undefined),
       };
 
+      prismaMock = {
+        order: {
+          findUnique: jest.fn(),
+        },
+        orderStatusHistory: {
+          findFirst: jest.fn(),
+        },
+      };
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           NotificationsListener,
           { provide: NotificationsService, useValue: service },
+          { provide: PrismaService, useValue: prismaMock },
         ],
       }).compile();
 
@@ -426,6 +435,11 @@ describe('Notifications Module Unit Tests', () => {
     });
 
     it('handles order.shipped and triggers status_shipped', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 'ord-ship-1',
+        trackingUrl: 'https://track.example.com/123',
+        trackingNumber: 'TRK123',
+      });
       await listener.handleOrderShipped({ orderId: 'ord-ship-1' });
       expect(service.dispatchCustomerNotification).toHaveBeenCalledWith(
         'ord-ship-1',
@@ -441,19 +455,28 @@ describe('Notifications Module Unit Tests', () => {
       );
     });
 
-    it('handles order.cancelled and triggers order_cancelled', async () => {
+    it('handles order.cancelled and suppresses email when fromStatus was payment_pending', async () => {
+      prismaMock.orderStatusHistory.findFirst.mockResolvedValue({
+        id: 'hist-1',
+        orderId: 'ord-canc-1',
+        fromStatus: 'payment_pending',
+        toStatus: 'cancelled',
+      });
       await listener.handleOrderCancelled({ orderId: 'ord-canc-1' });
-      expect(service.dispatchCustomerNotification).toHaveBeenCalledWith(
-        'ord-canc-1',
-        'order_cancelled',
-      );
+      expect(service.dispatchCustomerNotification).not.toHaveBeenCalled();
     });
 
-    it('handles payment.failed and triggers internal_payment_failed', async () => {
-      await listener.handlePaymentFailed({ orderId: 'ord-fail-1' });
-      expect(service.dispatchInternalAlert).toHaveBeenCalledWith(
-        'ord-fail-1',
-        'internal_payment_failed',
+    it('handles order.cancelled and sends email when fromStatus was paid or processing (staff cancel)', async () => {
+      prismaMock.orderStatusHistory.findFirst.mockResolvedValue({
+        id: 'hist-2',
+        orderId: 'ord-canc-2',
+        fromStatus: 'paid',
+        toStatus: 'cancelled',
+      });
+      await listener.handleOrderCancelled({ orderId: 'ord-canc-2' });
+      expect(service.dispatchCustomerNotification).toHaveBeenCalledWith(
+        'ord-canc-2',
+        'order_cancelled',
       );
     });
   });

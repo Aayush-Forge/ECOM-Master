@@ -54,6 +54,8 @@ describe('OrdersController', () => {
       OrderStatus.paid,
       'Payment verified',
       'user_456',
+      undefined,
+      undefined,
     );
     expect(result).toBe(mockUpdated);
   });
