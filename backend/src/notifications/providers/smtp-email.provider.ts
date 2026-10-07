@@ -70,10 +70,11 @@ export class SmtpEmailProvider implements EmailProvider, OnModuleInit {
       return;
     }
 
+    const brandName = process.env.EMAIL_BRAND_NAME || 'Sridattam';
     const fromAddress =
       options.from ||
       process.env.EMAIL_FROM ||
-      (process.env.SMTP_USER ? `"Sridattam" <${process.env.SMTP_USER}>` : 'noreply@sridattam.com');
+      (process.env.SMTP_USER ? `"${brandName}" <${process.env.SMTP_USER}>` : `"${brandName}" <noreply@sridattam.com>`);
 
     try {
       this.logger.log(`[SmtpEmailProvider] Sending email to ${options.to} | Subject: "${options.subject}"`);
