@@ -19,6 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PricingModule } from './pricing/pricing.module';
 import { CartModule } from './cart/cart.module';
+import { CustomersModule } from './customers/customers.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -43,6 +44,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ProductsModule,
     ClubbingModule,
     OrdersModule,
+    CustomersModule,
     PaymentsModule,
     NotificationsModule,
     AnalyticsModule,

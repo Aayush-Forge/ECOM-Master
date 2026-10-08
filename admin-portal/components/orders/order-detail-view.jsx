@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter, usePathname } from 'next/navigation'
+import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { getOrderById, updateOrderStatus, getValidTransitions, initiateRefund } from '@/lib/api/orders'
 import { getPaymentByOrderId } from '@/lib/api/payments'
 import { useAuth } from '@/lib/auth-context'
@@ -170,9 +170,16 @@ export default function OrderDetailView() {
     }
   }
 
+  const searchParams = useSearchParams()
+  const fromParam = searchParams?.get('from')
+  const phoneParam = searchParams?.get('phone')
+  const isBackToCustomer = fromParam === 'customer' && phoneParam && /^\d+$/.test(phoneParam)
+  const backHref = isBackToCustomer ? `/customers/${phoneParam}` : basePath
+  const backLabel = isBackToCustomer ? 'Back to Customer' : 'Back to Orders'
+
   if (loading) return (
     <div className="space-y-6">
-      <Button variant="ghost" disabled><ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders</Button>
+      <Button variant="ghost" disabled><ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}</Button>
       <Skeleton className="h-32 w-full" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Skeleton className="h-64 w-full" />
@@ -186,8 +193,8 @@ export default function OrderDetailView() {
   return (
     <div className="space-y-6">
       <Button variant="outline" asChild className="mb-4 bg-white text-stone-900 border-stone-300 hover:bg-stone-100 hover:text-stone-900 font-semibold shadow-xs">
-        <Link href={basePath}>
-          <ArrowLeft className="mr-2 h-4 w-4 text-stone-700" /> Back to Orders
+        <Link href={backHref}>
+          <ArrowLeft className="mr-2 h-4 w-4 text-stone-700" /> {backLabel}
         </Link>
       </Button>
 

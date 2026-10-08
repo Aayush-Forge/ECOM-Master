@@ -40,6 +40,7 @@ export const ROLE_NAV_ITEMS = {
     { label: 'Products', href: '/products', icon: 'Package', group: 'Catalog' },
     { label: 'Categories', href: '/categories', icon: 'FolderTree', group: 'Catalog' },
     { label: 'Discounts', href: '/discounts', icon: 'Tags', group: 'Catalog' },
+    { label: 'Customers', href: '/customers', icon: 'Users', group: 'Catalog' },
     { label: 'Users', href: '/users', icon: 'Users', group: 'Management' },
     { label: 'Audit Logs', href: '/audit-logs', icon: 'ScrollText', group: 'Management' },
   ],
@@ -57,16 +58,19 @@ export const ROLE_NAV_ITEMS = {
   ],
 };
 
-const EDITOR_ALLOWED = [
-  '/overview',
-  '/orders',
-  '/payments',
-  '/products',
-  '/categories',
-  '/discounts',
-];
-
-const VIEWER_ALLOWED = ['/orders', '/payments'];
+export const ROLE_ALLOWED_ROUTE_PREFIXES = {
+  admin: ['/'],
+  editor: [
+    '/overview',
+    '/orders',
+    '/payments',
+    '/products',
+    '/categories',
+    '/discounts',
+  ],
+  read_only: ['/orders', '/payments'],
+  employee: ['/orders', '/payments'],
+};
 
 export function getRedirectForRole(role, pathname) {
   if (!role) return '/login';
@@ -84,19 +88,15 @@ export function getRedirectForRole(role, pathname) {
     return null; // Admin can access everything
   }
 
-  if (normalized === 'editor') {
-    const isAllowed = EDITOR_ALLOWED.some(
-      (r) => pathname === r || pathname.startsWith(r + '/'),
-    );
-    return isAllowed ? null : '/overview';
-  }
+  const allowed = ROLE_ALLOWED_ROUTE_PREFIXES[normalized] || [];
+  const isAllowed = allowed.some(
+    (r) => pathname === r || pathname.startsWith(r + '/'),
+  );
 
-  if (normalized === 'read_only' || normalized === 'employee') {
-    const isAllowed = VIEWER_ALLOWED.some(
-      (r) => pathname === r || pathname.startsWith(r + '/'),
-    );
-    return isAllowed ? null : '/orders';
-  }
+  if (isAllowed) return null;
+
+  if (normalized === 'editor') return '/overview';
+  if (normalized === 'read_only' || normalized === 'employee') return '/orders';
 
   return '/login';
 }

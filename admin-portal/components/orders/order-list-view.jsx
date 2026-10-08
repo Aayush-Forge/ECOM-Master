@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FilterX, RefreshCw, Search } from 'lucide-react'
 
-export function OrderListView({ basePath = '/orders', title = 'Orders' }) {
+export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn = getAllOrders, linkQuery = '' }) {
   const [orders, setOrders] = useState(() => getAllOrdersSync())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -24,13 +24,14 @@ export function OrderListView({ basePath = '/orders', title = 'Orders' }) {
     setLoading(true)
     setError(null)
     try {
-      const data = await getAllOrders({
+      const data = await fetchFn({
         status: statusFilter,
         search: searchTerm.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       })
-      setOrders(data || [])
+      const list = Array.isArray(data) ? data : data?.data || []
+      setOrders(list)
     } catch (err) {
       console.error('Failed to fetch orders:', err)
       setError(err?.message || 'Failed to load orders. Please try again.')
@@ -213,7 +214,7 @@ export function OrderListView({ basePath = '/orders', title = 'Orders' }) {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" asChild className="border-stone-300 font-inter text-xs">
-                        <Link href={`${basePath}/${order.id}`}>View</Link>
+                        <Link href={`${basePath}/${order.id}${linkQuery}`}>View</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
