@@ -26,7 +26,8 @@ export class CustomersService {
   async getCustomers(search?: string, page = 1, perPage = 20) {
     const rawSearch = (search || '').trim().slice(0, 100);
     const escapedTerm = rawSearch ? this.escapeLike(rawSearch) : '';
-    const digitsOnly = rawSearch.replace(/\D/g, '');
+    const allDigits = rawSearch.replace(/\D/g, '');
+    const digitsOnly = allDigits.length > 10 ? allDigits.slice(-10) : allDigits;
 
     const hasTerm = escapedTerm.length > 0;
     const hasDigits = digitsOnly.length > 0;
