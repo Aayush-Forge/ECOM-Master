@@ -177,7 +177,35 @@ export class ClubbingService {
     }
   }
 
-  async getActiveRules() {
+  private toPublicRule(rule: any) {
+    return {
+      id: rule.id,
+      name: rule.name,
+      description: rule.description,
+      type: rule.type,
+      requiredQuantity: rule.requiredQuantity,
+      fixedPrice: rule.fixedPrice,
+      percentageOff: rule.percentageOff,
+      applicableCategoryId: rule.applicableCategoryId,
+      startsAt: rule.startsAt,
+      endsAt: rule.endsAt,
+      isActive: rule.isActive,
+      createdAt: rule.createdAt,
+      updatedAt: rule.updatedAt,
+      applicableCategory: rule.applicableCategory,
+      products: rule.products,
+    };
+  }
+
+  async getActiveRules(publicOnly = true) {
+    const rules = await this.findActiveRulesInternal();
+    if (publicOnly) {
+      return rules.map((rule) => this.toPublicRule(rule));
+    }
+    return rules;
+  }
+
+  private async findActiveRulesInternal() {
     const now = new Date();
     const rules = await this.prisma.clubbingRule.findMany({
       where: {
@@ -242,7 +270,7 @@ export class ClubbingService {
     cartItems: CartItemDiscountInput[],
     couponCode?: string,
   ) {
-    const activeRules = await this.getActiveRules();
+    const activeRules = await this.findActiveRulesInternal();
     const cleanCode = couponCode && couponCode.trim() ? couponCode.trim().toUpperCase() : null;
 
     let matchedCodeRule: any = null;

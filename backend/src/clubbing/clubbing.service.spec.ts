@@ -122,4 +122,38 @@ describe('ClubbingService', () => {
       expect(res.discountTotal).toBe(60);
     });
   });
+
+  describe('getActiveRules', () => {
+    it('returns active rules without code, usageLimit, or usageCount in public response', async () => {
+      prisma.clubbingRule.findMany.mockResolvedValue([
+        {
+          id: 'rule-secret',
+          name: 'Special Promotion',
+          description: 'Save big',
+          code: 'SECRET20',
+          usageLimit: 100,
+          usageCount: 10,
+          type: ClubbingRuleType.percentage_off_bundle,
+          requiredQuantity: 2,
+          percentageOff: 20,
+          fixedPrice: null,
+          applicableCategoryId: null,
+          startsAt: null,
+          endsAt: null,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          applicableCategory: null,
+          products: [],
+        },
+      ]);
+
+      const publicRules = await service.getActiveRules();
+      expect(publicRules).toHaveLength(1);
+      expect(publicRules[0].name).toBe('Special Promotion');
+      expect(publicRules[0]).not.toHaveProperty('code');
+      expect(publicRules[0]).not.toHaveProperty('usageLimit');
+      expect(publicRules[0]).not.toHaveProperty('usageCount');
+    });
+  });
 });

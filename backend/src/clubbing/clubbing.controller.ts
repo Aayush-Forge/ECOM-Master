@@ -78,11 +78,16 @@ export class ClubbingController {
 
   @Post('calculate')
   @Public()
-  calculateDiscount(@Body() body: CalculateDiscountDto) {
-    return this.clubbingService.calculateCartDiscount(
+  async calculateDiscount(@Body() body: CalculateDiscountDto) {
+    const result = await this.clubbingService.calculateCartDiscount(
       body.cartItems || [],
       body.couponCode,
     );
+    return {
+      discountTotal: result.discountTotal,
+      appliedCouponCode: result.appliedCouponCode,
+      appliedRuleId: result.appliedRuleId,
+    };
   }
 }
 
