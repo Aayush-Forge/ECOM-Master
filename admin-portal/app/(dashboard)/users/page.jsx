@@ -32,11 +32,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { Shield, UserCog, FilterX, RefreshCw, UserPlus } from 'lucide-react'
-import { getRoleLabel, ROLES } from '@/lib/roles'
+import { getRoleLabel, ROLES, hasRole } from '@/lib/roles'
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth()
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = hasRole(currentUser, ROLES.ADMIN)
 
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -134,7 +134,6 @@ export default function AdminUsersPage() {
       case 'editor':
         return <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200 font-inter text-xs font-semibold">Editor Employee</Badge>
       case 'read_only':
-      case 'employee':
         return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 font-inter text-xs font-semibold">Viewer Employee</Badge>
       case 'customer':
       default:
@@ -144,7 +143,6 @@ export default function AdminUsersPage() {
 
   const filteredUsers = users.filter((u) => {
     if (roleFilter === 'all') return true
-    if (roleFilter === 'read_only' && u.role === 'employee') return true
     return u.role?.toLowerCase() === roleFilter.toLowerCase()
   })
 
@@ -249,11 +247,10 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Select
-                        value={user.role === 'employee' ? 'read_only' : user.role}
+                        value={user.role}
                         onValueChange={(newRole) => {
-                          const currentNormalized = user.role === 'employee' ? 'read_only' : user.role
-                          if (newRole !== currentNormalized) {
-                            setRoleChangeTarget({ user, currentRole: currentNormalized, newRole })
+                          if (newRole !== user.role) {
+                            setRoleChangeTarget({ user, currentRole: user.role, newRole })
                           }
                         }}
                       >
