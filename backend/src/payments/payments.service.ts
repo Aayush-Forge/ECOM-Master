@@ -173,6 +173,8 @@ export class PaymentsService implements OnModuleInit {
       throw new BadRequestException('Signature verification required in production');
     }
 
+    let orderTransitioned = false;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
@@ -183,32 +185,40 @@ export class PaymentsService implements OnModuleInit {
         },
       });
 
-      await tx.order.update({
-        where: { id: orderId },
+      const updateResult = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          status: OrderStatus.payment_pending,
+        },
         data: {
           status: OrderStatus.paid,
           placedAt: new Date(),
         },
       });
 
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId,
-          fromStatus: order.status,
-          toStatus: OrderStatus.paid,
-          changedBySystem: 'Razorpay Verification',
-          note: `Payment captured successfully (${razorpayPaymentId})`,
-        },
-      });
+      if (updateResult.count === 1) {
+        orderTransitioned = true;
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId,
+            fromStatus: order.status,
+            toStatus: OrderStatus.paid,
+            changedBySystem: 'Razorpay Verification',
+            note: `Payment captured successfully (${razorpayPaymentId})`,
+          },
+        });
+      }
     });
 
-    this.eventEmitter.emit('order.status_changed', {
-      orderId,
-      fromStatus: order.status,
-      toStatus: OrderStatus.paid,
-      changedBySystem: 'Razorpay Verification',
-    });
-    this.eventEmitter.emit('order.paid', { orderId });
+    if (orderTransitioned) {
+      this.eventEmitter.emit('order.status_changed', {
+        orderId,
+        fromStatus: order.status,
+        toStatus: OrderStatus.paid,
+        changedBySystem: 'Razorpay Verification',
+      });
+      this.eventEmitter.emit('order.paid', { orderId });
+    }
 
     return {
       success: true,
@@ -364,6 +374,52 @@ export class PaymentsService implements OnModuleInit {
         where: { id: webhookRecordId },
         data: { status: PaymentWebhookStatus.processed, processedAt: new Date() },
       });
+      return;
+    }
+
+    if (payment.order?.status === OrderStatus.cancelled) {
+      this.logger.error(
+        `CRITICAL: Payment ${razorpayPaymentId} captured for already CANCELLED order ${payment.orderId}. Customer was charged but order is cancelled. Immediate staff action required.`,
+      );
+
+      await this.prisma.$transaction(async (tx) => {
+        if (payment.status !== PaymentStatus.CAPTURED) {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              razorpayPaymentId: razorpayPaymentId || payment.razorpayPaymentId,
+              status: PaymentStatus.CAPTURED,
+              method: paymentEntity?.method || payment.method,
+            },
+          });
+        }
+
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: payment.orderId,
+            fromStatus: OrderStatus.cancelled,
+            toStatus: OrderStatus.cancelled,
+            changedBySystem: 'Razorpay Webhook',
+            note: `ALERT: Payment ${razorpayPaymentId} captured after order was already cancelled. Manual refund or staff intervention required.`,
+          },
+        });
+
+        await tx.paymentWebhookEvent.update({
+          where: { id: webhookRecordId },
+          data: {
+            status: PaymentWebhookStatus.processed,
+            processedAt: new Date(),
+            paymentId: payment.id,
+          },
+        });
+      });
+
+      this.eventEmitter.emit('payment.captured_on_cancelled', {
+        orderId: payment.orderId,
+        paymentId: razorpayPaymentId,
+        amount: paymentEntity?.amount,
+      });
+
       return;
     }
 

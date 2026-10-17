@@ -229,8 +229,8 @@ describe('PaymentsService', () => {
           status: PaymentStatus.CAPTURED,
         },
       });
-      expect(prismaService.order.update).toHaveBeenCalledWith({
-        where: { id: 'order-1' },
+      expect(prismaService.order.updateMany).toHaveBeenCalledWith({
+        where: { id: 'order-1', status: OrderStatus.payment_pending },
         data: {
           status: OrderStatus.paid,
           placedAt: expect.any(Date),
@@ -585,6 +585,105 @@ describe('PaymentsService', () => {
         eventId: 'evt_duplicate_id',
       });
       expect(prismaService.payment.findFirst).not.toHaveBeenCalled();
+      expect(prismaService.orderStatusHistory.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('should log loud error, write alert history note, and emit payment.captured_on_cancelled if order was cancelled', async () => {
+      const orderState: any = {
+        id: 'order_cancelled_1',
+        status: OrderStatus.cancelled,
+        grandTotal: 500,
+        currency: 'INR',
+      };
+      const paymentState: any = {
+        id: 'pmt_cancelled_1',
+        orderId: 'order_cancelled_1',
+        razorpayOrderId: 'order_rzp_cancelled',
+        status: PaymentStatus.FAILED,
+        order: orderState,
+      };
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.paymentWebhookEvent.create.mockResolvedValue({
+        id: 'evt_row_cancelled',
+        razorpayEventId: 'evt_cap_cancelled_order',
+        status: PaymentWebhookStatus.received,
+      });
+      prismaService.payment.findFirst.mockResolvedValue(paymentState);
+
+      const webhookPayload = {
+        id: 'evt_cap_cancelled_order',
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: 'pay_rzp_retry_success',
+              order_id: 'order_rzp_cancelled',
+              amount: 50000,
+              currency: 'INR',
+              method: 'upi',
+            },
+          },
+        },
+      };
+
+      const webhookRes = await service.handleWebhook(webhookPayload);
+      expect(webhookRes.status).toBe('processed');
+      expect(prismaService.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'pmt_cancelled_1' },
+          data: expect.objectContaining({
+            status: PaymentStatus.CAPTURED,
+            razorpayPaymentId: 'pay_rzp_retry_success',
+          }),
+        }),
+      );
+      expect(prismaService.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          orderId: 'order_cancelled_1',
+          fromStatus: OrderStatus.cancelled,
+          toStatus: OrderStatus.cancelled,
+          note: expect.stringContaining('ALERT: Payment pay_rzp_retry_success captured after order was already cancelled'),
+        }),
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledWith('payment.captured_on_cancelled', {
+        orderId: 'order_cancelled_1',
+        paymentId: 'pay_rzp_retry_success',
+        amount: 50000,
+      });
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('order.paid', expect.anything());
+    });
+
+    it('should not write history or emit events in verifyPayment if concurrent webhook already transitioned order', async () => {
+      const orderState: any = {
+        id: 'order_race_1',
+        status: OrderStatus.payment_pending,
+        grandTotal: 300,
+        currency: 'INR',
+      };
+      const paymentState: any = {
+        id: 'pmt_race_1',
+        orderId: 'order_race_1',
+        razorpayOrderId: 'order_rzp_race',
+        status: PaymentStatus.CREATED,
+        order: orderState,
+      };
+
+      prismaService.order.findUnique.mockResolvedValue(orderState);
+      prismaService.payment.findFirst.mockResolvedValue(paymentState);
+      // Simulate concurrent webhook beating verifyPayment to the atomic update
+      prismaService.order.updateMany.mockResolvedValue({ count: 0 });
+
+      const verifyRes = await service.verifyPayment({
+        orderId: 'order_race_1',
+        razorpayOrderId: 'order_rzp_race',
+        razorpayPaymentId: 'pay_rzp_race',
+        razorpaySignature: 'sig_test',
+      });
+
+      expect(verifyRes.success).toBe(true);
+      expect(verifyRes.status).toBe(OrderStatus.paid);
       expect(prismaService.orderStatusHistory.create).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
