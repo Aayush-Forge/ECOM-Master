@@ -8,9 +8,17 @@ import * as path from 'path';
 
 dotenv.config();
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  'postgresql://sridattam_admin:sridattam_secure_pass_2026@localhost:5432/sridattam_dev_db?schema=public';
+if (process.env.NODE_ENV === 'production') {
+  console.error('Database seeding is strictly forbidden in production (NODE_ENV=production).');
+  process.exit(1);
+}
+
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL environment variable is required for seeding.');
+  process.exit(1);
+}
+
+const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
