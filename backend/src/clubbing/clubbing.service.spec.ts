@@ -124,18 +124,18 @@ describe('ClubbingService', () => {
   });
 
   describe('getActiveRules', () => {
-    it('returns active rules without code, usageLimit, or usageCount in public response', async () => {
+    it('queries only rules without a code and returns them without code, usageLimit, or usageCount in public response', async () => {
       prisma.clubbingRule.findMany.mockResolvedValue([
         {
-          id: 'rule-secret',
-          name: 'Special Promotion',
-          description: 'Save big',
-          code: 'SECRET20',
-          usageLimit: 100,
-          usageCount: 10,
+          id: 'rule-public-1',
+          name: 'Buy 2 Save 10%',
+          description: 'Automatic bundle discount',
+          code: null,
+          usageLimit: null,
+          usageCount: 0,
           type: ClubbingRuleType.percentage_off_bundle,
           requiredQuantity: 2,
-          percentageOff: 20,
+          percentageOff: 10,
           fixedPrice: null,
           applicableCategoryId: null,
           startsAt: null,
@@ -148,12 +148,33 @@ describe('ClubbingService', () => {
         },
       ]);
 
-      const publicRules = await service.getActiveRules();
+      const publicRules = await service.getActiveRules(true);
+      expect(prisma.clubbingRule.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isActive: true,
+            code: null,
+          }),
+        }),
+      );
       expect(publicRules).toHaveLength(1);
-      expect(publicRules[0].name).toBe('Special Promotion');
+      expect(publicRules[0].name).toBe('Buy 2 Save 10%');
       expect(publicRules[0]).not.toHaveProperty('code');
       expect(publicRules[0]).not.toHaveProperty('usageLimit');
       expect(publicRules[0]).not.toHaveProperty('usageCount');
+    });
+
+    it('does not filter by code: null when publicOnly is false', async () => {
+      prisma.clubbingRule.findMany.mockResolvedValue([]);
+
+      await service.getActiveRules(false);
+      expect(prisma.clubbingRule.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.not.objectContaining({
+            code: null,
+          }),
+        }),
+      );
     });
   });
 });

@@ -198,18 +198,19 @@ export class ClubbingService {
   }
 
   async getActiveRules(publicOnly = true) {
-    const rules = await this.findActiveRulesInternal();
+    const rules = await this.findActiveRulesInternal(publicOnly);
     if (publicOnly) {
       return rules.map((rule) => this.toPublicRule(rule));
     }
     return rules;
   }
 
-  private async findActiveRulesInternal() {
+  private async findActiveRulesInternal(onlyWithoutCode = false) {
     const now = new Date();
     const rules = await this.prisma.clubbingRule.findMany({
       where: {
         isActive: true,
+        ...(onlyWithoutCode ? { code: null } : {}),
         OR: [
           { startsAt: null, endsAt: null },
           { startsAt: { lte: now }, endsAt: null },
