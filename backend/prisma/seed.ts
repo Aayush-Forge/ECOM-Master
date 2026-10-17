@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 if (process.env.NODE_ENV === 'production') {
   console.error('Database seeding is strictly forbidden in production (NODE_ENV=production).');
@@ -194,6 +195,8 @@ async function main() {
   // 4. Delete Previously Seeded Fake Products & Dependent Relations
   // -------------------------------------------------------------
   console.log('Cleaning up previous test orders, cart items, and fake products...');
+  await prisma.paymentWebhookEvent.deleteMany({});
+  await prisma.payment.deleteMany({});
   await prisma.orderItem.deleteMany({});
   await prisma.orderStatusHistory.deleteMany({});
   await prisma.orderAddress.deleteMany({});
