@@ -26,6 +26,7 @@ describe('PaymentsService', () => {
       order: {
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       payment: {
         findFirst: jest.fn(),
@@ -311,8 +312,8 @@ describe('PaymentsService', () => {
         },
       });
 
-      expect(prismaService.order.update).toHaveBeenCalledWith({
-        where: { id: 'order_1' },
+      expect(prismaService.order.updateMany).toHaveBeenCalledWith({
+        where: { id: 'order_1', status: OrderStatus.payment_pending },
         data: {
           status: OrderStatus.paid,
           placedAt: expect.any(Date),
@@ -419,6 +420,173 @@ describe('PaymentsService', () => {
           paymentId: 'pmt_1',
         },
       });
+    });
+
+    it('should result in 1 history row and 1 order.paid emit when verify runs before webhook', async () => {
+      const orderState: any = {
+        id: 'order_1',
+        status: OrderStatus.payment_pending,
+        grandTotal: 260,
+        currency: 'INR',
+        placedAt: null,
+      };
+      const paymentState: any = {
+        id: 'pmt_1',
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_1',
+        status: PaymentStatus.CREATED,
+        order: orderState,
+      };
+
+      prismaService.order.findUnique.mockImplementation(() => Promise.resolve(orderState));
+      prismaService.payment.findFirst.mockImplementation(() => Promise.resolve(paymentState));
+      prismaService.payment.update.mockImplementation(({ data }: any) => {
+        Object.assign(paymentState, data);
+        return Promise.resolve(paymentState);
+      });
+      prismaService.order.update.mockImplementation(({ data }: any) => {
+        Object.assign(orderState, data);
+        return Promise.resolve(orderState);
+      });
+
+      const verifyRes = await service.verifyPayment({
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_1',
+        razorpayPaymentId: 'pay_rzp_1',
+        razorpaySignature: 'sig_test',
+      });
+      expect(verifyRes.success).toBe(true);
+      expect(prismaService.orderStatusHistory.create).toHaveBeenCalledTimes(1);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('order.paid', { orderId: 'order_1' });
+
+      eventEmitter.emit.mockClear();
+      prismaService.orderStatusHistory.create.mockClear();
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.paymentWebhookEvent.create.mockResolvedValue({
+        id: 'evt_row_1',
+        razorpayEventId: 'evt_cap_verify_then_webhook',
+        status: PaymentWebhookStatus.received,
+      });
+      prismaService.order.updateMany.mockResolvedValue({ count: 0 });
+
+      const webhookPayload = {
+        id: 'evt_cap_verify_then_webhook',
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: 'pay_rzp_1',
+              order_id: 'order_rzp_1',
+              amount: 26000,
+              currency: 'INR',
+              method: 'upi',
+            },
+          },
+        },
+      };
+
+      const webhookRes = await service.handleWebhook(webhookPayload);
+      expect(webhookRes.status).toBe('processed');
+      expect(prismaService.orderStatusHistory.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('order.paid', expect.anything());
+    });
+
+    it('should result in 1 history row and 1 order.paid emit when webhook runs before verify', async () => {
+      const orderState: any = {
+        id: 'order_2',
+        status: OrderStatus.payment_pending,
+        grandTotal: 260,
+        currency: 'INR',
+        placedAt: null,
+      };
+      const paymentState: any = {
+        id: 'pmt_2',
+        orderId: 'order_2',
+        razorpayOrderId: 'order_rzp_2',
+        status: PaymentStatus.CREATED,
+        order: orderState,
+      };
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.paymentWebhookEvent.create.mockResolvedValue({
+        id: 'evt_row_2',
+        razorpayEventId: 'evt_cap_webhook_first',
+        status: PaymentWebhookStatus.received,
+      });
+      prismaService.payment.findFirst.mockResolvedValue(paymentState);
+      prismaService.order.updateMany.mockImplementation(() => {
+        orderState.status = OrderStatus.paid;
+        return Promise.resolve({ count: 1 });
+      });
+      prismaService.payment.update.mockImplementation(({ data }: any) => {
+        Object.assign(paymentState, data);
+        return Promise.resolve(paymentState);
+      });
+
+      const webhookPayload = {
+        id: 'evt_cap_webhook_first',
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: 'pay_rzp_2',
+              order_id: 'order_rzp_2',
+              amount: 26000,
+              currency: 'INR',
+              method: 'card',
+            },
+          },
+        },
+      };
+
+      const webhookRes = await service.handleWebhook(webhookPayload);
+      expect(webhookRes.status).toBe('processed');
+      expect(prismaService.orderStatusHistory.create).toHaveBeenCalledTimes(1);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('order.paid', { orderId: 'order_2' });
+
+      prismaService.orderStatusHistory.create.mockClear();
+      eventEmitter.emit.mockClear();
+
+      prismaService.order.findUnique.mockResolvedValue(orderState);
+      prismaService.payment.findFirst.mockResolvedValue(paymentState);
+
+      const verifyRes = await service.verifyPayment({
+        orderId: 'order_2',
+        razorpayOrderId: 'order_rzp_2',
+        razorpayPaymentId: 'pay_rzp_2',
+        razorpaySignature: 'sig_test',
+      });
+
+      expect(verifyRes.success).toBe(true);
+      expect(verifyRes.status).toBe(OrderStatus.paid);
+      expect(prismaService.orderStatusHistory.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('should be a no-op when a duplicate webhook event id is received', async () => {
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue({
+        id: 'existing_evt_row',
+        razorpayEventId: 'evt_duplicate_id',
+        status: PaymentWebhookStatus.processed,
+      });
+
+      const payload = {
+        id: 'evt_duplicate_id',
+        event: 'payment.captured',
+        payload: {},
+      };
+
+      const result = await service.handleWebhook(payload);
+
+      expect(result).toEqual({
+        received: true,
+        status: 'already_processed',
+        eventId: 'evt_duplicate_id',
+      });
+      expect(prismaService.payment.findFirst).not.toHaveBeenCalled();
+      expect(prismaService.orderStatusHistory.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 });

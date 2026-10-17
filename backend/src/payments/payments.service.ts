@@ -402,33 +402,43 @@ export class PaymentsService implements OnModuleInit {
       }
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          razorpayPaymentId: razorpayPaymentId || payment.razorpayPaymentId,
-          status: PaymentStatus.CAPTURED,
-          method: paymentEntity?.method || payment.method,
-        },
-      });
+    let orderTransitioned = false;
 
-      await tx.order.update({
-        where: { id: payment.orderId },
+    await this.prisma.$transaction(async (tx) => {
+      if (payment.status !== PaymentStatus.CAPTURED) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            razorpayPaymentId: razorpayPaymentId || payment.razorpayPaymentId,
+            status: PaymentStatus.CAPTURED,
+            method: paymentEntity?.method || payment.method,
+          },
+        });
+      }
+
+      const updateResult = await tx.order.updateMany({
+        where: {
+          id: payment.orderId,
+          status: OrderStatus.payment_pending,
+        },
         data: {
           status: OrderStatus.paid,
           placedAt: payment.order?.placedAt || new Date(),
         },
       });
 
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId: payment.orderId,
-          fromStatus: payment.order?.status,
-          toStatus: OrderStatus.paid,
-          changedBySystem: 'Razorpay Webhook',
-          note: `Payment captured via webhook (${razorpayPaymentId || 'verified'})`,
-        },
-      });
+      if (updateResult.count === 1) {
+        orderTransitioned = true;
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: payment.orderId,
+            fromStatus: OrderStatus.payment_pending,
+            toStatus: OrderStatus.paid,
+            changedBySystem: 'Razorpay Webhook',
+            note: `Payment captured via webhook (${razorpayPaymentId || 'verified'})`,
+          },
+        });
+      }
 
       await tx.paymentWebhookEvent.update({
         where: { id: webhookRecordId },
@@ -440,13 +450,15 @@ export class PaymentsService implements OnModuleInit {
       });
     });
 
-    this.eventEmitter.emit('order.status_changed', {
-      orderId: payment.orderId,
-      fromStatus: payment.order?.status,
-      toStatus: OrderStatus.paid,
-      changedBySystem: 'Razorpay Webhook',
-    });
-    this.eventEmitter.emit('order.paid', { orderId: payment.orderId });
+    if (orderTransitioned) {
+      this.eventEmitter.emit('order.status_changed', {
+        orderId: payment.orderId,
+        fromStatus: OrderStatus.payment_pending,
+        toStatus: OrderStatus.paid,
+        changedBySystem: 'Razorpay Webhook',
+      });
+      this.eventEmitter.emit('order.paid', { orderId: payment.orderId });
+    }
   }
 
   private async handleRefundProcessedWebhook(payload: any, webhookRecordId: string) {
