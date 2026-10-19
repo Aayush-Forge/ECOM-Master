@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 export interface CSVProductRow {
   handle: string;
   type: 'simple' | 'variable' | 'variation';
-  sku: string;
+  sku?: string;
   parentSku?: string;
   title?: string;
   description?: string;
@@ -14,6 +14,10 @@ export interface CSVProductRow {
   regularPrice?: string;
   salePrice?: string;
   stock?: string;
+  weight?: string;
+  length?: string;
+  width?: string;
+  height?: string;
   images?: string;
   attributes?: string; // Format: "Color: Red, Blue | Size: S, M" or for variation: "Color: Red | Size: S"
   status?: string;
@@ -30,6 +34,42 @@ export interface ImportSummary {
 @Injectable()
 export class ProductsImportExportService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Helper to generate next sequential parent SKU or variation SKU
+   */
+  async generateSku(parentSku?: string, variantIndex?: number): Promise<string> {
+    if (parentSku && variantIndex !== undefined) {
+      const suffix = String(variantIndex).padStart(2, '0');
+      return `${parentSku}-${suffix}`;
+    }
+
+    try {
+      const result = await this.prisma.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
+        `SELECT nextval('product_sku_seq') AS nextval`,
+      );
+      if (result?.[0]?.nextval != null) {
+        return `SME${result[0].nextval}`;
+      }
+    } catch {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `CREATE SEQUENCE IF NOT EXISTS product_sku_seq START WITH 10001 INCREMENT BY 1;`,
+        );
+        const result = await this.prisma.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
+          `SELECT nextval('product_sku_seq') AS nextval`,
+        );
+        if (result?.[0]?.nextval != null) {
+          return `SME${result[0].nextval}`;
+        }
+      } catch (retryError) {
+        console.error('Failed to generate sequence-based SKU in import:', retryError);
+      }
+    }
+
+    const count = await this.prisma.product.count();
+    return `SME${10001 + count}`;
+  }
 
   /**
    * Generates a standard UTF-8 CSV string for all products and variations in the catalog.
@@ -53,6 +93,10 @@ export class ProductsImportExportService {
       'Regular Price',
       'Sale Price',
       'Stock',
+      'Weight',
+      'Length',
+      'Width',
+      'Height',
       'Images',
       'Attributes',
       'Status',
@@ -94,6 +138,10 @@ export class ProductsImportExportService {
           escapeCell(prod.basePrice ? Number(prod.basePrice) : ''),
           escapeCell(prod.salePrice ? Number(prod.salePrice) : ''),
           escapeCell(prod.stockQuantity),
+          escapeCell(prod.weight ? Number(prod.weight) : ''),
+          escapeCell(prod.length ? Number(prod.length) : ''),
+          escapeCell(prod.width ? Number(prod.width) : ''),
+          escapeCell(prod.height ? Number(prod.height) : ''),
           escapeCell(imagesStr),
           escapeCell(attributesStr),
           escapeCell(prod.status),
@@ -120,6 +168,10 @@ export class ProductsImportExportService {
               escapeCell(v.regularPrice !== undefined ? Number(v.regularPrice) : ''),
               escapeCell(v.salePrice !== undefined && v.salePrice !== null ? Number(v.salePrice) : ''),
               escapeCell(v.stockQuantity ?? 0),
+              escapeCell(v.weight !== undefined && v.weight !== null ? Number(v.weight) : ''),
+              escapeCell(v.length !== undefined && v.length !== null ? Number(v.length) : ''),
+              escapeCell(v.width !== undefined && v.width !== null ? Number(v.width) : ''),
+              escapeCell(v.height !== undefined && v.height !== null ? Number(v.height) : ''),
               escapeCell(v.image || ''),
               escapeCell(varAttrStr),
               v.isActive !== false ? 'active' : 'draft',
@@ -197,28 +249,36 @@ export class ProductsImportExportService {
 
     for (let r = 1; r < rows.length; r++) {
       const row = rows[r];
-      const sku = getCol(row, 'sku');
-      if (!sku) continue;
-
+      const rawSku = getCol(row, 'sku');
+      const title = getCol(row, 'title', 'name');
+      const handle = getCol(row, 'handle', 'slug');
       const typeRaw = getCol(row, 'type').toLowerCase();
+
+      // Skip row only if it completely lacks sku, title, and handle
+      if (!rawSku && !title && !handle) continue;
+
       let type: 'simple' | 'variable' | 'variation' = 'simple';
       if (typeRaw === 'variable') type = 'variable';
       else if (typeRaw === 'variation') type = 'variation';
 
       parsedData.push({
-        handle: getCol(row, 'handle', 'slug'),
+        handle,
         type,
-        sku: sku.toUpperCase(),
+        sku: rawSku ? rawSku.toUpperCase() : undefined,
         parentSku: getCol(row, 'parentsku', 'parent').toUpperCase() || undefined,
-        title: getCol(row, 'title', 'name'),
+        title,
         description: getCol(row, 'description', 'desc'),
         category: getCol(row, 'category', 'categoryname'),
         regularPrice: getCol(row, 'regularprice', 'price', 'baseprice'),
         salePrice: getCol(row, 'saleprice'),
         stock: getCol(row, 'stock', 'stockquantity', 'inventory'),
+        weight: getCol(row, 'weight', 'weightg', 'weightingrams'),
+        length: getCol(row, 'length'),
+        width: getCol(row, 'width'),
+        height: getCol(row, 'height'),
         images: getCol(row, 'images', 'image'),
         attributes: getCol(row, 'attributes', 'attribute'),
-        status: getCol(row, 'status') || 'active',
+        status: getCol(row, 'status').trim(),
       });
     }
 
@@ -234,30 +294,66 @@ export class ProductsImportExportService {
       throw new BadRequestException('No valid product rows found in CSV');
     }
 
-    // Separate parents and variations
+    // Auto-generate SKUs and associate variations with parents
     const parentMap = new Map<string, CSVProductRow>();
     const variationsByParent = new Map<string, CSVProductRow[]>();
     const errors: Array<{ row: number; sku?: string; message: string }> = [];
 
-    records.forEach((rec, idx) => {
-      const rowNum = idx + 2; // Accounting for 1-based index and header
-      if (rec.type === 'variation') {
-        if (!rec.parentSku) {
-          errors.push({ row: rowNum, sku: rec.sku, message: 'Variation row is missing Parent SKU' });
-          return;
-        }
-        const existing = variationsByParent.get(rec.parentSku) || [];
-        existing.push(rec);
-        variationsByParent.set(rec.parentSku, existing);
-      } else {
-        parentMap.set(rec.sku, rec);
-      }
-    });
+    // Pre-pass: assign SKUs to parents that lack one, or match by handle/title
+    const handleToParentSku = new Map<string, string>();
 
-    // Ensure all variations have parent definitions (either in CSV or DB)
-    for (const parentSku of variationsByParent.keys()) {
-      if (!parentMap.has(parentSku)) {
-        // Will check in DB during transaction
+    for (let idx = 0; idx < records.length; idx++) {
+      const rec = records[idx];
+      const rowNum = idx + 2;
+
+      if (rec.type !== 'variation') {
+        const rawStatus = (rec.status ?? '').trim().toLowerCase();
+        if (rawStatus && rawStatus !== 'active' && rawStatus !== 'draft' && rawStatus !== 'archived') {
+          errors.push({ row: rowNum, sku: rec.sku, message: 'Invalid status' });
+          continue;
+        }
+
+        let parentSku = rec.sku?.trim() ? rec.sku.trim().toUpperCase() : '';
+        if (!parentSku) {
+          parentSku = await this.generateSku();
+          rec.sku = parentSku;
+        }
+        parentMap.set(parentSku, rec);
+        if (rec.handle) {
+          handleToParentSku.set(rec.handle.toLowerCase().trim(), parentSku);
+        }
+        if (rec.title) {
+          handleToParentSku.set(rec.title.toLowerCase().trim(), parentSku);
+        }
+      }
+    }
+
+    // Now organize variations under their parent
+    for (let idx = 0; idx < records.length; idx++) {
+      const rec = records[idx];
+      const rowNum = idx + 2;
+
+      if (rec.type === 'variation') {
+        let parentSku = rec.parentSku?.trim() ? rec.parentSku.trim().toUpperCase() : undefined;
+
+        // Fallback: match parent by handle or title
+        if (!parentSku && rec.handle && handleToParentSku.has(rec.handle.toLowerCase().trim())) {
+          parentSku = handleToParentSku.get(rec.handle.toLowerCase().trim());
+          rec.parentSku = parentSku;
+        }
+        if (!parentSku && rec.title && handleToParentSku.has(rec.title.toLowerCase().trim())) {
+          parentSku = handleToParentSku.get(rec.title.toLowerCase().trim());
+          rec.parentSku = parentSku;
+        }
+
+        if (!parentSku) {
+          errors.push({ row: rowNum, sku: rec.sku, message: 'Variation row is missing Parent SKU and could not be linked to parent' });
+          continue;
+        }
+
+        const existing = variationsByParent.get(parentSku) || [];
+        existing.push(rec);
+        variationsByParent.set(parentSku, existing);
       }
     }
 
@@ -287,7 +383,7 @@ export class ProductsImportExportService {
         categoryLookup.set('general', defaultCategoryId);
       }
 
-      // 1. Process Parent Products
+      // Process Parent Products
       for (const [parentSku, pRow] of parentMap.entries()) {
         const existing = await tx.product.findUnique({
           where: { sku: parentSku },
@@ -324,9 +420,15 @@ export class ProductsImportExportService {
         let salePrice = pRow.salePrice ? Number(pRow.salePrice) : null;
         let stockQuantity = Number(pRow.stock || 0);
 
+        const parentWeight = pRow.weight ? Number(pRow.weight) : existing?.weight ? Number(existing.weight) : null;
+        const parentLength = pRow.length ? Number(pRow.length) : existing?.length ? Number(existing.length) : null;
+        const parentWidth = pRow.width ? Number(pRow.width) : existing?.width ? Number(existing.width) : null;
+        const parentHeight = pRow.height ? Number(pRow.height) : existing?.height ? Number(existing.height) : null;
+
         if (isVariable) {
           // Aggregate variation attributes
           const attrMap = new Map<string, Set<string>>();
+          let varIndex = 1;
 
           variationsJson = variationsForThisParent.map((vRow) => {
             const varAttrs: Array<{ name: string; option: string }> = [];
@@ -346,13 +448,27 @@ export class ProductsImportExportService {
             const sPrice = vRow.salePrice ? Number(vRow.salePrice) : null;
             const vStock = Number(vRow.stock || 0);
 
+            // Auto-generate variation SKU if missing
+            const variantSku = vRow.sku?.trim()
+              ? vRow.sku.trim().toUpperCase()
+              : `${parentSku}-${String(varIndex).padStart(2, '0')}`;
+            varIndex++;
+
+            const vWeight = vRow.weight !== undefined && vRow.weight !== '' ? Number(vRow.weight) : parentWeight;
+            const vLength = vRow.length !== undefined && vRow.length !== '' ? Number(vRow.length) : parentLength;
+            const vWidth = vRow.width !== undefined && vRow.width !== '' ? Number(vRow.width) : parentLength;
+            const vHeight = vRow.height !== undefined && vRow.height !== '' ? Number(vRow.height) : parentHeight;
+
             return {
               id: randomUUID(),
-              sku: vRow.sku,
+              sku: variantSku,
               regularPrice: regPrice,
               salePrice: sPrice,
               stockQuantity: vStock,
-              weight: null,
+              weight: vWeight,
+              length: vLength,
+              width: vWidth,
+              height: vHeight,
               image: vRow.images ? vRow.images.split(',')[0].trim() : null,
               attributes: varAttrs,
               isActive: vRow.status !== 'draft',
@@ -393,7 +509,17 @@ export class ProductsImportExportService {
           (pRow.title ? pRow.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : null) ||
           parentSku.toLowerCase();
 
-        const status = pRow.status === 'draft' ? ProductStatus.draft : ProductStatus.active;
+        const rawStatus = (pRow.status ?? '').trim().toLowerCase();
+        let status: ProductStatus;
+        if (rawStatus === 'draft') {
+          status = ProductStatus.draft;
+        } else if (rawStatus === 'archived') {
+          status = ProductStatus.archived;
+        } else if (rawStatus === 'active') {
+          status = ProductStatus.active;
+        } else {
+          status = existing ? existing.status : ProductStatus.active;
+        }
 
         if (existing) {
           await tx.product.update({
@@ -404,6 +530,10 @@ export class ProductsImportExportService {
               basePrice,
               salePrice,
               stockQuantity,
+              weight: parentWeight,
+              length: parentLength,
+              width: parentWidth,
+              height: parentHeight,
               images,
               status,
               categoryId,
@@ -432,6 +562,10 @@ export class ProductsImportExportService {
               basePrice,
               salePrice,
               stockQuantity,
+              weight: parentWeight,
+              length: parentLength,
+              width: parentWidth,
+              height: parentHeight,
               images,
               status,
               categoryId,
