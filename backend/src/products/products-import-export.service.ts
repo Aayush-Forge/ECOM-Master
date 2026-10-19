@@ -456,11 +456,17 @@ export class ProductsImportExportService {
 
             const vWeight = vRow.weight !== undefined && vRow.weight !== '' ? Number(vRow.weight) : parentWeight;
             const vLength = vRow.length !== undefined && vRow.length !== '' ? Number(vRow.length) : parentLength;
-            const vWidth = vRow.width !== undefined && vRow.width !== '' ? Number(vRow.width) : parentLength;
+            const vWidth = vRow.width !== undefined && vRow.width !== '' ? Number(vRow.width) : parentWidth;
             const vHeight = vRow.height !== undefined && vRow.height !== '' ? Number(vRow.height) : parentHeight;
+            const existingVariations = Array.isArray(existing?.variations)
+              ? (existing.variations as Array<{ id?: string; sku?: string }>)
+              : [];
+            const matchedVariation = existingVariations.find(
+              (v) => (v.sku ?? '').trim().toUpperCase() === variantSku,
+            );
 
             return {
-              id: randomUUID(),
+              id: matchedVariation?.id || randomUUID(),
               sku: variantSku,
               regularPrice: regPrice,
               salePrice: sPrice,
