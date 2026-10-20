@@ -205,10 +205,10 @@ function EmailPageContent() {
   const handleOpenEdit = async (tpl) => {
     setSelectedTemplate(tpl)
     const initialForm = {
-      subject: tpl.overrides?.subject || '',
-      heading: tpl.overrides?.heading || '',
-      intro: tpl.overrides?.intro || '',
-      footer: tpl.overrides?.footer || '',
+      subject: tpl.overrides?.subject || tpl.defaults?.subject || '',
+      heading: tpl.overrides?.heading || tpl.defaults?.heading || '',
+      intro: tpl.overrides?.intro || tpl.defaults?.intro || '',
+      footer: tpl.overrides?.footer || tpl.defaults?.footer || '',
     }
     setFormData(initialForm)
     setIsDrawerOpen(true)
@@ -240,12 +240,16 @@ function EmailPageContent() {
   }
 
   const handleResetToDefault = () => {
-    const emptyForm = { subject: '', heading: '', intro: '', footer: '' }
-    setFormData(emptyForm)
-    if (selectedTemplate) {
-      loadPreview(selectedTemplate.key, emptyForm)
+    if (!selectedTemplate) return
+    const defaultForm = {
+      subject: selectedTemplate.defaults?.subject || '',
+      heading: selectedTemplate.defaults?.heading || '',
+      intro: selectedTemplate.defaults?.intro || '',
+      footer: selectedTemplate.defaults?.footer || '',
     }
-    toast.info('Fields cleared to default wording. Click Save to apply.')
+    setFormData(defaultForm)
+    loadPreview(selectedTemplate.key, defaultForm)
+    toast.info('Reset input fields to default wording. Click Save to apply.')
   }
 
   const handleInsertPlaceholder = (placeholder) => {

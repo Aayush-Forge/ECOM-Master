@@ -66,13 +66,14 @@ export class AdminEmailTemplatesService {
     return EDITABLE_TEMPLATE_KEYS.map((key) => {
       const cfg = EDITABLE_TEMPLATES_CONFIG[key];
       const dbRow = dbMap.get(key);
+      const hasSubjectOverride = dbRow?.subject && dbRow.subject !== cfg.defaults.subject;
 
       return {
         key,
         label: cfg.label,
         defaults: cfg.defaults,
         overrides: {
-          subject: dbRow?.subject || null,
+          subject: hasSubjectOverride ? dbRow.subject : null,
           heading: dbRow?.heading || null,
           intro: dbRow?.intro || null,
           footer: dbRow?.footer || null,
@@ -99,21 +100,26 @@ export class AdminEmailTemplatesService {
       where: { key },
     });
 
-    // An empty string or null on a field = reset it to default / null in DB
+    // An empty string, null, or matching code default = reset it to default / null in DB
+    const isSubjectDefault = dto.subject?.trim() === cfg.defaults.subject;
+    const isHeadingDefault = dto.heading?.trim() === cfg.defaults.heading;
+    const isIntroDefault = dto.intro?.trim() === cfg.defaults.intro;
+    const isFooterDefault = dto.footer?.trim() === cfg.defaults.footer;
+
     const cleanSubject = dto.subject !== undefined
-      ? (dto.subject?.trim() ? dto.subject.trim() : null)
-      : (existing?.subject || null);
+      ? (dto.subject?.trim() && !isSubjectDefault ? dto.subject.trim() : null)
+      : (existing?.subject && existing.subject !== cfg.defaults.subject ? existing.subject : null);
 
     const cleanHeading = dto.heading !== undefined
-      ? (dto.heading?.trim() ? dto.heading.trim() : null)
+      ? (dto.heading?.trim() && !isHeadingDefault ? dto.heading.trim() : null)
       : (existing?.heading || null);
 
     const cleanIntro = dto.intro !== undefined
-      ? (dto.intro?.trim() ? dto.intro.trim() : null)
+      ? (dto.intro?.trim() && !isIntroDefault ? dto.intro.trim() : null)
       : (existing?.intro || null);
 
     const cleanFooter = dto.footer !== undefined
-      ? (dto.footer?.trim() ? dto.footer.trim() : null)
+      ? (dto.footer?.trim() && !isFooterDefault ? dto.footer.trim() : null)
       : (existing?.footer || null);
 
     // Subject is required in DB schema: if null/empty, store the code default subject
