@@ -42,6 +42,7 @@ export const ROLE_NAV_ITEMS = {
     { label: 'Discounts', href: '/discounts', icon: 'Tags', group: 'Catalog' },
     { label: 'Customers', href: '/customers', icon: 'Users', group: 'Catalog' },
     { label: 'Users', href: '/users', icon: 'Users', group: 'Management' },
+    { label: 'Email', href: '/email', icon: 'Mail', group: 'Management' },
     { label: 'Audit Logs', href: '/audit-logs', icon: 'ScrollText', group: 'Management' },
   ],
   editor: [

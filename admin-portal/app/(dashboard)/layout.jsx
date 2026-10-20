@@ -33,6 +33,7 @@ import {
   Tags,
   Users,
   ScrollText,
+  Mail,
   LogOut,
   Shield,
   Loader2,
@@ -47,6 +48,7 @@ const ICON_MAP = {
   Tags,
   Users,
   ScrollText,
+  Mail,
 }
 
 export default function DashboardLayout({ children }) {
@@ -56,34 +58,87 @@ export default function DashboardLayout({ children }) {
   const [authorized, setAuthorized] = useState(false)
 
   useEffect(() => {
+    // If still reading session from local storage, wait
     if (loading) return
 
+    // 1. Not authenticated or missing role: redirect to login
     if (!isAuthenticated || !user?.role) {
-      router.push('/login')
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login')
+      } else {
+        router.replace('/login')
+      }
       return
     }
 
     const role = (user.role || '').toLowerCase()
+
+    // 2. Customer trying to access admin portal: kick out
     if (role === 'customer') {
-      router.push('/login?error=unauthorized')
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login?error=unauthorized')
+      } else {
+        router.replace('/login?error=unauthorized')
+      }
       return
     }
 
+    // 3. Check role-based route permissions
     const redirect = getRedirectForRole(user.role, pathname)
     if (redirect && redirect !== pathname) {
-      router.push(redirect)
+      router.replace(redirect)
       return
     }
 
     setAuthorized(true)
   }, [loading, isAuthenticated, user, pathname, router])
 
+  // Fallback safety timeout: if authorization state takes longer than 3.5s, force evaluate or redirect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!authorized) {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('auth_session') : null
+        if (!raw) {
+          window.location.replace('/login')
+        }
+      }
+    }, 3500)
+    return () => clearTimeout(timer)
+  }, [authorized])
+
   if (!authorized || loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-stone-500">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3 text-stone-500 max-w-sm text-center">
           <Loader2 className="animate-spin text-[#FF6B00]" size={32} />
-          <span className="text-sm font-medium">Verifying authorization...</span>
+          <span className="text-sm font-medium text-stone-700">Verifying authorization...</span>
+          <p className="text-xs text-stone-400">If this screen does not disappear within a few seconds, click below to re-authenticate.</p>
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('auth_session')
+                  window.location.href = '/login'
+                }
+              }}
+              className="text-xs text-[#FF6B00] hover:underline font-semibold cursor-pointer"
+            >
+              Sign In Again
+            </button>
+            <span className="text-stone-300">•</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.location.reload()
+                }
+              }}
+              className="text-xs text-stone-600 hover:underline font-medium cursor-pointer"
+            >
+              Reload Page
+            </button>
+          </div>
         </div>
       </div>
     )
