@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module.js';
+import { AuditLogsModule } from '../audit/audit-logs.module.js';
 import { NotificationsService } from './notifications.service.js';
 import { NotificationsListener } from './notifications.listener.js';
 import { NotificationProcessor } from './notification-processor.js';
@@ -10,9 +11,14 @@ import { NOTIFICATION_PUBLISHER } from './publishers/notification-publisher.inte
 import { InProcessPublisher } from './publishers/in-process.publisher.js';
 import { BullMqPublisher } from './publishers/bullmq.publisher.js';
 import { NotificationWorker } from './workers/notification.worker.js';
+import { AdminEmailService } from './admin-email.service.js';
+import { AdminEmailTemplatesService } from './admin-email-templates.service.js';
+import { AdminEmailLogsController } from './admin-email-logs.controller.js';
+import { AdminEmailTemplatesController } from './admin-email-templates.controller.js';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuditLogsModule],
+  controllers: [AdminEmailLogsController, AdminEmailTemplatesController],
   providers: [
     NotificationsService,
     NotificationsListener,
@@ -22,6 +28,8 @@ import { NotificationWorker } from './workers/notification.worker.js';
     InProcessPublisher,
     BullMqPublisher,
     NotificationWorker,
+    AdminEmailService,
+    AdminEmailTemplatesService,
     {
       provide: EMAIL_PROVIDER,
       useFactory: (smtpProvider: SmtpEmailProvider, consoleProvider: ConsoleEmailProvider) => {
