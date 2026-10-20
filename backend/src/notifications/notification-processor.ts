@@ -3,7 +3,7 @@ import { NotificationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EMAIL_PROVIDER, type EmailProvider } from './providers/email-provider.interface.js';
 import type { NotificationJob } from './publishers/notification-publisher.interface.js';
-import { renderEmailTemplate } from './templates/email-templates.js';
+import { renderEmailTemplate, type EmailWordingOverrides } from './templates/email-templates.js';
 
 @Injectable()
 export class NotificationProcessor {
@@ -43,7 +43,11 @@ export class NotificationProcessor {
         where: { id: orderId },
         include: {
           customer: true,
-          items: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
           addresses: true,
         },
       });
@@ -55,7 +59,26 @@ export class NotificationProcessor {
       }
 
       // 3. Render email
-      const rendered = renderEmailTemplate(templateKey, order);
+      let overrides: EmailWordingOverrides | undefined;
+      try {
+        const dbTemplate = await this.prisma.emailTemplate.findUnique({
+          where: { key: templateKey },
+        });
+        if (dbTemplate) {
+          overrides = {
+            subject: dbTemplate.subject || undefined,
+            heading: dbTemplate.heading || undefined,
+            intro: dbTemplate.intro || undefined,
+            footer: dbTemplate.footer || undefined,
+          };
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `[NotificationProcessor] Failed to load email template overrides for "${templateKey}": ${err.message}`,
+        );
+      }
+
+      const rendered = renderEmailTemplate(templateKey, order, overrides);
 
       // 4. Send email
       await this.emailProvider.send({
