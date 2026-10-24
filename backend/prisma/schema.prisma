@@ -117,6 +117,8 @@ model Product {
 
   orderItems OrderItem[]
 
+  reviews Review[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -124,6 +126,29 @@ model Product {
   @@index([categoryId])
   @@index([status])
   @@map("products")
+}
+
+// =========================
+// REVIEW
+// =========================
+
+model Review {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId String @map("product_id") @db.Uuid
+
+  product Product @relation(fields: [productId], references: [id])
+
+  customerName String @map("customer_name")
+
+  stars Int
+
+  description String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("reviews")
 }
 
 // =========================
