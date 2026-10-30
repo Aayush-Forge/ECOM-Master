@@ -1,0 +1,98 @@
+# ==============================================================================
+# SRIDATTAM E-COMMERCE PLATFORM — FULL SYSTEM & SOFTWARE REQUIREMENTS
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. INFRASTRUCTURE & VIRTUALIZATION
+# ------------------------------------------------------------------------------
+# Docker Engine >= 24.0.0
+# Docker Compose (v2 Plugin) >= 2.20.0
+# Linux Kernel >= 5.15 (Ubuntu 22.04 LTS / 24.04 LTS recommended)
+# Windows 10/11: WSL 2 (Ubuntu distribution) enabled
+
+# ------------------------------------------------------------------------------
+# 2. HARDWARE / VPS SIZING REQUIREMENTS
+# ------------------------------------------------------------------------------
+# Minimum VPS (Testing / Low Traffic):
+#   - vCPU: 1 Core
+#   - RAM: 4 GB (+ 2GB-4GB Swap file enabled)
+#   - Storage: 50 GB NVMe SSD
+# Recommended VPS (Production - e.g., Hostinger KVM 2 / KVM 4):
+#   - vCPU: 2 to 4 Cores
+#   - RAM: 8 GB
+#   - Storage: 100 GB NVMe SSD
+#   - Network: 1 Gbps port
+
+# ------------------------------------------------------------------------------
+# 3. CORE SERVICES & DATABASES
+# ------------------------------------------------------------------------------
+# PostgreSQL: 15-alpine (Port 5432)
+#   - Driver: pg >= 8.23.0, @prisma/adapter-pg >= 7.9.1
+#   - Extensions/Modules: UUID support
+# Redis: 7-alpine (Port 6379)
+#   - Driver: ioredis >= 6.0.0
+#   - Purpose: Cache-aside layer, session store, BullMQ task queue
+
+# ------------------------------------------------------------------------------
+# 4. RUNTIME ENVIRONMENTS
+# ------------------------------------------------------------------------------
+# Node.js: >= 20.0.0 (LTS recommended)
+# npm: >= 10.0.0
+# Python: >= 3.10 (for test runners and DevOps verification)
+
+# ------------------------------------------------------------------------------
+# 5. BACKEND API SERVICE (NestJS + Prisma REST API - Port 5000)
+# ------------------------------------------------------------------------------
+# Framework & NestJS:
+#   @nestjs/common >= 11.0.1
+#   @nestjs/core >= 11.0.1
+#   @nestjs/platform-express >= 11.0.1
+#   @nestjs/throttler >= 6.7.1
+#   @nestjs/event-emitter >= 3.1.0
+#   @nestjs/bullmq >= 12.0.0
+#   bullmq >= 6.3.11
+# Database & ORM:
+#   prisma >= 7.9.1
+#   @prisma/client >= 7.9.1
+# Authentication & Security:
+#   @nestjs/jwt >= 11.0.2
+#   @nestjs/passport >= 11.0.5
+#   passport-jwt >= 4.0.1
+#   bcrypt >= 6.0.0
+#   helmet >= 8.3.0
+# Cloud Storage & Integrations:
+#   @aws-sdk/client-s3 >= 3.1123.0 (Cloudflare R2 Object Storage)
+#   razorpay >= 2.9.8 (Payment Gateway)
+#   nodemailer >= 10.0.16 (Transactional Email)
+
+# ------------------------------------------------------------------------------
+# 6. CUSTOMER STOREFRONT (Next.js 14 App Router - Port 3000)
+# ------------------------------------------------------------------------------
+# Next.js >= 14.2.3
+# React >= 18.3.1
+# React-DOM >= 18.3.1
+# TailwindCSS >= 3.4.1
+# Lucide React >= 1.16.0
+# Radix UI primitives (@radix-ui/react-dialog, @radix-ui/react-dropdown-menu, etc.)
+# Axios >= 1.10.0
+
+# ------------------------------------------------------------------------------
+# 7. STAFF ADMIN PORTAL (Next.js 14 App Router - Port 3001)
+# ------------------------------------------------------------------------------
+# Next.js >= 14.2.3
+# React >= 18.3.1
+# TailwindCSS >= 3.4.1
+# Recharts >= 2.15.4 (Analytics & Sales Visualizations)
+# Tiptap Rich Text Editor (@tiptap/react >= 3.31.3)
+# Radix UI Component Library
+
+# ------------------------------------------------------------------------------
+# 8. PYTHON TESTING & VERIFICATION SUITE
+# ------------------------------------------------------------------------------
+requests>=2.31.0
+urllib3>=2.0.0
+pytest>=8.0.0
+pytest-timeout>=2.3.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9
+redis>=5.0.0
