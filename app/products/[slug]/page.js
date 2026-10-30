@@ -5,7 +5,7 @@ import ProductDetailClient from '@/components/products/product-detail-client'
 
 export const revalidate = 3600
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+const BACKEND_URL = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://sridattam.in'
 
 const getProduct = cache(async (slug) => {
