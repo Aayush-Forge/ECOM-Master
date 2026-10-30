@@ -75,21 +75,21 @@ export default function Header() {
             <div className="flex items-center gap-16 px-8">
               <span>FREE DELIVERY ABOVE RS. 499/-</span>
               <span className="text-[#D7A65B]">✦</span>
-              <span>BUY INDIA'S PREMIUM SAMBRANI CUP KIT</span>
+              <span>BUY INDIA&apos;S PREMIUM SAMBRANI CUP KIT</span>
               <span className="text-[#D7A65B]">✦</span>
               <span>BUY PREMIUM DHOOP STICKS</span>
               <span className="text-[#D7A65B]">✦</span>
-              <span>BUY INDIA'S PREMIUM CORPORATE GIFTS</span>
+              <span>BUY INDIA&apos;S PREMIUM CORPORATE GIFTS</span>
               <span className="text-[#D7A65B]">✦</span>
             </div>
             <div className="flex items-center gap-16 px-8" aria-hidden="true">
               <span>FREE DELIVERY ABOVE RS. 499/-</span>
               <span className="text-[#D7A65B]">✦</span>
-              <span>BUY INDIA'S PREMIUM SAMBRANI CUP KIT</span>
+              <span>BUY INDIA&apos;S PREMIUM SAMBRANI CUP KIT</span>
               <span className="text-[#D7A65B]">✦</span>
               <span>BUY PREMIUM DHOOP STICKS</span>
               <span className="text-[#D7A65B]">✦</span>
-              <span>BUY INDIA'S PREMIUM CORPORATE GIFTS</span>
+              <span>BUY INDIA&apos;S PREMIUM CORPORATE GIFTS</span>
               <span className="text-[#D7A65B]">✦</span>
             </div>
           </div>
@@ -175,7 +175,7 @@ export default function Header() {
                             {categories.map(cat => (
                               <Link 
                                 key={cat.id}
-                                href={`/products?category=${cat.slug}`}
+                                href={`/categories/${cat.slug}`}
                                 onClick={() => setOpen(false)}
                                 className="block text-sm font-body tracking-[0.12em] text-midnight/70 hover:text-saffron-600 transition-colors"
                               >
@@ -207,6 +207,7 @@ export default function Header() {
                           Track Order
                         </Link>
                       </div>
+
                     </nav>
 
                     {/* Bottom ritual statement */}
@@ -227,6 +228,7 @@ export default function Header() {
 
             {/* Column 3: Utility Actions (Search & Cart) aligned discreetly right */}
             <div className="flex justify-end items-center gap-3 h-full">
+
               {/* Search Toggle */}
               <button
                 aria-label="Open search"
@@ -301,4 +303,3 @@ export default function Header() {
     </>
   )
 }
-

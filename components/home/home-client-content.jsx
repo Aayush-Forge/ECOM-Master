@@ -1,0 +1,959 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { 
+  Flame, 
+  Leaf, 
+  Star, 
+  ChevronRight, 
+  Sparkles, 
+  AlertCircle, 
+  Heart, 
+  ArrowRight, 
+  ChevronLeft, 
+  Plus, 
+  Minus, 
+  Check, 
+  Compass, 
+  Play, 
+  ShoppingBag,
+  Clock,
+  Package,
+  MessageSquare,
+  ShieldCheck
+} from 'lucide-react'
+import Header from '@/components/layout/header'
+import Footer from '@/components/layout/footer'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useCart } from '@/lib/cart-context'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+
+function normalizeStoreProduct(p) {
+  if (!p) return null
+  const rawImages = Array.isArray(p.images) ? p.images : []
+  const images = rawImages.map(img => (typeof img === 'string' ? { src: img } : img))
+  const isVariable = p.productType === 'variable' || p.type === 'variable' || (Array.isArray(p.variationsData) && p.variationsData.length > 0)
+
+  const activeVarPrices = isVariable && Array.isArray(p.variationsData) && p.variationsData.length > 0
+    ? p.variationsData
+        .filter((v) => v.isActive !== false && v.stock_status !== 'outofstock')
+        .map((v) => Number(v.price || v.sale_price || v.salePrice || v.regular_price || v.regularPrice || 0))
+        .filter((pr) => pr > 0)
+    : []
+
+  const minVarPrice = activeVarPrices.length > 0 ? Math.min(...activeVarPrices) : null
+  const basePrice = Number(p.basePrice ?? p.regular_price ?? p.price ?? 0)
+  const salePrice = p.salePrice ? Number(p.salePrice) : null
+
+  const currentPrice = isVariable && minVarPrice !== null ? minVarPrice : (salePrice !== null ? salePrice : basePrice)
+  const compareAt = isVariable ? 0 : (salePrice !== null ? basePrice : 0)
+  const inStock = p.stockQuantity !== undefined ? p.stockQuantity > 0 : (p.stock_status === 'instock' || p.stock_status === undefined)
+
+  return {
+    ...p,
+    id: p.id,
+    type: isVariable ? 'variable' : (p.type || 'simple'),
+    name: p.title || p.name || 'Untitled Product',
+    slug: p.slug,
+    price: currentPrice,
+    regular_price: basePrice,
+    compareAt: compareAt,
+    images: images.length > 0 ? images : [{ src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' }],
+    short_description: p.shortDescription || p.short_description || '',
+    description: p.description || '',
+    category: p.category?.name || (typeof p.category === 'string' ? p.category : ''),
+    category_slug: p.category?.slug || '',
+    stock_status: inStock ? 'instock' : 'outofstock',
+    in_stock: inStock,
+  }
+}
+
+function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart }) {
+  const [activeImgIdx, setActiveImgIdx] = useState(0)
+  const [cardQty, setCardQty] = useState(1)
+  const images = product.images || []
+  const isVariable = product.type === 'variable'
+  const inStock = product.stock_status === 'instock' || product.stock_status === undefined
+  const hasMultipleImages = images.length > 1
+  const inWishlist = wishlist.includes(product.id)
+  
+  const handlePrevImg = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setActiveImgIdx(prev => (prev === 0 ? images.length - 1 : prev - 1))
+  }
+
+  const handleNextImg = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setActiveImgIdx(prev => (prev === images.length - 1 ? 0 : prev + 1))
+  }
+
+  const currentImg = images[activeImgIdx]?.src || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'
+  const price = parseFloat(product.price) || 0
+  const compareAt = parseFloat(product.compareAt || product.regular_price) || 0
+  const rating = parseFloat(product.average_rating) || 0
+  const ratingCount = parseInt(product.rating_count) || 0
+
+  return (
+    <div className="group bg-white border border-stone-200 p-3 sm:p-4 flex flex-col justify-between shadow-sm relative transition-all duration-500 hover:border-[#D7A65B]/40 hover:shadow-md hover:bg-stone-50/20 rounded-sm overflow-hidden">
+      {/* Invisible overlay Link to make the whole card clickable */}
+      <Link href={`/products/${product.slug}`} className="absolute inset-0 z-10" />
+
+      <div className="space-y-3 sm:space-y-4">
+        {/* Image Frame */}
+        <div className="aspect-square w-full relative overflow-hidden bg-stone-50 border border-stone-150 group/img rounded-sm">
+          <Image 
+            src={currentImg} 
+            alt={product.name} 
+            fill 
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 280px"
+            className="object-cover opacity-90 transition-transform duration-700 ease-out group-hover:scale-105"
+          />
+          
+          {/* Swiper Arrow buttons, visible on hover */}
+          {hasMultipleImages && (
+            <>
+              <button
+                onClick={handlePrevImg}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/80 border border-stone-200 text-[#6B1024] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 z-20 hover:bg-white hover:scale-110"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleNextImg}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/80 border border-stone-200 text-[#6B1024] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 z-20 hover:bg-white hover:scale-110"
+                aria-label="Next image"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Dot Indicators */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-20 bg-black/10 px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+                {images.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setActiveImgIdx(i)
+                    }}
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                      activeImgIdx === i ? 'bg-[#D7A65B] scale-110' : 'bg-white/60 hover:bg-white'
+                    }`}
+                    aria-label={`Go to image ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Info details */}
+        <div className="space-y-1 text-left">
+          <div className="space-y-0.5">
+            <h3 className="font-cormorant text-base sm:text-xl text-[#6B1024] font-bold leading-snug tracking-wide line-clamp-1">
+              {product.name}
+            </h3>
+            <p className="text-[10px] sm:text-[11px] text-[#6B1024]/75 line-clamp-2 h-7 sm:h-8 font-light leading-relaxed">
+              {product.short_description?.replace(/<[^>]*>/g, '') || 'Authentic pure botanical fragrance.'}
+            </p>
+          </div>
+
+          {/* Rating row */}
+          <div className="flex items-center gap-1 sm:gap-1.5 pt-0.5">
+            <div className="flex gap-0.5">
+              {[...Array(5)].map((_, s) => {
+                const filled = s < Math.round(rating)
+                return (
+                  <Star 
+                    key={s} 
+                    className={`w-2.5 h-2.5 ${filled ? 'fill-[#D7A65B] text-[#D7A65B]' : 'text-stone-300'}`} 
+                  />
+                )
+              })}
+            </div>
+            <span className="text-[9px] text-[#6B1024]/60 font-light">
+              {ratingCount > 0 ? `${rating} (${ratingCount})` : 'No reviews'}
+            </span>
+          </div>
+
+          {/* Pricing */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span className="text-sm sm:text-lg font-cormorant font-bold text-[#6B1024]">
+              {isVariable ? `From ₹${price.toFixed(0)}` : `₹${price.toFixed(0)}`}
+            </span>
+            {!isVariable && compareAt > price && (
+              <>
+                <span className="text-[10px] sm:text-xs text-[#6B1024]/50 line-through">
+                  ₹{compareAt.toFixed(0)}
+                </span>
+                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded-sm">
+                  Save ₹{(compareAt - price).toFixed(0)} ({Math.round(((compareAt - price) / compareAt) * 100)}%)
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Actions panel */}
+      <div className="pt-3 sm:pt-4 mt-3 sm:mt-4 border-t border-stone-100 z-20 relative">
+        <div className="flex flex-col gap-2">
+          {/* Quantity Selector Row */}
+          {!isVariable && inStock && (
+            <div className="flex items-center justify-center border border-stone-200 rounded-sm bg-stone-50/55 py-1.5 px-3 h-10 gap-2 w-full">
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={(e) => { 
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setCardQty(q => Math.max(1, q - 1)) 
+                  }} 
+                  className="p-1 hover:bg-stone-200 rounded-full text-stone-600 transition"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <span className="font-bold min-w-[16px] text-center text-midnight text-xs sm:text-sm">{cardQty}</span>
+                <button 
+                  onClick={(e) => { 
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setCardQty(q => q + 1) 
+                  }} 
+                  className="p-1 hover:bg-stone-200 rounded-full text-stone-600 transition"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          <Button 
+            onClick={(e) => handleAddToCart(e, product, cardQty)}
+            className="w-full bg-[#6B1024] hover:bg-[#4D0013] text-white border border-[#6B1024] px-2 py-3.5 sm:py-4 rounded-none font-bold uppercase tracking-wider text-[9px] flex items-center justify-center gap-1.5 h-10"
+            disabled={!inStock}
+          >
+            <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" /> {inStock ? (isVariable ? 'Select Options' : 'Add To Cart') : 'Out of Stock'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Section 7: Default/Fallback Testimonials Data
+const testimonials = [
+  {
+    name: 'Anjali R.',
+    role: 'Verified Buyer',
+    quote: 'The fragrance transforms our daily prayer into a peaceful experience.',
+    rating: 5,
+    initial: 'A'
+  },
+  {
+    name: 'Vikram S.',
+    role: 'Ritual Practitioner',
+    quote: 'Premium packaging and exceptional quality.',
+    rating: 5,
+    initial: 'V'
+  },
+  {
+    name: 'Meera K.',
+    role: 'Daily Devotee',
+    quote: 'Long-lasting aroma with an authentic traditional feel.',
+    rating: 5,
+    initial: 'M'
+  }
+]
+
+export default function HomeClientContent({ initialProducts = [], initialCategories = [], initialTopReviews = [] }) {
+  const { addItem, openDrawer } = useCart()
+  
+  // Backend connection state
+  const [products, setProducts] = useState(initialProducts)
+  const [categories, setCategories] = useState(initialCategories)
+  const [topReviews, setTopReviews] = useState(initialTopReviews)
+  const [loading, setLoading] = useState(initialProducts.length === 0)
+  const [error, setError] = useState(null)
+
+  // Wishlist, Slider and Testimonial states
+  const [wishlist, setWishlist] = useState([])
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [touchStart, setTouchStart] = useState(null)
+  const [touchEnd, setTouchEnd] = useState(null)
+  const [testimonialIndex, setTestimonialIndex] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+    // Fetch real products and categories from NestJS backend
+    // NOTE: Product schema currently lacks an isFeatured flag; displaying first N products by creation date.
+    // NOTE: No backend reviews/testimonials module exists yet; using curated static testimonials.
+    Promise.all([
+      fetch(`${backendUrl}/all-products?per_page=13`).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
+      fetch(`${backendUrl}/categories`).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
+      fetch(`${backendUrl}/reviews/top?limit=10`).then(async (r) => {
+        if (!r.ok) return []
+        return r.json()
+      }).catch(() => []),
+    ])
+      .then(([pData, cData, rData]) => {
+        const rawProducts = Array.isArray(pData) ? pData : pData?.data || []
+        const mappedProducts = rawProducts.map(normalizeStoreProduct).filter(Boolean)
+        setProducts(mappedProducts)
+        setCategories(Array.isArray(cData) ? cData : [])
+        setTopReviews(Array.isArray(rData) ? rData : [])
+        setError(null)
+      })
+      .catch((err) => {
+        console.error('Failed to load products or categories from backend:', err)
+        setError('Unable to load products right now. Please check your connection or try again later.')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
+
+  // Auto-play testimonials slider
+  useEffect(() => {
+    const totalMobileSlides = testimonials.length
+    const totalDesktopSlides = Math.ceil(totalMobileSlides / 3)
+    if (totalMobileSlides <= 1) return
+
+    const timer = setInterval(() => {
+      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+      const maxSlides = isDesktop ? totalDesktopSlides : totalMobileSlides
+      setTestimonialIndex(prev => (prev + 1) % maxSlides)
+    }, 8000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Wishlist Handler
+  const toggleWishlist = (productId, productName) => {
+    setWishlist(prev => {
+      const exists = prev.includes(productId)
+      if (exists) {
+        toast.info(`Removed "${productName}" from your wishlist`)
+        return prev.filter(id => id !== productId)
+      } else {
+        toast.success(`Added "${productName}" to your wishlist`)
+        return [...prev, productId]
+      }
+    })
+  }
+
+  // Cart Add Handler
+  const handleAddToCart = (e, product, quantity = 1) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const img = product.images?.[0]?.src || ''
+    const isVariable = product.type === 'variable'
+
+    if (isVariable) {
+      window.location.href = `/products/${product.slug}`
+      return
+    }
+
+    addItem({
+      product_id: product.id,
+      name: product.name,
+      slug: product.slug,
+      price: parseFloat(product.price) || 0,
+      regular_price: parseFloat(product.compareAt || product.regular_price) || parseFloat(product.price) || 0,
+      image: img,
+      weight: parseFloat(product.weight) || 0,
+      attrs: []
+    }, quantity)
+    
+    toast.success(`Added ×${quantity} "${product.name}" to cart`)
+    openDrawer()
+  }
+
+  // Hero Slider Data
+  const slides = [
+    {
+      id: 1,
+      headline: 'SRIDATTAM Agarbatti',
+      subheadline: 'Premium botanical incense sticks crafted for daily rituals, peace, and reflection.',
+      cta: 'Explore Collection',
+      link: '/categories/incense-sticks',
+      desktopImage: '/HD1.png',
+      mobileImage: '/HM1.png',
+      image: '/HD1.png',
+      layoutType: 'right'
+    },
+    {
+      id: 2,
+      headline: 'Devotional Fragrances',
+      subheadline: 'Hand-rolled sticks prepared with sun-dried petals and pure botanical oils.',
+      cta: 'Explore Collection',
+      link: '/categories/incense-sticks',
+      desktopImage: '/HD2.png',
+      mobileImage: '/HM2.png',
+      image: '/HD2.png',
+      layoutType: 'right'
+    },
+    {
+      id: 3,
+      headline: 'Natural Dhoop Sticks',
+      subheadline: 'Charcoal-free bamboo-free dhoop sticks for a clean and pure atmosphere.',
+      cta: 'Explore Collection',
+      link: '/categories/bamboo-free-dhoop-sticks',
+      desktopImage: '/HD3.png',
+      mobileImage: '/HM3.png',
+      image: '/HD3.png',
+      layoutType: 'right'
+    },
+    {
+      id: 4,
+      headline: 'Sambrani Kits',
+      subheadline: 'Complete traditional sambrani cups and accessories for positive energy.',
+      cta: 'Explore Collection',
+      link: '/categories/sambrani-kits-2',
+      desktopImage: '/HD4.png',
+      mobileImage: '/HM4.png',
+      image: '/HD4.png',
+      layoutType: 'right'
+    }
+  ]
+
+  // Auto transition hero slides
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % slides.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [slides.length])
+
+  // Touch Swipe Gesture Handlers
+  const minSwipeDistance = 50 
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+    if (isLeftSwipe) {
+      setCurrentSlide(prev => (prev + 1) % slides.length)
+    } else if (isRightSwipe) {
+      setCurrentSlide(prev => (prev === 0 ? slides.length - 1 : prev - 1))
+    }
+  }
+
+  // Section 2: Trust Highlights (Matched to About page's Purity Promise)
+  const trustHighlights = [
+    {
+      title: 'Pure Wood Base',
+      desc: 'Made entirely from clean, natural wood-powder bases without toxic binders or coal dust.',
+      icon: Leaf
+    },
+    {
+      title: 'Sacred Sambrani',
+      desc: 'Infused with authentic natural Sambrani resin (Loban) for air purification and positive energy.',
+      icon: Flame
+    },
+    {
+      title: '100% Charcoal-Free',
+      desc: 'Completely free from charcoal, guaranteeing zero toxic black soot and pure botanical smoke.',
+      icon: ShieldCheck
+    },
+    {
+      title: 'Proudly Made in India',
+      desc: 'Crafted using local sacred flora, herbs, and traditional Vedic processes by Indian artisans.',
+      icon: Heart
+    }
+  ]
+
+  // Section 5 Categories Format helper functions
+  const getCategoryImage = (cat) => {
+    if (cat.image?.src) return cat.image.src
+    const fallbacks = {
+      'incense-sticks': 'https://images.unsplash.com/photo-1617954095840-0427f79be4cf?auto=format&fit=crop&w=600&q=80',
+      'dhoop-sticks': 'https://images.unsplash.com/photo-1581600140682-d4e68c8cde32?auto=format&fit=crop&w=600&q=80',
+      'dhoop-cones': 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=600&q=80',
+      'sambrani-kits': 'https://images.unsplash.com/photo-1760835249761-dc1ad2d7d759?auto=format&fit=crop&w=600&q=80',
+      'ritual-kit': '/ritual-kit.png',
+      sandalwood: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+      floral: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=600&q=80',
+      resins: 'https://images.unsplash.com/photo-1581600140682-d4e68c8cde32?auto=format&fit=crop&w=600&q=80',
+      samidha: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=600&q=80',
+      camphor: 'https://images.unsplash.com/photo-1760835249761-dc1ad2d7d759?auto=format&fit=crop&w=600&q=80',
+      combos: 'https://images.unsplash.com/photo-1617954095840-0427f79be4cf?auto=format&fit=crop&w=600&q=80'
+    }
+    return fallbacks[cat.slug] || 'https://images.unsplash.com/photo-1602928321679-560bb453f190?auto=format&fit=crop&w=600&q=80'
+  }
+
+  const getCategoryDesc = (cat) => {
+    const descriptions = {
+      'incense-sticks': 'Hand-rolled botanical incense sticks crafted for daily rituals and calm.',
+      'dhoop-sticks': 'Charcoal-free bambooless dhoop sticks for pure sacred aroma.',
+      'dhoop-cones': 'Easy-light pooja cones for fast and soothing devotion.',
+      'sambrani-kits': 'Traditional DIY Sambrani cowdung cups and herbal powders.',
+      'ritual-kit': 'Flagship curated hampers bringing together signature scents.',
+      sandalwood: 'Premium slow-burning natural Mysore sandalwood formulations.',
+      floral: 'Velvety damask rose, Mogra jasmine and garden flora.',
+      resins: 'Oman frankincense, Loban and golden guggulu gum crystals.',
+      samidha: 'Aromatic mango logs pre-soaked in Desi ghee & honey.',
+      camphor: 'Pure Bhimseni camphor crystals for daily cleanses.',
+      combos: 'Curated wellness bundles and starter sets.'
+    }
+    return descriptions[cat.slug] || 'Authentic pure Indian fragrances.'
+  }
+
+  // Filter Categories to display real categories
+  const displayedCategories = categories.length > 0 
+    ? categories.filter(c => c.slug !== 'uncategorized').slice(0, 5) 
+    : []
+
+  const activeTestimonials = testimonials
+
+  // Group testimonials into pages of 3 for desktop
+  const desktopSlides = []
+  for (let i = 0; i < activeTestimonials.length; i += 3) {
+    desktopSlides.push(activeTestimonials.slice(i, i + 3))
+  }
+
+  // Group testimonials into pages of 1 for mobile
+  const mobileSlides = activeTestimonials.map(t => [t])
+
+  const desktopIndex = Math.min(testimonialIndex, Math.max(0, desktopSlides.length - 1))
+  const mobileIndex = Math.min(testimonialIndex, Math.max(0, mobileSlides.length - 1))
+
+  return (
+    <main className="min-h-screen bg-transparent text-[#6B1024] font-inter overflow-x-hidden selection:bg-[#6B1024] selection:text-white relative">
+      <Header />
+
+      {/* SECTION 1 — HERO SLIDER */}
+      <section 
+        className="relative aspect-[1086/1448] md:aspect-[1536/450] w-full overflow-hidden bg-[#130306]"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {slides.map((slide, idx) => {
+          const activeImageSrc =
+            isMobile && slide.mobileImage
+              ? slide.mobileImage
+              : slide.desktopImage || slide.image
+
+          return (
+            <div
+              key={slide.id}
+              className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
+                currentSlide === idx ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+              }`}
+            >
+              {/* Clickable Image Slide Link */}
+              <Link href={slide.link} className="absolute inset-0 z-20 cursor-pointer">
+                <div className="absolute inset-0">
+                  <Image 
+                    src={activeImageSrc}
+                    alt={slide.headline} 
+                    fill 
+                    sizes="100vw"
+                    priority={idx === 0}
+                    className="object-cover"
+                  />
+                </div>
+              </Link>
+            </div>
+          )
+        })}
+
+        {/* Carousel controls */}
+        {slides.length > 1 && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-30">
+            {slides.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  currentSlide === idx ? 'bg-[#D7A65B] w-8' : 'bg-[#F7E9D1]/30 hover:bg-[#D7A65B]/60'
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 2 — TRUST & QUALITY HIGHLIGHTS */}
+      <section className="bg-transparent border-b border-stone-100 py-10 md:py-12 relative z-10">
+        <div className="container max-w-6xl mx-auto px-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {trustHighlights.map((item, idx) => (
+              <div 
+                key={idx} 
+                className="bg-white border border-stone-200/60 p-5 md:p-6 flex flex-col justify-between items-center text-center group hover:border-[#D7A65B]/40 hover:bg-stone-50/20 transition-all duration-500 shadow-sm animate-fade-in"
+              >
+                <div className="w-14 h-14 mx-auto rounded-full border border-[#D7A65B]/40 text-[#D7A65B] flex items-center justify-center mb-4 bg-stone-50 group-hover:scale-110 transition-all duration-500 shrink-0">
+                  <item.icon className="w-6 h-6 stroke-[1.25]" />
+                </div>
+                <div className="space-y-1 flex-grow flex flex-col justify-center">
+                  <h3 className="font-cormorant text-lg md:text-xl font-bold tracking-widest text-[#D7A65B] uppercase mb-1 lining-nums">
+                    {item.title}
+                  </h3>
+                  <p className="text-[10px] sm:text-xs text-[#6B1024]/75 font-light leading-relaxed max-w-[180px] mx-auto">
+                    {item.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3 — FEATURED PRODUCTS */}
+      <section className="py-16 md:py-20 bg-transparent relative z-10">
+        <div className="container max-w-6xl mx-auto px-4">
+          <div className="text-center max-w-xl mx-auto mb-12 space-y-2">
+            <span className="text-xs tracking-[0.25em] text-[#D7A65B] uppercase block font-semibold">SHOP THE COLLECTION</span>
+            <h2 className="font-cormorant text-3xl md:text-4xl text-[#6B1024] tracking-widest uppercase font-light">Featured Collection</h2>
+            <p className="text-xs text-[#6B1024]/75 font-light">Our most loved fragrances and ritual essentials.</p>
+            <div className="w-12 h-px bg-[#D7A65B] mx-auto mt-3" />
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 md:gap-8">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="aspect-square bg-stone-300/40 rounded-none animate-pulse" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-12 px-6 border border-stone-200 bg-white max-w-md mx-auto space-y-4 shadow-sm">
+              <AlertCircle className="w-8 h-8 text-[#6B1024] mx-auto opacity-75" />
+              <p className="text-sm text-[#6B1024] font-medium">{error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="border-[#6B1024] text-[#6B1024] hover:bg-[#6B1024] hover:text-white text-xs uppercase tracking-wider"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-12 px-6 border border-stone-200 bg-white max-w-md mx-auto shadow-sm">
+              <p className="text-sm text-[#6B1024]/80">No products available at the moment.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 md:gap-8">
+              {products.slice(0, 8).map((product) => (
+                <HomeProductCard
+                  key={product.id}
+                  product={product}
+                  wishlist={wishlist}
+                  toggleWishlist={toggleWishlist}
+                  handleAddToCart={handleAddToCart}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* SECTION 4 — COMPLETE RITUAL KITS */}
+      <section className="py-16 md:py-24 bg-gradient-to-b from-stone-50/40 via-white to-stone-50/40 text-[#6B1024] border-y border-stone-150 relative z-10">
+        <div className="container max-w-6xl mx-auto px-4">
+          <div className="text-center max-w-xl mx-auto mb-16 space-y-2">
+            <span className="text-xs tracking-[0.3em] text-[#D7A65B] uppercase block font-semibold">FLAGSHIP GIFT HAMPER</span>
+            <h2 className="font-cormorant text-4xl md:text-5xl text-[#6B1024] tracking-widest uppercase font-light">SANKALPA</h2>
+            <p className="text-xs text-[#6B1024]/75 font-light italic">"Meaning 'Sacred Intention' - A curated journey of pure botanical aromas."</p>
+            <div className="w-16 h-px bg-[#D7A65B] mx-auto mt-4" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            {/* Left: Image with double golden frames */}
+            <div className="lg:col-span-5 relative aspect-square w-full max-w-md mx-auto bg-white p-2 border border-[#D7A65B]/20 shadow-2xl group">
+              <div className="relative w-full h-full overflow-hidden border border-[#D7A65B]/30">
+                <Image 
+                  src="/ritual-kit.png" 
+                  alt="Sankalpa Premium Spiritual Gift Hamper" 
+                  fill 
+                  sizes="(max-width: 1024px) 100vw, 450px"
+                  className="object-cover transition-transform duration-1000 ease-out group-hover:scale-105" 
+                />
+              </div>
+              {/* Subtle gold corner decorations */}
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#D7A65B]/60" />
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#D7A65B]/60" />
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#D7A65B]/60" />
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#D7A65B]/60" />
+            </div>
+
+            {/* Right: Premium copy and detailed grid */}
+            <div className="lg:col-span-7 space-y-8 text-left max-w-2xl mx-auto lg:mx-0">
+              <div className="space-y-4">
+                <h3 className="font-cormorant text-2xl md:text-3xl text-[#D7A65B] uppercase tracking-wider font-light">
+                  Sridattam's Flagship Hamper
+                </h3>
+                <p className="text-sm md:text-base text-[#6B1024]/95 leading-relaxed font-light font-body">
+                  Built for the moments that deserve more than a single product. <strong>Sankalpa</strong> brings together our entire fragrance universe in one premium box: every signature mood, our mixed dhoop sticks and cones, and the interactive Sannidya sambrani kit.
+                </p>
+              </div>
+
+              {/* Inside the Box & Why Gift Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* Inside the Hamper */}
+                <div className="space-y-4 bg-white/70 border border-stone-250/60 p-5 rounded-sm hover:border-[#D7A65B]/30 transition-all duration-300 shadow-sm">
+                  <h4 className="text-xs font-bold tracking-[0.2em] text-[#D7A65B] uppercase border-b border-stone-150 pb-2">
+                    What's Inside
+                  </h4>
+                  <ul className="space-y-3">
+                    {[
+                      { text: 'All 4 Signature Moods', desc: 'Rajahmasa, Kalyani, Chandanavana & Nandanam (30 sticks each)' },
+                      { text: 'Trishakthi Bambooless Dhoop Sticks', desc: 'Mixed mood combo' },
+                      { text: 'Trishakthi Dhoop Cones', desc: 'Mixed mood combo' },
+                      { text: 'Sannidya DIY Sambrani Cup Kit', desc: 'Cowdung cups, 2 powders & steel holder' }
+                    ].map((item, idx) => (
+                      <li key={idx} className="flex gap-2.5 items-start text-xs text-[#6B1024]/90 font-light">
+                        <div className="w-4 h-4 border border-[#D7A65B]/35 rounded-full flex items-center justify-center text-[#D7A65B] bg-[#4D0013]/5 shrink-0 mt-0.5">
+                          <Check className="w-2.5 h-2.5 stroke-[2]" />
+                        </div>
+                        <div>
+                          <strong className="font-semibold block text-[#6B1024]">{item.text}</strong>
+                          <span className="text-[10px] text-[#6B1024]/75 leading-relaxed">{item.desc}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Why Perfect Gift */}
+                <div className="space-y-4 bg-white/70 border border-stone-250/60 p-5 rounded-sm hover:border-[#D7A65B]/30 transition-all duration-300 shadow-sm">
+                  <h4 className="text-xs font-bold tracking-[0.2em] text-[#D7A65B] uppercase border-b border-stone-150 pb-2">
+                    Why Gift It
+                  </h4>
+                  <ul className="space-y-3">
+                    {[
+                      { text: 'A Complete Fragrance Journey', desc: 'Not just a single product, but a full olfactory ritual.' },
+                      { text: 'Ideal for Occasions', desc: 'Ideal for Diwali, weddings, housewarmings, corporate and return gifts.' },
+                      { text: 'Premium Presentation', desc: 'Exquisite presentation, ready to gift as-is.' },
+                      { text: 'Full Range Introduction', desc: 'Introduces the receiver to the entire Sridattam range in one box.' }
+                    ].map((item, idx) => (
+                      <li key={idx} className="flex gap-2.5 items-start text-xs text-[#6B1024]/90 font-light">
+                        <div className="w-4 h-4 border border-[#D7A65B]/35 rounded-full flex items-center justify-center text-[#D7A65B] bg-[#4D0013]/5 shrink-0 mt-0.5">
+                          <Check className="w-2.5 h-2.5 stroke-[2]" />
+                        </div>
+                        <div>
+                          <strong className="font-semibold block text-[#6B1024]">{item.text}</strong>
+                          <span className="text-[10px] text-[#6B1024]/75 leading-relaxed">{item.desc}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Blockquote banner statement */}
+              <div className="relative bg-[#4D0013]/5 border-l-2 border-[#D7A65B] p-4 text-xs italic font-cormorant text-[#6B1024]/90 leading-relaxed tracking-wide">
+                "Sankalpa is more than a hamper - it is an invitation to bring intention, ritual and fragrance into someone's home. True to Sridattam's promise - spiritually rooted in tradition."
+              </div>
+
+              <div className="pt-2">
+                <Button asChild size="lg" className="bg-[#6B1024] hover:bg-[#4D0013] text-white font-semibold tracking-widest rounded-none px-8 py-5 text-xs uppercase transition-colors duration-300">
+                  <Link href="/products/sankalpa-premium-spiritual-gift-hamper-4-signature-moods-dhoop-sambrani-kit">Shop Sankalpa Hamper</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 5 — EXPLORE OUR COLLECTION */}
+      <section className="py-16 md:py-20 bg-transparent border-b border-stone-150 relative z-10">
+        <div className="container max-w-6xl mx-auto px-4">
+          <div className="text-center max-w-xl mx-auto mb-12 space-y-2">
+            <span className="text-xs tracking-[0.25em] text-[#D7A65B] uppercase block font-semibold">DISCOVER EVERYTHING</span>
+            <h2 className="font-cormorant text-3xl md:text-4xl text-[#6B1024] tracking-widest uppercase font-light">Explore Our Ritual Collection</h2>
+            <p className="text-xs text-[#6B1024]/75 font-light">Discover every fragrance and ritual essential.</p>
+            <div className="w-12 h-px bg-[#D7A65B] mx-auto mt-3" />
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+            {displayedCategories.map((cat, idx) => (
+              <Link 
+                key={idx}
+                href={`/categories/${cat.slug}`}
+                className="group bg-white border border-stone-200 p-3 sm:p-4 flex flex-col justify-between shadow-sm relative transition-all duration-500 hover:border-[#D7A65B]/40 hover:shadow-md hover:bg-stone-50/20 h-full"
+              >
+                <div className="space-y-3 sm:space-y-4">
+                  {/* Category Image Box */}
+                  <div className="aspect-[4/3] w-full relative overflow-hidden bg-stone-50 border border-stone-200">
+                    <Image 
+                      src={getCategoryImage(cat)} 
+                      alt={cat.name} 
+                      fill 
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 280px"
+                      className="object-cover opacity-90 transition-transform duration-700 ease-out group-hover:scale-105" 
+                    />
+                    <div className="absolute bottom-2.5 right-2.5 bg-[#6B1024] text-white text-[9px] font-bold tracking-widest px-2.5 py-1 uppercase border border-[#D7A65B]/20 z-10">
+                      {cat.count ? `${cat.count} Products` : 'Collection'}
+                    </div>
+                  </div>
+                  <div className="space-y-1 sm:space-y-1.5 text-left">
+                    <h3 className="font-cormorant text-lg sm:text-xl text-[#6B1024] tracking-wider uppercase font-bold">
+                      {cat.name}
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] text-[#6B1024]/75 font-light leading-relaxed h-10 sm:h-12 overflow-hidden">
+                      {cat.description?.replace(/<[^>]*>/g, '') || getCategoryDesc(cat)}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 6 — BRAND STORY IMMERSIVE BANNER */}
+      <section className="relative py-24 flex items-center justify-center overflow-hidden bg-transparent text-[#6B1024] border-y border-stone-150 z-10">
+        <div className="absolute inset-0 z-0">
+          <Image 
+            src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1600&q=80" 
+            alt="Warm atmosphere" 
+            fill 
+            sizes="100vw"
+            className="object-cover opacity-5 scale-105" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/80 to-white/90" />
+        </div>
+        
+        <div className="container relative z-10 max-w-3xl text-center px-4 space-y-6">
+          <span className="text-xs font-semibold tracking-[0.3em] text-[#D7A65B] uppercase block">THE SRIDATTAM LEGACY</span>
+          <h2 className="font-cormorant text-3xl md:text-4xl tracking-widest uppercase font-light leading-tight">
+            Crafted For Rituals.<br/>Inspired By Tradition.
+          </h2>
+          <div className="w-12 h-px bg-[#D7A65B] mx-auto" />
+          <p className="text-sm md:text-base text-[#6B1024]/90 max-w-xl mx-auto leading-relaxed font-light font-cormorant italic">
+            Every product is thoughtfully created with devotion, purity, craftsmanship, and respect for timeless Indian traditions.
+          </p>
+          <div className="pt-4">
+            <Button asChild size="lg" variant="outline" className="border-[#6B1024]/30 text-[#6B1024] hover:bg-[#6B1024]/10 hover:border-[#6B1024] font-semibold tracking-widest rounded-none px-8 py-5 text-xs uppercase transition-all duration-300 bg-transparent">
+              <Link href="/about">Learn Our Story</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 7 — ACTUAL CUSTOMER REVIEWS (HORIZONTAL MARQUEE) */}
+      <section className="py-16 md:py-24 bg-transparent border-b border-stone-150 text-[#6B1024] relative z-10 overflow-hidden">
+        <div className="container max-w-6xl mx-auto px-4 mb-10 text-center space-y-2">
+          <span className="text-xs tracking-[0.25em] text-[#D7A65B] uppercase block font-semibold">SHARED DEVOTION</span>
+          <h2 className="font-cormorant text-3xl md:text-4xl text-[#6B1024] tracking-widest uppercase font-light">What Devotees Are Saying</h2>
+          <div className="w-12 h-px bg-[#D7A65B] mx-auto mt-3" />
+        </div>
+
+        {/* Horizontal Marquee Track (Double loop for seamless infinite scroll) */}
+        {topReviews.length === 0 ? (
+          <div className="container max-w-md mx-auto text-center py-6 text-stone-400 text-xs">
+            <MessageSquare className="w-6 h-6 mx-auto mb-2 text-stone-300" />
+            <p>Customer reviews will be showcased here.</p>
+          </div>
+        ) : (
+          <div className="relative w-full overflow-hidden py-3">
+            {/* Fade Gradients at Edges */}
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-r from-white via-white/80 to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-l from-white via-white/80 to-transparent z-10" />
+
+            <div className="animate-marquee-reviews flex gap-6 items-stretch">
+              {topReviews.map((rev, idx) => (
+                <div
+                  key={`${rev.id}-${idx}`}
+                  className="w-[300px] md:w-[360px] bg-white border border-stone-200/90 rounded-xl p-6 text-left shadow-2xs hover:shadow-md hover:border-[#D7A65B]/60 transition-all duration-300 flex flex-col justify-between shrink-0"
+                >
+                  <div className="space-y-3">
+                    {/* Stars & Date */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            className={`w-3.5 h-3.5 ${
+                              s <= (rev.stars || 5)
+                                ? 'fill-[#D7A65B] text-[#D7A65B]'
+                                : 'text-stone-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-stone-400">
+                        {rev.createdAt
+                          ? new Date(rev.createdAt).toLocaleDateString('en-IN', {
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : ''}
+                      </span>
+                    </div>
+
+                    {/* Review text */}
+                    <p className="italic text-sm text-[#6B1024]/90 leading-relaxed font-cormorant line-clamp-3 min-h-[56px]">
+                      &ldquo;{rev.description}&rdquo;
+                    </p>
+                  </div>
+
+                  {/* Customer & Product Link */}
+                  <div className="pt-4 border-t border-stone-100 mt-4 space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#240A0F] text-[#D7A65B] border border-[#D7A65B]/30 flex items-center justify-center font-cormorant text-xs font-semibold shrink-0">
+                        {(rev.customerName || 'D')[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <cite className="font-semibold uppercase tracking-wider text-[11px] text-[#6B1024] not-italic block truncate">
+                          {rev.customerName || 'Devotee'}
+                        </cite>
+                        <span className="text-[9px] text-[#D7A65B] font-medium block">Verified Purchase</span>
+                      </div>
+                    </div>
+
+                    {rev.product?.title && (
+                      <Link
+                        href={rev.product?.slug ? `/products/${rev.product.slug}` : '/products'}
+                        className="inline-flex items-center gap-1.5 text-[10px] text-stone-500 hover:text-[#6B1024] bg-stone-50 px-2 py-1 rounded border border-stone-150 transition truncate max-w-full"
+                      >
+                        <Package className="w-3 h-3 text-[#D7A65B] shrink-0" />
+                        <span className="truncate">{rev.product.title}</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <Footer />
+    </main>
+  )
+}

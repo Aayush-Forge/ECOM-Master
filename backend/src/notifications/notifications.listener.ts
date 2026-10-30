@@ -1,0 +1,130 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { OrderStatus } from '@prisma/client';
+import { NotificationsService } from './notifications.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+
+@Injectable()
+export class NotificationsListener {
+  private readonly logger = new Logger(NotificationsListener.name);
+
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+
+  @OnEvent('order.paid')
+  async handleOrderPaid(payload: { orderId: string }): Promise<void> {
+    try {
+      if (!payload?.orderId) return;
+      this.logger.log(`[NotificationsListener] Received order.paid for order ${payload.orderId}`);
+      // 1. Send confirmation to customer
+      await this.notificationsService.dispatchCustomerNotification(
+        payload.orderId,
+        'order_confirmation',
+      );
+      // 2. Send internal alert to admin/staff (order.paid ONLY)
+      await this.notificationsService.dispatchInternalAlert(
+        payload.orderId,
+        'internal_new_order',
+      );
+    } catch (err: any) {
+      this.logger.error(`Error in handleOrderPaid: ${err?.message || err}`);
+    }
+  }
+
+  @OnEvent('order.processing')
+  async handleOrderProcessing(payload: { orderId: string }): Promise<void> {
+    try {
+      if (!payload?.orderId) return;
+      this.logger.log(`[NotificationsListener] Received order.processing for order ${payload.orderId}`);
+      await this.notificationsService.dispatchCustomerNotification(
+        payload.orderId,
+        'status_processing',
+      );
+    } catch (err: any) {
+      this.logger.error(`Error in handleOrderProcessing: ${err?.message || err}`);
+    }
+  }
+
+  @OnEvent('order.shipped')
+  async handleOrderShipped(payload: { orderId: string }): Promise<void> {
+    try {
+      if (!payload?.orderId) return;
+      this.logger.log(`[NotificationsListener] Received order.shipped for order ${payload.orderId}`);
+      // Load tracking information directly from database (don't trust event payload)
+      const order = await this.prisma.order.findUnique({
+        where: { id: payload.orderId },
+        select: { id: true, trackingUrl: true, trackingNumber: true },
+      });
+      if (!order) {
+        this.logger.warn(`[NotificationsListener] Order ${payload.orderId} not found in DB on order.shipped`);
+        return;
+      }
+      await this.notificationsService.dispatchCustomerNotification(
+        payload.orderId,
+        'status_shipped',
+      );
+    } catch (err: any) {
+      this.logger.error(`Error in handleOrderShipped: ${err?.message || err}`);
+    }
+  }
+
+  @OnEvent('order.delivered')
+  async handleOrderDelivered(payload: { orderId: string }): Promise<void> {
+    try {
+      if (!payload?.orderId) return;
+      this.logger.log(`[NotificationsListener] Received order.delivered for order ${payload.orderId}`);
+      await this.notificationsService.dispatchCustomerNotification(
+        payload.orderId,
+        'status_delivered',
+      );
+    } catch (err: any) {
+      this.logger.error(`Error in handleOrderDelivered: ${err?.message || err}`);
+    }
+  }
+
+  @OnEvent('order.cancelled')
+  async handleOrderCancelled(payload: { orderId: string }): Promise<void> {
+    try {
+      if (!payload?.orderId) return;
+      this.logger.log(`[NotificationsListener] Received order.cancelled for order ${payload.orderId}`);
+
+      // Read fromStatus from the DB order_status_history, not the event payload.
+      const history = await this.prisma.orderStatusHistory.findFirst({
+        where: { orderId: payload.orderId, toStatus: OrderStatus.cancelled },
+        orderBy: { changedAt: 'desc' },
+      });
+
+      // Customer email ONLY when previous status was NOT payment_pending
+      if (!history || history.fromStatus === OrderStatus.payment_pending) {
+        this.logger.log(
+          `[NotificationsListener] Skipping order_cancelled email for order ${payload.orderId} because previous status was ${history?.fromStatus ?? 'none'} (payment_pending cancels send nothing)`,
+        );
+        return;
+      }
+
+      await this.notificationsService.dispatchCustomerNotification(
+        payload.orderId,
+        'order_cancelled',
+      );
+    } catch (err: any) {
+      this.logger.error(`Error in handleOrderCancelled: ${err?.message || err}`);
+    }
+  }
+
+  @OnEvent('order.refunded')
+  async handleOrderRefunded(payload: { orderId: string }): Promise<void> {
+    try {
+      if (!payload?.orderId) return;
+      this.logger.log(`[NotificationsListener] Received order.refunded for order ${payload.orderId}`);
+      await this.notificationsService.dispatchCustomerNotification(
+        payload.orderId,
+        'refund_processed',
+      );
+    } catch (err: any) {
+      this.logger.error(`Error in handleOrderRefunded: ${err?.message || err}`);
+    }
+  }
+}

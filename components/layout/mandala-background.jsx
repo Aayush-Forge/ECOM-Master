@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { usePathname } from 'next/navigation'
 
 // FloralMandala: Intricate organic hand-drawn style with curved petals and scrolls
 const FloralMandala = ({ className }) => (
@@ -93,6 +94,30 @@ const BorderPattern = ({ className, id }) => (
 )
 
 export default function MandalaBackground() {
+  const pathname = usePathname()
+  const isSubdomain = typeof window !== 'undefined' && (
+    window.location.hostname.startsWith('admin.') ||
+    window.location.hostname.startsWith('admin-') ||
+    window.location.hostname.split(':')[0] === 'admin'
+  )
+
+  if (
+    isSubdomain ||
+    pathname?.startsWith('/admin') ||
+    pathname?.startsWith('/staff') ||
+    pathname?.startsWith('/login') ||
+    pathname === '/orders' ||
+    pathname === '/payments' ||
+    pathname === '/products' ||
+    pathname === '/categories' ||
+    pathname === '/discounts' ||
+    pathname === '/users' ||
+    pathname === '/audit-logs' ||
+    pathname === '/overview'
+  ) {
+    return null
+  }
+
   return (
     <div className="absolute inset-x-0 top-0 bottom-0 pointer-events-none overflow-hidden z-0 bg-[#FFFDF9]/60">
       {/* Top Border Pattern Strip */}

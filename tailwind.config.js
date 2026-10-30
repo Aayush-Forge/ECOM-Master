@@ -46,16 +46,19 @@ module.exports = {
         // Backwards-compat alias — ivory now refers to brand cream
         ivory: { DEFAULT: '#FFF3C1', 50: '#FFFAE2', 100: '#FFF6D2', 200: '#FFF3C1' },
         saffron: {
+          DEFAULT: '#FF6B00',
           50: '#FFF4E6', 100: '#FFE4C2', 200: '#FFCC85',
           300: '#FFB347', 400: '#FF9522', 500: '#FF6B00',
           600: '#E55A00', 700: '#B84600', 800: '#8C3500', 900: '#5C2200'
         },
         gold: {
+          DEFAULT: '#D4AF37',
           50: '#FBF6E5', 100: '#F5E9B8', 200: '#EDD683',
           300: '#E2C24E', 400: '#D4AF37', 500: '#B8932A',
           600: '#937420', 700: '#6F5618', 800: '#4D3B0F', 900: '#2E2308'
         },
         maroon: {
+          DEFAULT: '#800020',
           50: '#FCE9EC', 100: '#F4BFC7', 200: '#E687A0',
           300: '#D45878', 400: '#B83A5C', 500: '#800020',
           600: '#660019', 700: '#4D0013', 800: '#33000C', 900: '#1A0006'
