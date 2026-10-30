@@ -2,6 +2,106 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { wcConfigured, wcRequest, safeProduct, safeVariation, safeCategory, safeOrder, resolveProductAcf, clearWcCache } from '@/lib/wc'
+import { findCouponByCode } from '@/lib/coupons'
+import { SEED_PRODUCTS, SEED_CATEGORIES } from '@/lib/products-seed'
+
+const RICH_FALLBACK_CATEGORIES = [
+  { id: 1, name: 'Mysore Sandalwood', slug: 'sandalwood', count: 6, description: 'Premium slow-burning natural Mysore sandalwood formulations.', image: { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' } },
+  { id: 2, name: 'Floral Notes', slug: 'floral', count: 5, description: 'Velvety damask rose, Mogra jasmine and garden flora.', image: { src: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=600&q=80' } },
+  { id: 3, name: 'Sacred Resins', slug: 'resins', count: 4, description: 'Oman frankincense, Loban and golden guggulu gum crystals.', image: { src: 'https://images.unsplash.com/photo-1581600140682-d4e68c8cde32?auto=format&fit=crop&w=600&q=80' } },
+  { id: 4, name: 'Wood Samidha', slug: 'samidha', count: 4, description: 'Aromatic mango logs pre-soaked in Desi ghee & honey.', image: { src: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=600&q=80' } },
+  { id: 5, name: 'Pure Camphor', slug: 'camphor', count: 3, description: 'Pure Bhimseni camphor crystals for daily cleanses.', image: { src: 'https://images.unsplash.com/photo-1760835249761-dc1ad2d7d759?auto=format&fit=crop&w=600&q=80' } },
+  { id: 6, name: 'Luxury Bundles', slug: 'combos', count: 6, description: 'Curated wellness bundles and starter sets.', image: { src: 'https://images.unsplash.com/photo-1617954095840-0427f79be4cf?auto=format&fit=crop&w=600&q=80' } },
+  { id: 7, name: 'Incense Sticks', slug: 'incense-sticks', count: 8, description: 'Pure wood base and botanical flower fragrances.', image: { src: 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=600&q=80' } },
+]
+
+async function getFallbackProducts(q = {}) {
+  let list = []
+  try {
+    const res = await fetch('http://localhost:5000/products', { cache: 'no-store' })
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        list = data
+      }
+    }
+  } catch (e) {
+    // backend unreachable, fallback to seed
+  }
+
+  if (list.length === 0) {
+    list = [...SEED_PRODUCTS]
+  }
+
+  // Filter by category
+  if (q.category) {
+    const cat = String(q.category).toLowerCase()
+    list = list.filter(p => {
+      const cats = Array.isArray(p.categories)
+        ? p.categories.map(c => (typeof c === 'string' ? c.toLowerCase() : c.slug?.toLowerCase()))
+        : []
+      return cats.includes(cat) || cats.some(c => c && c.includes(cat))
+    })
+  }
+
+  // Filter by search
+  if (q.search) {
+    const term = String(q.search).toLowerCase()
+    list = list.filter(p =>
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.description && p.description.toLowerCase().includes(term))
+    )
+  }
+
+  // Filter by featured
+  if (q.featured) {
+    list = list.filter(p => !!p.featured)
+  }
+
+  // Filter by include
+  if (q.include) {
+    const ids = String(q.include).split(',').map(s => s.trim().toLowerCase())
+    list = list.filter(p => ids.includes(String(p.id).toLowerCase()) || ids.includes(String(p.slug).toLowerCase()))
+  }
+
+  // Sorting
+  if (q.orderby === 'price') {
+    list.sort((a, b) => {
+      const pa = parseFloat(a.price) || 0
+      const pb = parseFloat(b.price) || 0
+      return q.order === 'asc' ? pa - pb : pb - pa
+    })
+  } else if (q.orderby === 'popularity' || q.orderby === 'rating') {
+    list.sort((a, b) => (parseFloat(b.average_rating) || 0) - (parseFloat(a.average_rating) || 0))
+  }
+
+  // Pagination
+  const page = q.page || 1
+  const perPage = q.per_page || 20
+  const start = (page - 1) * perPage
+  const paginated = list.slice(start, start + perPage)
+
+  return paginated.map(safeProduct)
+}
+
+async function getFallbackSingleProduct(slug) {
+  try {
+    const res = await fetch(`http://localhost:5000/products/${encodeURIComponent(slug)}`, { cache: 'no-store' })
+    if (res.ok) {
+      const data = await res.json()
+      if (data && data.id) {
+        return { ...safeProduct(data), variationsData: [], related: [] }
+      }
+    }
+  } catch {}
+
+  const found = SEED_PRODUCTS.find(p => p.slug === slug || String(p.id) === slug)
+  if (found) {
+    const related = SEED_PRODUCTS.filter(p => p.id !== found.id).slice(0, 4).map(safeProduct)
+    return { ...safeProduct(found), variationsData: [], related }
+  }
+  return null
+}
 
 const CORS_ORIGINS = process.env.CORS_ORIGINS || '*'
 
@@ -104,55 +204,75 @@ async function handleRoute(request, { params }) {
 
     // ---- VALIDATE COUPON ----
     if (route === '/coupons/validate' && method === 'POST') {
-      if (!wcConfigured()) return err('WooCommerce keys not configured', 503, 'WC_NOT_CONFIGURED')
       let body
       try { body = await request.json() } catch { return err('Invalid JSON', 400) }
       const code = String(body.code || '').trim()
       if (!code) return err('Coupon code is required', 400)
 
-      try {
-        const list = await wcRequest('/coupons', { query: { code: code.toLowerCase() } })
-        const coupon = (list || []).find(c => String(c.code).toLowerCase() === code.toLowerCase())
-        if (!coupon) {
-          return err('Invalid coupon code.', 404)
-        }
+      // 1. If WooCommerce is configured, try fetching live WooCommerce coupon
+      if (wcConfigured()) {
+        try {
+          const list = await wcRequest('/coupons', { query: { code: code.toLowerCase() } })
+          const coupon = (list || []).find(c => String(c.code).toLowerCase() === code.toLowerCase())
+          if (coupon) {
+            const now = new Date()
+            if (coupon.date_expires) {
+              const expires = new Date(coupon.date_expires)
+              if (expires < now) {
+                return err('This coupon has expired.', 400)
+              }
+            }
 
-        const now = new Date()
-        if (coupon.date_expires) {
-          const expires = new Date(coupon.date_expires)
-          if (expires < now) {
-            return err('This coupon has expired.', 400)
+            if (coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit) {
+              return err('This coupon has reached its usage limit.', 400)
+            }
+
+            return json({
+              id: coupon.id,
+              code: coupon.code,
+              discount_type: coupon.discount_type,
+              amount: coupon.amount,
+              minimum_amount: coupon.minimum_amount,
+              maximum_amount: coupon.maximum_amount,
+              individual_use: coupon.individual_use,
+              exclude_sale_items: coupon.exclude_sale_items,
+              product_ids: coupon.product_ids || [],
+              excluded_product_ids: coupon.excluded_product_ids || [],
+              product_categories: coupon.product_categories || [],
+              excluded_product_categories: coupon.excluded_product_categories || [],
+              free_shipping: coupon.free_shipping
+            })
           }
+        } catch (e) {
+          console.warn('WooCommerce coupon lookup error, checking active local catalog:', e?.message || e)
         }
-
-        if (coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit) {
-          return err('This coupon has reached its usage limit.', 400)
-        }
-
-        return json({
-          id: coupon.id,
-          code: coupon.code,
-          discount_type: coupon.discount_type,
-          amount: coupon.amount,
-          minimum_amount: coupon.minimum_amount,
-          maximum_amount: coupon.maximum_amount,
-          individual_use: coupon.individual_use,
-          exclude_sale_items: coupon.exclude_sale_items,
-          product_ids: coupon.product_ids || [],
-          excluded_product_ids: coupon.excluded_product_ids || [],
-          product_categories: coupon.product_categories || [],
-          excluded_product_categories: coupon.excluded_product_categories || [],
-          free_shipping: coupon.free_shipping
-        })
-      } catch (e) {
-        console.error('Coupon validation error:', e)
-        return err('Failed to validate coupon.', 500)
       }
+
+      // 2. Resilient Fallback to built-in Active Store Coupons
+      const fallbackCoupon = findCouponByCode(code)
+      if (fallbackCoupon) {
+        return json({
+          id: fallbackCoupon.id,
+          code: fallbackCoupon.code,
+          discount_type: fallbackCoupon.discount_type,
+          amount: fallbackCoupon.amount,
+          minimum_amount: fallbackCoupon.minimum_amount,
+          maximum_amount: fallbackCoupon.maximum_amount,
+          individual_use: fallbackCoupon.individual_use,
+          exclude_sale_items: fallbackCoupon.exclude_sale_items,
+          product_ids: fallbackCoupon.product_ids || [],
+          excluded_product_ids: fallbackCoupon.excluded_product_ids || [],
+          product_categories: fallbackCoupon.product_categories || [],
+          excluded_product_categories: fallbackCoupon.excluded_product_categories || [],
+          free_shipping: fallbackCoupon.free_shipping
+        })
+      }
+
+      return err('Invalid coupon code. Try WELCOME10, DIWALI2026, or FESTIVE100.', 404)
     }
 
     // ---- PRODUCTS LIST ----
     if (route === '/products' && method === 'GET') {
-      if (!wcConfigured()) return err('WooCommerce keys not configured. Add WC_CONSUMER_KEY, WC_CONSUMER_SECRET and NEXT_PUBLIC_WC_BASE_URL to /app/.env then restart.', 503, 'WC_NOT_CONFIGURED')
       const u = new URL(request.url)
       const q = {
         per_page: Math.min(parseInt(u.searchParams.get('limit') || '20', 10), 100),
@@ -170,51 +290,70 @@ async function handleRoute(request, { params }) {
       else if (sort === 'newest') { q.orderby = 'date'; q.order = 'desc' }
       else if (sort === 'featured') { q.orderby = 'popularity'; q.order = 'desc' }
 
-      // category param: WC expects category ID, but we accept slug too. If slug, look it up.
-      if (q.category && !/^[0-9]+$/.test(q.category)) {
+      if (wcConfigured()) {
         try {
-          const cats = await wcRequest('/products/categories', { query: { slug: q.category } })
-          q.category = cats?.[0]?.id ? String(cats[0].id) : undefined
-        } catch { q.category = undefined }
-      }
+          // category param: WC expects category ID, but we accept slug too. If slug, look it up.
+          if (q.category && !/^[0-9]+$/.test(q.category)) {
+            try {
+              const cats = await wcRequest('/products/categories', { query: { slug: q.category } })
+              q.category = cats?.[0]?.id ? String(cats[0].id) : undefined
+            } catch { q.category = undefined }
+          }
 
-      const [products, reviews] = await Promise.all([
-        wcRequest('/products', { query: q }),
-        wcRequest('/products/reviews', { query: { per_page: 100 } }).catch(() => [])
-      ])
-      const reviewMap = {}
+          const [products, reviews] = await Promise.all([
+            wcRequest('/products', { query: q }),
+            wcRequest('/products/reviews', { query: { per_page: 100 } }).catch(() => [])
+          ])
+          const reviewMap = {}
 
-      if (Array.isArray(reviews)) {
-        for (const r of reviews) {
-          const pid = r.product_id
-          if (!reviewMap[pid]) reviewMap[pid] = { sum: 0, count: 0 }
-          reviewMap[pid].sum += r.rating
-          reviewMap[pid].count += 1
+          if (Array.isArray(reviews)) {
+            for (const r of reviews) {
+              const pid = r.product_id
+              if (!reviewMap[pid]) reviewMap[pid] = { sum: 0, count: 0 }
+              reviewMap[pid].sum += r.rating
+              reviewMap[pid].count += 1
+            }
+          }
+          if (Array.isArray(products) && products.length > 0) {
+            const safeProducts = products.map(p => {
+              const stats = reviewMap[p.id]
+              if (stats) {
+                p.average_rating = String((stats.sum / stats.count).toFixed(2))
+                p.rating_count = stats.count
+              }
+              return safeProduct(p)
+            })
+            return json(safeProducts)
+          }
+        } catch (e) {
+          console.warn('WooCommerce products fetch failed, using backend/seed catalog:', e?.message || e)
         }
       }
-      const safeProducts = products.map(p => {
-        const stats = reviewMap[p.id]
-        if (stats) {
-          p.average_rating = String((stats.sum / stats.count).toFixed(2))
-          p.rating_count = stats.count
-        }
-        return safeProduct(p)
-      })
-      return json(safeProducts)
+
+      // Resilient Fallback to NestJS backend or seed catalog
+      const fallbackProducts = await getFallbackProducts(q)
+      return json(fallbackProducts)
     }
 
     // ---- PRODUCT REVIEWS ----
     if (route === '/products/reviews') {
-      if (!wcConfigured()) return err('WooCommerce keys not configured', 503, 'WC_NOT_CONFIGURED')
       if (method === 'GET') {
-        const u = new URL(request.url)
-        const productId = u.searchParams.get('product')
-        const q = { per_page: 100 }
-        if (productId) q.product = productId
-        const reviews = await wcRequest('/products/reviews', { query: q })
-        return json(reviews)
+        if (wcConfigured()) {
+          try {
+            const u = new URL(request.url)
+            const productId = u.searchParams.get('product')
+            const q = { per_page: 100 }
+            if (productId) q.product = productId
+            const reviews = await wcRequest('/products/reviews', { query: q })
+            if (Array.isArray(reviews)) return json(reviews)
+          } catch (e) {
+            console.warn('WC reviews fetch failed:', e?.message)
+          }
+        }
+        return json([])
       }
       if (method === 'POST') {
+        if (!wcConfigured()) return err('WooCommerce keys not configured', 503, 'WC_NOT_CONFIGURED')
         let body
         try { body = await request.json() } catch { return err('Invalid JSON', 400) }
         const { product_id, review, reviewer, reviewer_email, rating } = body || {}
@@ -238,46 +377,79 @@ async function handleRoute(request, { params }) {
 
     // ---- SINGLE PRODUCT (with variations) ----
     if (route.startsWith('/products/') && method === 'GET') {
-      if (!wcConfigured()) return err('WooCommerce keys not configured', 503, 'WC_NOT_CONFIGURED')
       const slug = decodeURIComponent(route.replace('/products/', ''))
       if (!SLUG_RE.test(slug)) return err('Invalid product slug', 400)
-      const list = await wcRequest('/products', { query: { slug, status: 'publish' } })
-      const product = list?.[0]
-      if (!product) return err('Product not found', 404)
 
-      // Fetch ACF, reviews, variations, and related products in parallel
-      const [acf, reviews, variationsData, relatedData] = await Promise.all([
-        resolveProductAcf(product),
-        wcRequest('/products/reviews', { query: { product: product.id } }).catch(() => []),
-        (product.type === 'variable' && Array.isArray(product.variations) && product.variations.length)
-          ? wcRequest(`/products/${product.id}/variations`, { query: { per_page: 100 } }).catch(() => [])
-          : Promise.resolve([]),
-        (Array.isArray(product.related_ids) && product.related_ids.length)
-          ? wcRequest('/products', { query: { include: product.related_ids.slice(0, 6).join(','), per_page: 6 } }).catch(() => [])
-          : Promise.resolve([])
-      ])
+      if (wcConfigured()) {
+        try {
+          const list = await wcRequest('/products', { query: { slug, status: 'publish' } })
+          const product = list?.[0]
+          if (product) {
+            const [acf, reviews, variationsData, relatedData] = await Promise.all([
+              resolveProductAcf(product),
+              wcRequest('/products/reviews', { query: { product: product.id } }).catch(() => []),
+              (product.type === 'variable' && Array.isArray(product.variations) && product.variations.length)
+                ? wcRequest(`/products/${product.id}/variations`, { query: { per_page: 100 } }).catch(() => [])
+                : Promise.resolve([]),
+              (Array.isArray(product.related_ids) && product.related_ids.length)
+                ? wcRequest('/products', { query: { include: product.related_ids.slice(0, 6).join(','), per_page: 6 } }).catch(() => [])
+                : Promise.resolve([])
+            ])
 
-      product.acf = acf
-      if (Array.isArray(reviews) && reviews.length > 0) {
-        const sum = reviews.reduce((s, r) => s + r.rating, 0)
-        product.average_rating = String((sum / reviews.length).toFixed(2))
-        product.rating_count = reviews.length
-      } else {
-        product.average_rating = '0.00'
-        product.rating_count = 0
+            product.acf = acf
+            if (Array.isArray(reviews) && reviews.length > 0) {
+              const sum = reviews.reduce((s, r) => s + r.rating, 0)
+              product.average_rating = String((sum / reviews.length).toFixed(2))
+              product.rating_count = reviews.length
+            } else {
+              product.average_rating = '0.00'
+              product.rating_count = 0
+            }
+
+            const variations = (variationsData || []).map(safeVariation)
+            const related = (relatedData || []).map(safeProduct)
+
+            return json({ ...safeProduct(product), variationsData: variations, related })
+          }
+        } catch (e) {
+          console.warn('WC single product fetch failed, trying backend/seed fallback:', e?.message)
+        }
       }
 
-      const variations = (variationsData || []).map(safeVariation)
-      const related = (relatedData || []).map(safeProduct)
+      // Resilient Fallback to NestJS backend or seed catalog
+      const fallbackSingle = await getFallbackSingleProduct(slug)
+      if (fallbackSingle) return json(fallbackSingle)
 
-      return json({ ...safeProduct(product), variationsData: variations, related })
+      return err('Product not found', 404)
     }
 
     // ---- CATEGORIES ----
     if (route === '/categories' && method === 'GET') {
-      if (!wcConfigured()) return err('WooCommerce keys not configured', 503, 'WC_NOT_CONFIGURED')
-      const cats = await wcRequest('/products/categories', { query: { per_page: 100, hide_empty: 'true', orderby: 'count', order: 'desc' } })
-      return json((cats || []).map(safeCategory))
+      if (wcConfigured()) {
+        try {
+          const cats = await wcRequest('/products/categories', { query: { per_page: 100, hide_empty: 'true', orderby: 'count', order: 'desc' } })
+          if (Array.isArray(cats) && cats.length > 0) {
+            return json(cats.map(safeCategory))
+          }
+        } catch (e) {
+          console.warn('WC categories fetch failed, using fallback categories:', e?.message)
+        }
+      }
+      return json(RICH_FALLBACK_CATEGORIES)
+    }
+
+    // ---- ACTIVE CLUBBING RULE / CAMPAIGN ----
+    if ((route === '/clubbing/active' || route === '/clubbing-rules/active') && method === 'GET') {
+      try {
+        const res = await fetch('http://localhost:5000/clubbing/active', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          return json(data)
+        }
+      } catch (e) {
+        console.warn('Backend active clubbing fetch failed in route.js:', e?.message)
+      }
+      return json([])
     }
 
     // ---- CREATE ORDER (returns WC payment_url) ----

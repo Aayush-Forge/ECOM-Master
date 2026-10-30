@@ -1,14 +1,24 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/lib/cart-context'
 import { Minus, Plus, Trash2, Flame, Sparkles } from 'lucide-react'
+import { getActiveClubbings, calculateClubbingDiscount } from '@/lib/api/clubbings'
 
 export default function CartDrawer() {
   const { items, isOpen, closeDrawer, removeItem, updateQuantity, subtotal, cartKey } = useCart()
+  const [activeClubbings, setActiveClubbings] = useState([])
+
+  useEffect(() => {
+    getActiveClubbings().then(c => setActiveClubbings(c || [])).catch(() => {})
+  }, [items])
+
+  const clubbingResult = calculateClubbingDiscount(items, activeClubbings)
+  const clubbingDiscount = clubbingResult.discount || 0
 
   return (
     <Sheet open={isOpen} onOpenChange={(o) => !o && closeDrawer()}>
@@ -93,17 +103,36 @@ export default function CartDrawer() {
                         <span>-₹{totalSaved.toFixed(0)}</span>
                       </div>
                     )}
+                    {clubbingDiscount > 0 && (
+                      <div className="flex justify-between items-center text-emerald-700 font-semibold bg-[#FFF9EE] px-2.5 py-1.5 rounded-md border border-[#D7A65B]/40 text-xs">
+                        <span className="flex items-center gap-1.5 text-[#6B1024]">
+                          <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
+                          Festive Bundle ({clubbingResult.appliedRule?.tagline || 'Clubbing'})
+                        </span>
+                        <span className="text-emerald-700 font-bold">-₹{clubbingDiscount.toFixed(0)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between pt-2 border-t border-stone-200 text-midnight font-bold">
                       <span>Subtotal</span>
-                      <span className="text-saffron-600">₹{subtotal.toFixed(0)}</span>
+                      <span className="text-saffron-600">₹{Math.max(0, subtotal - clubbingDiscount).toFixed(0)}</span>
                     </div>
                   </div>
 
-                  {totalSaved > 0 && (
+                  {(totalSaved > 0 || clubbingDiscount > 0) && (
                     <div className="bg-emerald-50 text-emerald-700 text-xs font-bold py-2 px-3 rounded text-center">
-                      You are saving ₹{totalSaved.toFixed(0)} on this order!
+                      You are saving ₹{(totalSaved + clubbingDiscount).toFixed(0)} on this order!
                     </div>
                   )}
+
+                  <div className="bg-[#FFF9EE] border border-[#D7A65B]/40 rounded-lg p-2.5 flex items-center justify-between text-xs text-[#6B1024]">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
+                      <span>Festive Clubbing & Coupons</span>
+                    </div>
+                    <Link href="/clubbing" onClick={closeDrawer} className="font-bold underline text-[#6B1024] hover:text-[#FF6B00] text-[11px]">
+                      View Bundles →
+                    </Link>
+                  </div>
 
                   <p className="text-[10px] text-muted-foreground text-center">Shipping calculated at checkout</p>
                   <Button asChild onClick={closeDrawer} className="w-full bg-saffron-500 hover:bg-saffron-600 text-white font-semibold py-6 text-base">

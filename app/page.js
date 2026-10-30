@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
+import ClubbingFestiveBanner from '@/components/home/clubbing-festive-banner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCart } from '@/lib/cart-context'
@@ -32,14 +33,19 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SEED_PRODUCTS, SEED_CATEGORIES } from '@/lib/products-seed'
 
-function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart }) {
+function HomeProductCard({ product, wishlist = [], toggleWishlist, handleAddToCart }) {
   const [activeImgIdx, setActiveImgIdx] = useState(0)
   const [cardQty, setCardQty] = useState(1)
-  const images = product.images || []
+  if (!product) return null
+
+  const images = Array.isArray(product.images) && product.images.length > 0
+    ? product.images
+    : [{ src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' }]
   const isVariable = product.type === 'variable'
   const inStock = product.stock_status === 'instock' || product.stock_status === undefined
   const hasMultipleImages = images.length > 1
-  const inWishlist = wishlist.includes(product.id)
+  const wishlistSafe = Array.isArray(wishlist) ? wishlist : []
+  const inWishlist = wishlistSafe.includes(product.id)
   
   const handlePrevImg = (e) => {
     e.preventDefault()
@@ -53,7 +59,7 @@ function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart })
     setActiveImgIdx(prev => (prev === images.length - 1 ? 0 : prev + 1))
   }
 
-  const currentImg = images[activeImgIdx]?.src || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'
+  const currentImg = images[activeImgIdx]?.src || images[0]?.src || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'
   const price = parseFloat(product.price) || 0
   const compareAt = parseFloat(product.compareAt || product.regular_price) || 0
   const rating = parseFloat(product.average_rating) || 0
@@ -62,7 +68,7 @@ function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart })
   return (
     <div className="group bg-white border border-stone-200 p-3 sm:p-4 flex flex-col justify-between shadow-sm relative transition-all duration-500 hover:border-[#D7A65B]/40 hover:shadow-md hover:bg-stone-50/20 rounded-sm overflow-hidden">
       {/* Invisible overlay Link to make the whole card clickable */}
-      <Link href={`/products/${product.slug}`} className="absolute inset-0 z-10" />
+      <Link href={`/products/${product.slug || product.id || ''}`} className="absolute inset-0 z-10" />
 
       <div className="space-y-3 sm:space-y-4">
         {/* Image Frame */}
@@ -121,7 +127,7 @@ function HomeProductCard({ product, wishlist, toggleWishlist, handleAddToCart })
               {product.name}
             </h3>
             <p className="text-[10px] sm:text-[11px] text-[#6B1024]/75 line-clamp-2 h-7 sm:h-8 font-light leading-relaxed">
-              {product.short_description?.replace(/<[^>]*>/g, '') || 'Authentic pure botanical fragrance.'}
+              {typeof product.short_description === 'string' && product.short_description ? product.short_description.replace(/<[^>]*>/g, '') : 'Authentic pure botanical fragrance.'}
             </p>
           </div>
 
@@ -250,38 +256,72 @@ export default function Home() {
   const [dynamicTestimonials, setDynamicTestimonials] = useState([])
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/products?featured=true&limit=8').then(async r => ({ ok: r.ok, status: r.status, data: await r.json() })),
-      fetch('/api/categories').then(async r => ({ ok: r.ok, status: r.status, data: await r.json() })),
-      fetch('/api/products/reviews').then(async r => ({ ok: r.ok, status: r.status, data: await r.json() })).catch(() => ({ ok: false, data: [] }))
-    ]).then(([p, c, rev]) => {
-      if (!p.ok && p.data?.code === 'WC_NOT_CONFIGURED') {
-        setNotConfigured(true)
-        setProducts(SEED_PRODUCTS.slice(0, 8))
-      } else {
-        setProducts(Array.isArray(p.data) && p.data.length > 0 ? p.data : SEED_PRODUCTS.slice(0, 8))
-      }
-      setCategories(Array.isArray(c.data) ? c.data : [])
+    let active = true
 
-      if (rev.ok && Array.isArray(rev.data)) {
-        const filtered = rev.data.filter(r => r.rating === 4 || r.rating === 5)
-        if (filtered.length > 0) {
-          const mapped = filtered.map(r => ({
-            name: r.reviewer,
-            role: 'Verified Buyer',
-            quote: r.review.replace(/<[^>]*>/g, '').trim(),
-            rating: r.rating,
-            initial: (r.reviewer || 'D').trim().charAt(0).toUpperCase()
-          }))
-          setDynamicTestimonials(mapped)
+    const loadData = async () => {
+      try {
+        const [pRes, cRes, revRes] = await Promise.allSettled([
+          fetch('/api/products?featured=true&limit=8').then(r => r.json()),
+          fetch('/api/categories').then(r => r.json()),
+          fetch('/api/products/reviews').then(r => r.json())
+        ])
+
+        if (!active) return
+
+        // Products resolution
+        let prodList = []
+        if (pRes.status === 'fulfilled' && Array.isArray(pRes.value) && pRes.value.length > 0) {
+          prodList = pRes.value
+        } else {
+          try {
+            const bRes = await fetch('http://localhost:5000/products')
+            if (bRes.ok) {
+              const bData = await bRes.json()
+              if (Array.isArray(bData) && bData.length > 0) prodList = bData
+            }
+          } catch {}
+          if (prodList.length === 0) {
+            prodList = SEED_PRODUCTS.slice(0, 8)
+          }
         }
-      }
+        setProducts(prodList)
 
-      setLoading(false)
-    }).catch(() => {
-      setProducts(SEED_PRODUCTS.slice(0, 8))
-      setLoading(false)
-    })
+        // Categories resolution
+        let catList = []
+        if (cRes.status === 'fulfilled' && Array.isArray(cRes.value) && cRes.value.length > 0) {
+          catList = cRes.value
+        } else {
+          catList = SEED_CATEGORIES
+        }
+        setCategories(catList)
+
+        // Reviews resolution
+        if (revRes.status === 'fulfilled' && Array.isArray(revRes.value)) {
+          const filtered = revRes.value.filter(r => r && (r.rating === 4 || r.rating === 5))
+          if (filtered.length > 0) {
+            const mapped = filtered.map(r => ({
+              name: r.reviewer || 'Verified Buyer',
+              role: 'Verified Buyer',
+              quote: typeof r.review === 'string' ? r.review.replace(/<[^>]*>/g, '').trim() : 'Divine fragrances that bring deep peace.',
+              rating: r.rating || 5,
+              initial: (r.reviewer || 'D').trim().charAt(0).toUpperCase()
+            }))
+            setDynamicTestimonials(mapped)
+          }
+        }
+      } catch (err) {
+        console.warn('Homepage data load error, using fallback catalog:', err)
+        if (active) {
+          setProducts(SEED_PRODUCTS.slice(0, 8))
+          setCategories(SEED_CATEGORIES)
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    loadData()
+    return () => { active = false }
   }, [])
 
   // Auto-play testimonials slider
@@ -445,6 +485,7 @@ export default function Home() {
 
   // Section 5 Categories Format helper functions
   const getCategoryImage = (cat) => {
+    if (!cat) return 'https://images.unsplash.com/photo-1602928321679-560bb453f190?auto=format&fit=crop&w=600&q=80'
     if (cat.image?.src) return cat.image.src
     const fallbacks = {
       sandalwood: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
@@ -452,27 +493,30 @@ export default function Home() {
       resins: 'https://images.unsplash.com/photo-1581600140682-d4e68c8cde32?auto=format&fit=crop&w=600&q=80',
       samidha: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=600&q=80',
       camphor: 'https://images.unsplash.com/photo-1760835249761-dc1ad2d7d759?auto=format&fit=crop&w=600&q=80',
-      combos: 'https://images.unsplash.com/photo-1617954095840-0427f79be4cf?auto=format&fit=crop&w=600&q=80'
+      combos: 'https://images.unsplash.com/photo-1617954095840-0427f79be4cf?auto=format&fit=crop&w=600&q=80',
+      'incense-sticks': 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=600&q=80'
     }
-    return fallbacks[cat.slug] || 'https://images.unsplash.com/photo-1602928321679-560bb453f190?auto=format&fit=crop&w=600&q=80'
+    return (cat.slug && fallbacks[cat.slug]) || 'https://images.unsplash.com/photo-1602928321679-560bb453f190?auto=format&fit=crop&w=600&q=80'
   }
 
   const getCategoryDesc = (cat) => {
+    if (!cat) return 'Authentic pure Indian fragrances.'
     const descriptions = {
       sandalwood: 'Premium slow-burning natural Mysore sandalwood formulations.',
       floral: 'Velvety damask rose, Mogra jasmine and garden flora.',
       resins: 'Oman frankincense, Loban and golden guggulu gum crystals.',
       samidha: 'Aromatic mango logs pre-soaked in Desi ghee & honey.',
       camphor: 'Pure Bhimseni camphor crystals for daily cleanses.',
-      combos: 'Curated wellness bundles and starter sets.'
+      combos: 'Curated wellness bundles and starter sets.',
+      'incense-sticks': 'Pure wood base and botanical flower fragrances.'
     }
-    return descriptions[cat.slug] || 'Authentic pure Indian fragrances.'
+    return (cat.slug && descriptions[cat.slug]) || 'Authentic pure Indian fragrances.'
   }
 
   // Filter Categories to display 4 cards
-  const displayedCategories = categories.length > 0 
-    ? categories.filter(c => c.slug !== 'uncategorized').slice(0, 4) 
-    : SEED_CATEGORIES.slice(0, 4)
+  const validCategories = (Array.isArray(categories) && categories.length > 0 ? categories : SEED_CATEGORIES)
+    .filter(c => c && c.slug !== 'uncategorized')
+  const displayedCategories = validCategories.slice(0, 4)
 
   const activeTestimonials = dynamicTestimonials.length > 0 ? dynamicTestimonials : testimonials
 
@@ -564,6 +608,9 @@ export default function Home() {
         )}
       </section>
 
+      {/* DYNAMIC FESTIVE CLUBBING BANNER */}
+      <ClubbingFestiveBanner />
+
       {/* SECTION 2 — TRUST & QUALITY HIGHLIGHTS */}
       <section className="bg-transparent border-b border-stone-100 py-10 md:py-12 relative z-10">
         <div className="container max-w-6xl mx-auto px-4">
@@ -608,9 +655,9 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 md:gap-8">
-              {products.slice(0, 8).map((product) => (
+              {(Array.isArray(products) ? products : []).slice(0, 8).map((product, idx) => (
                 <HomeProductCard
-                  key={product.id}
+                  key={product?.id || product?.slug || idx}
                   product={product}
                   wishlist={wishlist}
                   toggleWishlist={toggleWishlist}
@@ -743,8 +790,8 @@ export default function Home() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {displayedCategories.map((cat, idx) => (
               <Link 
-                key={idx}
-                href={`/products?category=${cat.slug}`}
+                key={cat?.id || cat?.slug || idx}
+                href={`/products?category=${cat?.slug || ''}`}
                 className="group bg-white border border-stone-200 p-3 sm:p-4 flex flex-col justify-between shadow-sm relative transition-all duration-500 hover:border-[#D7A65B]/40 hover:shadow-md hover:bg-stone-50/20 h-full"
               >
                 <div className="space-y-3 sm:space-y-4">
@@ -752,21 +799,21 @@ export default function Home() {
                   <div className="aspect-[4/3] w-full relative overflow-hidden bg-stone-50 border border-stone-200">
                     <Image 
                       src={getCategoryImage(cat)} 
-                      alt={cat.name} 
+                      alt={cat?.name || 'Category'} 
                       fill 
                       className="object-cover opacity-90 transition-transform duration-700 ease-out group-hover:scale-105" 
                       unoptimized 
                     />
                     <div className="absolute bottom-2.5 right-2.5 bg-[#6B1024] text-white text-[9px] font-bold tracking-widest px-2.5 py-1 uppercase border border-[#D7A65B]/20 z-10">
-                      {cat.count} Products
+                      {cat?.count ?? 4} Products
                     </div>
                   </div>
                   <div className="space-y-1 sm:space-y-1.5 text-left">
                     <h3 className="font-cormorant text-lg sm:text-xl text-[#6B1024] tracking-wider uppercase font-bold">
-                      {cat.name}
+                      {cat?.name || 'Sacred Fragrance'}
                     </h3>
                     <p className="text-[10px] sm:text-[11px] text-[#6B1024]/75 font-light leading-relaxed h-10 sm:h-12 overflow-hidden">
-                      {cat.description?.replace(/<[^>]*>/g, '') || getCategoryDesc(cat)}
+                      {typeof cat?.description === 'string' && cat.description.trim() ? cat.description.replace(/<[^>]*>/g, '') : getCategoryDesc(cat)}
                     </p>
                   </div>
                 </div>

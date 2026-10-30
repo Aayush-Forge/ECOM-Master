@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -182,19 +181,21 @@ model CartItem {
 }
 
 model Order {
-  id            String      @id @default(uuid()) @db.Uuid
-  orderNumber   String      @unique @map("order_number")
-  customerId    String?     @map("customer_id") @db.Uuid
-  status        OrderStatus
-  subtotal      Decimal
-  discountTotal Decimal     @map("discount_total")
-  taxTotal      Decimal     @map("tax_total")
-  shippingTotal Decimal     @map("shipping_total")
-  grandTotal    Decimal     @map("grand_total")
-  currency      String      @default("INR")
-  placedAt      DateTime?   @map("placed_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  createdAt     DateTime    @default(now()) @map("created_at")
+  id                  String      @id @default(uuid()) @db.Uuid
+  orderNumber         String      @unique @map("order_number")
+  invoiceNumber       String?     @map("invoice_number")
+  customerId          String?     @map("customer_id") @db.Uuid
+  status              OrderStatus
+  subtotal            Decimal
+  discountTotal       Decimal     @map("discount_total")
+  taxTotal            Decimal     @map("tax_total")
+  shippingTotal       Decimal     @map("shipping_total")
+  grandTotal          Decimal     @map("grand_total")
+  shippingLabelStatus String?     @default("pending") @map("shipping_label_status")
+  currency            String      @default("INR")
+  placedAt            DateTime?   @map("placed_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
 
   customer      User?                @relation(fields: [customerId], references: [id])
   items         OrderItem[]
@@ -337,4 +338,18 @@ model NotificationLog {
   @@index([orderId])
   @@index([userId])
   @@map("notification_log")
+}
+
+model ShippingSlab {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String
+  minWeight         Float    @map("min_weight")
+  maxWeight         Float    @map("max_weight")
+  destinationRegion String   @map("destination_region")
+  rate              Float
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("shipping_slabs")
 }

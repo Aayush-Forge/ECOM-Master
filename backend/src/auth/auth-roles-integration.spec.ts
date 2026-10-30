@@ -7,6 +7,8 @@ import { RolesGuard } from './guards/roles.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ROLES_KEY, IS_PUBLIC_KEY, ROLES } from './roles.constants';
 
+import { UserService } from '../user/user.service';
+
 describe('Auth & RolesGuard Integration', () => {
   let authService: AuthService;
   let jwtService: JwtService;
@@ -26,6 +28,13 @@ describe('Auth & RolesGuard Integration', () => {
         AuthService,
         RolesGuard,
         JwtAuthGuard,
+        {
+          provide: UserService,
+          useValue: {
+            getUserByEmail: jest.fn(),
+            createUser: jest.fn(),
+          },
+        },
         {
           provide: Reflector,
           useValue: {

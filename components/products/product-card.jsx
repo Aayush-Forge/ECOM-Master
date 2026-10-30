@@ -38,8 +38,8 @@ export default function ProductCard({ product, compact = false }) {
   }
 
   const price = parseFloat(product.price) || 0
-  const regular = parseFloat(product.regular_price) || 0
-  const onSale = product.on_sale && regular > price
+  const regular = parseFloat(product.regular_price || product.compareAt) || 0
+  const onSale = (product.on_sale || regular > price || Boolean(product.clubbingBadge)) && regular > price
   const rating = parseFloat(product.average_rating) || 0
   const ratingCount = parseInt(product.rating_count) || 0
 
@@ -53,14 +53,17 @@ export default function ProductCard({ product, compact = false }) {
           <Image src={img} alt={product.name} fill sizes="(max-width: 768px) 50vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-110" unoptimized />
         )}
+        {product.clubbingBadge ? (
+          <Badge className="absolute top-2 right-2 bg-[#6B1024] text-[#FFD700] border border-[#D7A65B] font-black text-[10px] shadow-sm">
+            {product.clubbingBadge}
+          </Badge>
+        ) : onSale && inStock ? (
+          <Badge className="absolute top-2 right-2 bg-saffron-500 text-white">Sale</Badge>
+        ) : !inStock ? (
+          <Badge className="absolute top-2 right-2 bg-destructive">Out of Stock</Badge>
+        ) : null}
         {product.featured && (
           <Badge className="absolute top-2 left-2 bg-gold-400 text-midnight border-none">Featured</Badge>
-        )}
-        {!inStock && (
-          <Badge className="absolute top-2 right-2 bg-destructive">Out of Stock</Badge>
-        )}
-        {onSale && inStock && (
-          <Badge className="absolute top-2 right-2 bg-saffron-500 text-white">Sale</Badge>
         )}
       </div>
       <div className="p-4 flex flex-col flex-grow justify-between gap-2">

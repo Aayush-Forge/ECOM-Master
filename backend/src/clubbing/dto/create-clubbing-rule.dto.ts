@@ -9,7 +9,10 @@ import {
   IsArray,
   IsDateString,
 } from 'class-validator';
-import { ClubbingRuleType } from '../../generated/prisma';
+export enum ClubbingRuleType {
+  fixed_price_bundle = 'fixed_price_bundle',
+  percentage_off_bundle = 'percentage_off_bundle',
+}
 
 export class CreateClubbingRuleDto {
   @IsString()

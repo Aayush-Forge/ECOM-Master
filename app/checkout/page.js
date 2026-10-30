@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Lock, ChevronLeft, Loader2, ShieldCheck, CreditCard } from 'lucide-react'
+import { Lock, ChevronLeft, Loader2, ShieldCheck, CreditCard, Sparkles } from 'lucide-react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
+import { getActiveClubbings, calculateClubbingDiscount } from '@/lib/api/clubbings'
 
 import { isValidPhoneNumber } from 'libphonenumber-js'
 
@@ -197,10 +198,66 @@ function CheckoutPage() {
     }
   }
 
-  // Shipping: Free for orders >= 499, otherwise standard ₹49
-  const shippingCharge = (displaySubtotal >= 499 || displaySubtotal === 0) ? 0 : 49
+  const [activeClubbings, setActiveClubbings] = useState([])
+  useEffect(() => {
+    getActiveClubbings().then(c => setActiveClubbings(c || [])).catch(() => {})
+  }, [])
 
-  const finalTotal = Math.max(0, displaySubtotal - couponDiscount + shippingCharge)
+  const clubbingResult = calculateClubbingDiscount(displayItems, activeClubbings)
+  const clubbingDiscount = clubbingResult.discount || 0
+
+  // Dynamic Shipping Calculation from Backend Slabs
+  const [dynamicShipping, setDynamicShipping] = useState(null)
+  const [calculatingShipping, setCalculatingShipping] = useState(false)
+
+  // Calculate cart weight (default 0.25 kg per unit if unspecified)
+  const totalWeight = displayItems.reduce((acc, it) => {
+    const itemWeight = parseFloat(it.weight || 0.25)
+    return acc + (isNaN(itemWeight) ? 0.25 : itemWeight) * (it.quantity || 1)
+  }, 0)
+
+  useEffect(() => {
+    let isCancelled = false
+    const calculateDynamicShipping = async () => {
+      if (displayItems.length === 0) {
+        setDynamicShipping(null)
+        return
+      }
+      setCalculatingShipping(true)
+      try {
+        const dest = form.state || form.postcode || 'National'
+        const res = await fetch('http://localhost:5000/shipping-slabs/calculate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            weight: Number(totalWeight.toFixed(2)),
+            destinationRegion: dest,
+            orderSubtotal: displaySubtotal
+          })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (!isCancelled) {
+            setDynamicShipping(data)
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch dynamic shipping rate:', err)
+      } finally {
+        if (!isCancelled) setCalculatingShipping(false)
+      }
+    }
+
+    calculateDynamicShipping()
+    return () => { isCancelled = true }
+  }, [totalWeight, form.state, form.postcode, displaySubtotal, displayItems.length])
+
+  // Shipping fee resolved: use dynamic rate if available, fallback to free over ₹499 else ₹49
+  const shippingCharge = dynamicShipping !== null && dynamicShipping.shippingFee !== undefined
+    ? dynamicShipping.shippingFee
+    : ((displaySubtotal >= 499 || displaySubtotal === 0) ? 0 : 49)
+
+  const finalTotal = Math.max(0, displaySubtotal - clubbingDiscount - couponDiscount + shippingCharge)
 
   useEffect(() => {
     if (hydrated && initDone && displayItems.length === 0 && !submitting) router.replace('/cart')
@@ -521,6 +578,28 @@ function CheckoutPage() {
                             {validatingCoupon ? '...' : 'Apply'}
                           </Button>
                         </div>
+                        {/* Quick-Apply Active Offers */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[10px] text-stone-500 font-medium">Active Offers:</span>
+                          {[
+                            { code: 'WELCOME10', label: '10% OFF' },
+                            { code: 'DIWALI2026', label: '₹200 OFF' },
+                            { code: 'FESTIVE100', label: '₹100 OFF' }
+                          ].map((offer) => (
+                            <button
+                              key={offer.code}
+                              type="button"
+                              onClick={() => {
+                                setCouponCode(offer.code)
+                                setCouponError('')
+                              }}
+                              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-[#D7A65B]/40 bg-[#FFF9EE] text-[#6B1024] hover:bg-[#D7A65B]/20 transition-colors cursor-pointer"
+                              title={`Apply ${offer.code}`}
+                            >
+                              {offer.code} ({offer.label})
+                            </button>
+                          ))}
+                        </div>
                         {couponError && <p className="text-xs text-rose-600 font-medium">{couponError}</p>}
                       </div>
                     ) : (
@@ -558,23 +637,56 @@ function CheckoutPage() {
                             <span>-₹{displayDiscountDiff.toFixed(0)}</span>
                           </div>
                         )}
+                        {clubbingDiscount > 0 && (
+                          <div className="flex justify-between items-center text-emerald-700 font-semibold bg-[#FFF9EE] px-2.5 py-1.5 rounded-md border border-[#D7A65B]/40">
+                            <span className="flex items-center gap-1.5 text-xs text-[#6B1024]">
+                              <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
+                              Festive Bundle ({clubbingResult.appliedRule?.tagline || 'Clubbing'})
+                            </span>
+                            <span className="text-emerald-700 font-bold">-₹{clubbingDiscount.toFixed(0)}</span>
+                          </div>
+                        )}
                         {couponDiscount > 0 && (
                           <div className="flex justify-between text-emerald-600 font-semibold">
                             <span>Coupon Discount {appliedCoupon ? `(${appliedCoupon.code})` : ''}</span>
                             <span>-₹{couponDiscount.toFixed(0)}</span>
                           </div>
                         )}
-                        <div className="flex justify-between">
-                          <span>Shipping</span>
-                          <span className="text-stone-800">{shippingCharge === 0 ? 'Free delivery' : `₹${shippingCharge.toFixed(0)}`}</span>
+                        <div className="flex justify-between items-center py-1">
+                          <div className="flex flex-col">
+                            <span className="text-stone-700 font-medium flex items-center gap-1.5">
+                              Shipping &amp; Delivery
+                              {calculatingShipping && (
+                                <span className="inline-block w-2.5 h-2.5 rounded-full border border-saffron-500 border-t-transparent animate-spin" />
+                              )}
+                            </span>
+                            <span className="text-[11px] text-stone-500">
+                              Weight: {totalWeight.toFixed(2)} kg {dynamicShipping?.slab ? `• ${dynamicShipping.slab.name}` : ''}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            {shippingCharge === 0 ? (
+                              <div>
+                                <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded text-xs border border-emerald-200">
+                                  FREE Delivery
+                                </span>
+                                <p className="text-[10px] text-stone-400 mt-0.5">Order over ₹499</p>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="text-stone-800 font-bold">₹{shippingCharge.toFixed(0)}</span>
+                                <p className="text-[10px] text-stone-500 mt-0.5 font-mono">Dynamic Slab Rate</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="flex justify-between text-xl font-display text-maroon-500 pt-2 border-t border-stone-200 mt-2 font-bold">
                           <span>Total</span>
                           <span className="text-saffron-600">₹{finalTotal.toFixed(0)}</span>
                         </div>
-                        {(displayDiscountDiff > 0 || couponDiscount > 0) && (
+                        {(displayDiscountDiff > 0 || clubbingDiscount > 0 || couponDiscount > 0) && (
                           <div className="bg-emerald-50 text-emerald-700 text-xs font-bold py-2.5 px-3 rounded-lg text-center mt-3 border border-emerald-100/60">
-                            Congratulations! You saved ₹{(displayDiscountDiff + couponDiscount).toFixed(0)} ({Math.round(((displayDiscountDiff + couponDiscount) / displayRegularSubtotal) * 100)}%) on this order!
+                            Congratulations! You saved ₹{(displayDiscountDiff + clubbingDiscount + couponDiscount).toFixed(0)} ({Math.round(((displayDiscountDiff + clubbingDiscount + couponDiscount) / displayRegularSubtotal) * 100)}%) on this order!
                           </div>
                         )}
                       </div>

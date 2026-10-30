@@ -26,6 +26,7 @@ import {
   CreditCard,
   Package,
   Tags,
+  Sparkles,
   Store,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +39,7 @@ const ICON_MAP = {
   CreditCard,
   Package,
   Tags,
+  Sparkles,
 }
 
 export default function StaffLayout({ children }) {

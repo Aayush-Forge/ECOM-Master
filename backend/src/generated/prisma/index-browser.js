@@ -196,6 +196,7 @@ exports.Prisma.CartItemScalarFieldEnum = {
 exports.Prisma.OrderScalarFieldEnum = {
   id: 'id',
   orderNumber: 'orderNumber',
+  invoiceNumber: 'invoiceNumber',
   customerId: 'customerId',
   status: 'status',
   subtotal: 'subtotal',
@@ -203,6 +204,7 @@ exports.Prisma.OrderScalarFieldEnum = {
   taxTotal: 'taxTotal',
   shippingTotal: 'shippingTotal',
   grandTotal: 'grandTotal',
+  shippingLabelStatus: 'shippingLabelStatus',
   currency: 'currency',
   placedAt: 'placedAt',
   updatedAt: 'updatedAt',
@@ -297,6 +299,18 @@ exports.Prisma.NotificationLogScalarFieldEnum = {
   templateKey: 'templateKey',
   sentAt: 'sentAt',
   status: 'status'
+};
+
+exports.Prisma.ShippingSlabScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  minWeight: 'minWeight',
+  maxWeight: 'maxWeight',
+  destinationRegion: 'destinationRegion',
+  rate: 'rate',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -396,7 +410,8 @@ exports.Prisma.ModelName = {
   PaymentWebhookEvent: 'PaymentWebhookEvent',
   Address: 'Address',
   EmailTemplate: 'EmailTemplate',
-  NotificationLog: 'NotificationLog'
+  NotificationLog: 'NotificationLog',
+  ShippingSlab: 'ShippingSlab'
 };
 
 /**

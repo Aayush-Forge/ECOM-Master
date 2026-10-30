@@ -10,13 +10,7 @@ import { ROLE_HOME_ROUTES, getRoleLabel } from '@/lib/roles'
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet'
 import CartDrawer from '@/components/layout/cart-drawer'
 import { cn } from '@/lib/utils'
-
-const nav = [
-  { href: '/', label: 'Home' },
-  { href: '/products', label: 'Products' },
-  { href: '/about', label: 'About' },
-  { href: '/track-order', label: 'Track Order' }
-]
+import { getActiveClubbings, extractFestivalNavLabel } from '@/lib/api/clubbings'
 
 function Logo() {
   return (
@@ -59,6 +53,64 @@ export default function Header() {
         .catch(() => {})
     }
   }, [open])
+
+  // Dynamic Festive Campaign Navbar Labeling
+  const [festiveNavLabel, setFestiveNavLabel] = useState('DIWALI')
+  const [activeFestiveRule, setActiveFestiveRule] = useState(null)
+
+  useEffect(() => {
+    let active = true
+
+    const loadActiveFestiveRule = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/clubbing/active', {
+          headers: { Accept: 'application/json' },
+        })
+        if (res.ok) {
+          const rules = await res.json()
+          if (active && Array.isArray(rules) && rules.length > 0) {
+            const rule = rules.find((r) => r.isActive !== false) || rules[0]
+            setActiveFestiveRule(rule)
+            setFestiveNavLabel(extractFestivalNavLabel(rule))
+            return
+          }
+        }
+      } catch {
+        // Fallback to local
+      }
+
+      try {
+        const local = await getActiveClubbings()
+        if (active && Array.isArray(local) && local.length > 0) {
+          const rule = local[0]
+          setActiveFestiveRule(rule)
+          setFestiveNavLabel(extractFestivalNavLabel(rule))
+          return
+        }
+      } catch {}
+
+      if (active) {
+        setFestiveNavLabel('FESTIVE')
+      }
+    }
+
+    loadActiveFestiveRule()
+
+    const onUpdate = () => loadActiveFestiveRule()
+    window.addEventListener('sd:clubbings-updated', onUpdate)
+    return () => {
+      active = false
+      window.removeEventListener('sd:clubbings-updated', onUpdate)
+    }
+  }, [])
+
+  const navItems = [
+    { href: '/', label: 'Home' },
+    { href: '/products', label: 'Products' },
+    { href: '/products?clubbing=diwali', label: festiveNavLabel },
+    { href: '/about', label: 'About' },
+    { href: '/track-order', label: 'Track Order' }
+  ]
 
   const onSearchSubmit = (e) => {
     e.preventDefault()
@@ -189,6 +241,19 @@ export default function Header() {
                             ))}
                           </div>
                         </div>
+                      </div>
+
+                      {/* Clubbing (Festive Event) */}
+                      <div className="border-b border-stone-100 pb-5">
+                        <Link 
+                          href="/products?clubbing=diwali" 
+                          onClick={() => setOpen(false)}
+                          className="flex items-center justify-between text-base font-body font-medium tracking-[0.2em] uppercase text-midnight hover:text-[#6B1024] transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <span>{festiveNavLabel}</span>
+                          </span>
+                        </Link>
                       </div>
 
                       {/* About */}
@@ -322,13 +387,13 @@ export default function Header() {
           {/* Row 2: Horizontal Navigation Menu (Desktop Only) */}
           <div className="hidden md:flex justify-center border-t border-stone-200/50 py-5">
             <nav className="flex items-center gap-16">
-              {nav.map(n => (
+              {navItems.map(n => (
                 <Link
                   key={n.href}
                   href={n.href}
-                  className="text-xs font-semibold tracking-[0.25em] uppercase text-midnight hover:text-saffron-600 transition-colors relative group py-1"
+                  className="text-xs font-semibold tracking-[0.25em] uppercase text-midnight hover:text-saffron-600 transition-colors relative group py-1 flex items-center"
                 >
-                  {n.label}
+                  <span>{n.label}</span>
                   <span className="absolute -bottom-1 left-0 h-px w-0 bg-saffron-500 transition-all duration-300 group-hover:w-full" />
                 </Link>
               ))}

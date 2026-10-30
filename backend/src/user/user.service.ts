@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Request } from '@nestjs/common';
-import { RegisterUserDto } from 'src/auth/dto/registerUser.dto';
-import { PrismaService } from 'src/prisma.service';
+import { RegisterUserDto } from '../auth/dto/registerUser.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class UserService {
@@ -19,7 +19,7 @@ export class UserService {
         email: registerUserDto.email,
         phone: registerUserDto.phone,
         passwordHash: registerUserDto.password,
-        role: 'CUSTOMER',
+        role: 'customer',
         firstName: registerUserDto.first_name,
         lastName: registerUserDto.last_name,
       },
