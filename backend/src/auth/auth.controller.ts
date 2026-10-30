@@ -46,7 +46,7 @@ export class AuthController {
     );
   }
 
-  @Roles(ROLES.ADMIN)
+  @Roles(ROLES.READ_ONLY)
   @Get('adminPanel')
   adminPanelAuth() {
     return true;

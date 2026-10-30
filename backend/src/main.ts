@@ -4,10 +4,11 @@ import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import 'reflect-metadata';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
