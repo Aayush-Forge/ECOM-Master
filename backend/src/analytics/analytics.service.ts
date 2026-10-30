@@ -19,11 +19,29 @@ export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private parseDateRange(startDate?: string, endDate?: string): DateRange {
-    const end = endDate ? new Date(endDate) : new Date();
-    // Default to 30 days prior if startDate not supplied
-    const start = startDate
-      ? new Date(startDate)
-      : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    let end: Date;
+    if (!endDate) {
+      end = new Date();
+    } else {
+      end = new Date(endDate);
+      if (isNaN(end.getTime())) {
+        end = new Date();
+      } else if (!endDate.includes('T')) {
+        end.setUTCHours(23, 59, 59, 999);
+      }
+    }
+
+    let start: Date;
+    if (!startDate) {
+      start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      start = new Date(startDate);
+      if (isNaN(start.getTime())) {
+        start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+      } else if (!startDate.includes('T')) {
+        start.setUTCHours(0, 0, 0, 0);
+      }
+    }
 
     return { start, end };
   }
