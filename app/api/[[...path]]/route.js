@@ -205,7 +205,7 @@ async function handleRoute(request, { params }) {
 
     // ---- PRODUCT REVIEWS ----
     if (route === '/products/reviews') {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+      const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       if (method === 'GET') {
         const u = new URL(request.url)
         const productId = u.searchParams.get('product')

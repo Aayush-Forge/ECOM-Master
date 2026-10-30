@@ -5,7 +5,7 @@ import ProductsCatalogClient from '@/components/products/products-catalog-client
 
 export const revalidate = 3600
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+const BACKEND_URL = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://sridattam.in'
 
 export async function generateMetadata({ searchParams }) {
