@@ -18,16 +18,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ShoppingBag, ChevronRight } from 'lucide-react';
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState(() => getMyOrdersSync());
-  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function fetchOrders() {
+      setLoading(true);
+      setError(null);
       try {
         const data = await getMyOrders();
         setOrders(data || []);
-      } catch (error) {
-        console.error('Failed to fetch orders:', error);
+      } catch (err) {
+        console.error('Failed to fetch orders:', err);
+        setError('Failed to load your orders. Please check your connection.');
+      } finally {
+        setLoading(false);
       }
     }
     fetchOrders();
@@ -112,6 +118,12 @@ export default function OrdersPage() {
                     <TableCell className="text-right"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                   </TableRow>
                 ))
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-16 text-center">
+                    <p className="text-red-600 font-inter text-sm mb-2 font-medium">{error}</p>
+                  </TableCell>
+                </TableRow>
               ) : orders.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-16 text-center">

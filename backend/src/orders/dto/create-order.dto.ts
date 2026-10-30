@@ -1,14 +1,64 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString, IsNumber, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsEmail,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
-class OrderItemDto {
+export class OrderItemInputDto {
   @IsString()
   @IsNotEmpty()
   productId!: string;
 
   @IsNumber()
-  @IsNotEmpty()
+  @Min(1)
   quantity!: number;
+
+  @IsString()
+  @IsOptional()
+  variationId?: string;
+}
+
+export { OrderItemInputDto as OrderItemDto };
+
+export class OrderAddressInputDto {
+  @IsString()
+  @IsNotEmpty()
+  fullName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  phone!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  addressLine1!: string;
+
+  @IsString()
+  @IsOptional()
+  addressLine2?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  city!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  state!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  postalCode!: string;
+
+  @IsString()
+  @IsOptional()
+  country?: string;
 }
 
 export class CreateOrderDto {
@@ -16,8 +66,35 @@ export class CreateOrderDto {
   @IsOptional()
   customerId?: string;
 
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => OrderItemDto)
-  items!: OrderItemDto[];
+  @Type(() => OrderItemInputDto)
+  items!: OrderItemInputDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => OrderAddressInputDto)
+  shippingAddress?: OrderAddressInputDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => OrderAddressInputDto)
+  billingAddress?: OrderAddressInputDto;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  couponCode?: string;
+
+  @IsOptional()
+  @IsString()
+  cartId?: string;
+
+  @IsOptional()
+  @IsString()
+  cartToken?: string;
 }

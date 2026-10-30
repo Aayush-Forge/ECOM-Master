@@ -337,18 +337,35 @@ async function handleRoute(request, { params }) {
 
     // ---- PRODUCT REVIEWS ----
     if (route === '/products/reviews') {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       if (method === 'GET') {
-        if (wcConfigured()) {
-          try {
-            const u = new URL(request.url)
-            const productId = u.searchParams.get('product')
-            const q = { per_page: 100 }
-            if (productId) q.product = productId
-            const reviews = await wcRequest('/products/reviews', { query: q })
-            if (Array.isArray(reviews)) return json(reviews)
-          } catch (e) {
-            console.warn('WC reviews fetch failed:', e?.message)
+        const u = new URL(request.url)
+        const productId = u.searchParams.get('product')
+        try {
+          const targetUrl = productId ? backendUrl + '/reviews?productId=' + encodeURIComponent(productId) : backendUrl + '/reviews'
+          const res = await fetch(targetUrl, {
+            cache: 'no-store',
+          })
+          if (res.ok) {
+            const raw = await res.json()
+            const list = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : []
+            const reviews = list.map(r => ({
+              id: r.id,
+              reviewer: r.customerName || 'Anonymous',
+              review: r.description || '',
+              rating: Number(r.stars) || 5,
+              date_created: r.createdAt || new Date().toISOString(),
+              product_id: r.productId,
+              is_verified_buyer: r.isVerifiedBuyer ?? true,
+            }))
+            return json(reviews)
           }
+        } catch {}
+        if (wcConfigured()) {
+          const q = { per_page: 100 }
+          if (productId) q.product = productId
+          const reviews = await wcRequest('/products/reviews', { query: q }).catch(() => [])
+          return json(reviews)
         }
         return json([])
       }
@@ -356,22 +373,44 @@ async function handleRoute(request, { params }) {
         if (!wcConfigured()) return err('WooCommerce keys not configured', 503, 'WC_NOT_CONFIGURED')
         let body
         try { body = await request.json() } catch { return err('Invalid JSON', 400) }
-        const { product_id, review, reviewer, reviewer_email, rating } = body || {}
+        const { product_id, review, reviewer, rating, email, phone } = body || {}
         if (!product_id || !review || !reviewer || !rating) {
           return err('Missing required fields (product_id, review, reviewer, rating)', 400)
         }
-        const generatedEmail = reviewer_email || `${reviewer.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'devotee'}@sridattam.com`
-        const payload = {
-          product_id: parseInt(product_id, 10),
-          review: String(review),
-          reviewer: String(reviewer),
-          reviewer_email: generatedEmail,
-          rating: parseInt(rating, 10),
-          status: 'approved'
+        if (!email && !phone) {
+          return err('Please provide the email or phone number used during your purchase to verify your delivery.', 400)
         }
-        const result = await wcRequest('/products/reviews', { method: 'POST', body: payload })
-        clearWcCache()
-        return json(result)
+        try {
+          const res = await fetch(backendUrl + '/reviews', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productId: String(product_id),
+              customerName: String(reviewer),
+              description: String(review),
+              stars: Math.min(5, Math.max(1, parseInt(rating, 10) || 5)),
+              email: email ? String(email).trim() : undefined,
+              phone: phone ? String(phone).trim() : undefined,
+            }),
+          })
+          if (res.ok) {
+            const saved = await res.json()
+            return json({
+              id: saved.id,
+              reviewer: saved.customerName,
+              review: saved.description,
+              rating: saved.stars,
+              date_created: saved.createdAt,
+              product_id: saved.productId,
+              is_verified_buyer: saved.isVerifiedBuyer ?? true,
+            })
+          } else {
+            const errBody = await res.json().catch(() => null)
+            return err(errBody?.message || 'Failed to submit review', res.status)
+          }
+        } catch {
+          return err('Failed to connect to backend review service', 502)
+        }
       }
     }
 
@@ -387,7 +426,19 @@ async function handleRoute(request, { params }) {
           if (product) {
             const [acf, reviews, variationsData, relatedData] = await Promise.all([
               resolveProductAcf(product),
-              wcRequest('/products/reviews', { query: { product: product.id } }).catch(() => []),
+              (async () => {
+                try {
+                  const bUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+                  const rRes = await fetch(bUrl + '/reviews?productId=' + encodeURIComponent(product.id), { cache: 'no-store' })
+                  if (rRes.ok) {
+                    const list = await rRes.json()
+                    if (Array.isArray(list) && list.length > 0) {
+                      return list.map(r => ({ rating: r.stars }))
+                    }
+                  }
+                } catch {}
+                return wcRequest('/products/reviews', { query: { product: product.id } }).catch(() => [])
+              })(),
               (product.type === 'variable' && Array.isArray(product.variations) && product.variations.length)
                 ? wcRequest(`/products/${product.id}/variations`, { query: { per_page: 100 } }).catch(() => [])
                 : Promise.resolve([]),

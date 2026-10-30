@@ -1,23 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateClubbingRuleDto, ClubbingRuleType } from './dto/create-clubbing-rule.dto';
+import { CreateClubbingRuleDto } from './dto/create-clubbing-rule.dto';
+import { UpdateClubbingRuleDto } from './dto/update-clubbing-rule.dto';
 
-export interface ClubbingRuleModel {
-  id: string;
-  name: string;
-  type: ClubbingRuleType | string;
-  requiredQuantity: number;
-  fixedPrice: number | null;
-  percentageOff: number | null;
-  applicableCategoryId?: string | null;
-  applicableProductIds: string[];
-  startsAt?: Date | null;
-  endsAt?: Date | null;
-  isActive: boolean;
-  featuredOnHomepage?: boolean;
-  tagline?: string;
-  bannerImage?: string;
-  description?: string;
+export interface CartItemDiscountInput {
+  productId: string;
+  quantity: number;
+  price: number;
 }
 
 @Injectable()
@@ -107,62 +101,64 @@ export class ClubbingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createRule(dto: CreateClubbingRuleDto) {
-    try {
-      const createData: any = {
-        name: dto.name,
-        type: dto.type,
-        requiredQuantity: Number(dto.requiredQuantity),
-        isActive: dto.isActive !== undefined ? dto.isActive : true,
-        applicableProductIds: Array.isArray(dto.applicableProductIds)
-          ? dto.applicableProductIds.filter((id) => typeof id === 'string' && id.length === 36)
-          : [],
-      };
-      if (dto.fixedPrice !== undefined && dto.fixedPrice !== null) {
-        createData.fixedPrice = Number(dto.fixedPrice);
-      }
-      if (dto.percentageOff !== undefined && dto.percentageOff !== null) {
-        createData.percentageOff = Number(dto.percentageOff);
-      }
-      if (dto.applicableCategoryId && dto.applicableCategoryId.length === 36) {
-        createData.applicableCategoryId = dto.applicableCategoryId;
-      }
-      if (dto.startsAt) {
-        createData.startsAt = new Date(dto.startsAt);
-      }
-      if (dto.endsAt) {
-        createData.endsAt = new Date(dto.endsAt);
-      }
+    const { applicableProductIds, code, ...ruleData } = dto;
+    const normalizedCode = code && code.trim() ? code.trim().toUpperCase() : null;
 
-      const created = await this.prisma.clubbingRule.create({
-        data: createData,
+    try {
+      return await this.prisma.clubbingRule.create({
+        data: {
+          ...ruleData,
+          code: normalizedCode,
+          startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
+          endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+          products: applicableProductIds?.length
+            ? {
+                create: applicableProductIds.map((productId) => ({
+                  product: { connect: { id: productId } },
+                })),
+              }
+            : undefined,
+        },
+        include: {
+          applicableCategory: true,
+          products: {
+            include: {
+              product: true,
+            },
+          },
+        },
       });
-      return created;
     } catch (err: any) {
-      console.warn('Prisma createRule error, saving to memory fallback:', err.message);
-      const newRule: ClubbingRuleModel = {
-        id: `clb_${Date.now()}`,
-        name: dto.name,
-        type: dto.type,
-        requiredQuantity: dto.requiredQuantity,
-        fixedPrice: dto.fixedPrice !== undefined && dto.fixedPrice !== null ? Number(dto.fixedPrice) : null,
-        percentageOff: dto.percentageOff !== undefined && dto.percentageOff !== null ? Number(dto.percentageOff) : null,
-        applicableCategoryId: dto.applicableCategoryId || null,
-        applicableProductIds: dto.applicableProductIds || [],
-        startsAt: dto.startsAt ? new Date(dto.startsAt) : new Date(),
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
-        isActive: dto.isActive !== undefined ? dto.isActive : true,
-      };
-      this.fallbackRules.unshift(newRule);
-      return newRule;
+      if (err?.code === 'P2002') {
+        throw new ConflictException(`Discount code "${normalizedCode}" is already in use`);
+      }
+      throw err;
     }
   }
 
   async getAllRules() {
     try {
       const dbRules = await this.prisma.clubbingRule.findMany({
-        include: { applicableCategory: true },
+        include: {
+          applicableCategory: true,
+          products: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  sku: true,
+                  basePrice: true,
+                  salePrice: true,
+                  images: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
       });
-      if (dbRules.length > 0) {
+      if (dbRules && dbRules.length > 0) {
         return dbRules;
       }
       return this.fallbackRules;
@@ -171,67 +167,313 @@ export class ClubbingService {
     }
   }
 
-  async getActiveRules() {
-    try {
-      const dbRules = await this.prisma.clubbingRule.findMany({
-        where: { isActive: true },
-        include: { applicableCategory: true },
-      });
-      if (dbRules.length > 0) {
-        return dbRules;
-      }
-      return this.fallbackRules.filter((r) => r.isActive);
-    } catch {
-      return this.fallbackRules.filter((r) => r.isActive);
+  async getRuleById(id: string) {
+    const fallback = this.fallbackRules.find((r) => r.id === id);
+    if (fallback) return fallback;
+
+    const rule = await this.prisma.clubbingRule.findUnique({
+      where: { id },
+      include: {
+        applicableCategory: true,
+        products: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                title: true,
+                sku: true,
+                basePrice: true,
+                salePrice: true,
+                images: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!rule) {
+      throw new NotFoundException(`Clubbing rule with ID "${id}" not found`);
     }
+
+    return rule;
+  }
+
+  async updateRule(id: string, dto: UpdateClubbingRuleDto) {
+    const existing = await this.prisma.clubbingRule.findUnique({
+      where: { id },
+      include: { products: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Clubbing rule with ID "${id}" not found`);
+    }
+
+    const { applicableProductIds, code, ...ruleData } = dto;
+    const normalizedCode =
+      code !== undefined
+        ? code && code.trim()
+          ? code.trim().toUpperCase()
+          : null
+        : undefined;
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (applicableProductIds !== undefined) {
+          await tx.clubbingRuleProduct.deleteMany({
+            where: { ruleId: id },
+          });
+
+          if (applicableProductIds.length > 0) {
+            await tx.clubbingRuleProduct.createMany({
+              data: applicableProductIds.map((productId) => ({
+                ruleId: id,
+                productId,
+              })),
+            });
+          }
+        }
+
+        return tx.clubbingRule.update({
+          where: { id },
+          data: {
+            ...ruleData,
+            ...(normalizedCode !== undefined ? { code: normalizedCode } : {}),
+            startsAt:
+              dto.startsAt !== undefined
+                ? dto.startsAt
+                  ? new Date(dto.startsAt)
+                  : null
+                : undefined,
+            endsAt:
+              dto.endsAt !== undefined
+                ? dto.endsAt
+                  ? new Date(dto.endsAt)
+                  : null
+                : undefined,
+          },
+          include: {
+            applicableCategory: true,
+            products: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        });
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new ConflictException(`Discount code "${normalizedCode}" is already in use`);
+      }
+      throw err;
+    }
+  }
+
+  private toPublicRule(rule: any) {
+    return {
+      id: rule.id,
+      name: rule.name,
+      description: rule.description,
+      type: rule.type,
+      requiredQuantity: rule.requiredQuantity,
+      fixedPrice: rule.fixedPrice,
+      percentageOff: rule.percentageOff,
+      applicableCategoryId: rule.applicableCategoryId,
+      startsAt: rule.startsAt,
+      endsAt: rule.endsAt,
+      isActive: rule.isActive,
+      createdAt: rule.createdAt,
+      updatedAt: rule.updatedAt,
+      applicableCategory: rule.applicableCategory,
+      products: rule.products,
+      bannerImageDesktop: rule.bannerImageDesktop,
+      bannerImageMobile: rule.bannerImageMobile,
+      bannerImage: rule.bannerImage,
+      clubbingProducts: rule.clubbingProducts,
+    };
+  }
+
+  async getActiveRules(publicOnly = true) {
+    try {
+      const rules = await this.findActiveRulesInternal(publicOnly);
+      if (rules && rules.length > 0) {
+        if (publicOnly) {
+          return rules.map((rule) => this.toPublicRule(rule));
+        }
+        return rules;
+      }
+    } catch {}
+
+    const fallbackActive = this.fallbackRules.filter((r) => r.isActive);
+    if (publicOnly) {
+      return fallbackActive.map((rule) => this.toPublicRule(rule));
+    }
+    return fallbackActive;
+  }
+
+  private async findActiveRulesInternal(onlyWithoutCode = false) {
+    const now = new Date();
+    const rules = await this.prisma.clubbingRule.findMany({
+      where: {
+        isActive: true,
+        ...(onlyWithoutCode ? { code: null } : {}),
+        OR: [
+          { startsAt: null, endsAt: null },
+          { startsAt: { lte: now }, endsAt: null },
+          { startsAt: null, endsAt: { gte: now } },
+          { startsAt: { lte: now }, endsAt: { gte: now } },
+        ],
+      },
+      include: {
+        applicableCategory: true,
+        products: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    return rules.filter(
+      (rule) => rule.usageLimit == null || rule.usageCount < rule.usageLimit,
+    );
   }
 
   async deleteRule(id: string) {
-    try {
-      const rule = await this.prisma.clubbingRule.findUnique({ where: { id } });
-      if (!rule) throw new NotFoundException('Clubbing rule not found');
-      return await this.prisma.clubbingRule.delete({ where: { id } });
-    } catch {
-      const idx = this.fallbackRules.findIndex((r) => r.id === id);
-      if (idx === -1) throw new NotFoundException('Clubbing rule not found');
-      const deleted = this.fallbackRules.splice(idx, 1)[0];
-      return deleted;
+    const idx = this.fallbackRules.findIndex((r) => r.id === id);
+    if (idx !== -1) {
+      return this.fallbackRules.splice(idx, 1)[0];
     }
+
+    const rule = await this.prisma.clubbingRule.findUnique({ where: { id } });
+    if (!rule) {
+      throw new NotFoundException('Clubbing rule not found');
+    }
+
+    await this.prisma.clubbingRuleProduct.deleteMany({
+      where: { ruleId: id },
+    });
+
+    return this.prisma.clubbingRule.delete({ where: { id } });
   }
 
-  async calculateCartDiscount(cartItems: { productId: string; quantity: number; price: number }[]) {
-    const activeRules = await this.getActiveRules();
+  async bulkDelete(ids: string[]) {
+    if (!ids || ids.length === 0) return { count: 0 };
+
+    await this.prisma.clubbingRuleProduct.deleteMany({
+      where: { ruleId: { in: ids } },
+    });
+
+    return this.prisma.clubbingRule.deleteMany({
+      where: { id: { in: ids } },
+    });
+  }
+
+  async bulkUpdateStatus(ids: string[], isActive: boolean) {
+    if (!ids || ids.length === 0) return { count: 0 };
+
+    return this.prisma.clubbingRule.updateMany({
+      where: { id: { in: ids } },
+      data: { isActive },
+    });
+  }
+
+  async calculateCartDiscount(
+    cartItems: CartItemDiscountInput[],
+    couponCode?: string,
+  ) {
+    let activeRules: any[] = [];
+    try {
+      activeRules = await this.findActiveRulesInternal();
+    } catch {
+      activeRules = [];
+    }
+
+    const cleanCode = couponCode && couponCode.trim() ? couponCode.trim().toUpperCase() : null;
+
+    if (cleanCode && (!activeRules || activeRules.length === 0)) {
+      const found = await this.prisma.clubbingRule.findFirst({
+        where: {
+          code: { equals: cleanCode, mode: 'insensitive' },
+        },
+        include: {
+          applicableCategory: true,
+          products: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      if (!found || !found.isActive) {
+        throw new BadRequestException('Invalid coupon code');
+      }
+
+      const now = new Date();
+      if (found.startsAt && found.startsAt > now) {
+        throw new BadRequestException('Coupon is not yet active');
+      }
+      if (found.endsAt && found.endsAt < now) {
+        throw new BadRequestException('Coupon has expired');
+      }
+      if (found.usageLimit != null && found.usageCount >= found.usageLimit) {
+        throw new BadRequestException('Coupon usage limit reached');
+      }
+
+      activeRules = [found];
+    }
+
     let totalDiscount = 0;
+    let appliedCode: string | null = null;
+    let appliedRuleId: string | null = null;
 
     for (const rule of activeRules) {
-      const applicableItems = (rule.applicableProductIds && rule.applicableProductIds.length > 0)
-        ? cartItems.filter((item) => rule.applicableProductIds.includes(item.productId))
-        : cartItems;
+      if (rule.code) {
+        if (!cleanCode || rule.code.toUpperCase() !== cleanCode) {
+          continue;
+        }
+      }
 
-      const totalQuantity = applicableItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+      const ruleProductIds = new Set((rule.products || []).map((p: any) => p.productId));
 
-      if (totalQuantity >= rule.requiredQuantity) {
+      const applicableItems = cartItems.filter((item) =>
+        ruleProductIds.size === 0 || ruleProductIds.has(item.productId),
+      );
+
+      const totalQuantity = applicableItems.reduce(
+        (sum, item) => sum + (item.quantity || 1),
+        0,
+      );
+
+      if (totalQuantity >= (rule.requiredQuantity || 1)) {
         const originalPrice = applicableItems.reduce(
           (sum, item) => sum + (Number(item.price) || 0) * (item.quantity || 1),
           0,
         );
 
-        let discount = 0;
+        let ruleDiscount = 0;
         if (rule.type === 'fixed_price_bundle' && rule.fixedPrice) {
-          const bundlePrice = Number(rule.fixedPrice);
-          if (originalPrice > bundlePrice) {
-            discount = originalPrice - bundlePrice;
-          }
+          ruleDiscount = Math.max(0, originalPrice - Number(rule.fixedPrice));
         } else if (rule.type === 'percentage_off_bundle' && rule.percentageOff) {
-          discount = (originalPrice * Number(rule.percentageOff)) / 100;
+          ruleDiscount = Math.max(0, originalPrice * (Number(rule.percentageOff) / 100));
         }
 
-        if (discount > totalDiscount) {
-          totalDiscount = discount;
+        if (ruleDiscount > 0) {
+          totalDiscount += ruleDiscount;
+          if (rule.code) {
+            appliedCode = rule.code;
+            appliedRuleId = rule.id;
+          }
         }
       }
     }
 
-    return { discountTotal: Math.round(Math.max(0, totalDiscount)) };
+    return {
+      discountTotal: Math.round(Math.max(0, totalDiscount)),
+      appliedCouponCode: appliedCode,
+      appliedRuleId,
+    };
   }
 }

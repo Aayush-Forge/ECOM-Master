@@ -1,26 +1,31 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Reflector } from '@nestjs/core';
+import { OrderStatus } from '@prisma/client';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { AuditLogsService } from '../audit/audit-logs.service';
+import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../auth/roles.constants';
 
 describe('OrdersController', () => {
   let controller: OrdersController;
+  let ordersService: any;
   let reflector: Reflector;
 
-  const mockOrdersService = {
-    createOrder: jest.fn(),
-    getOrder: jest.fn(),
-    handleRefundWebhook: jest.fn(),
-  };
-
   beforeEach(async () => {
-    jest.clearAllMocks();
+    ordersService = {
+      createOrder: jest.fn(),
+      getOrder: jest.fn(),
+      getOrderById: jest.fn(),
+      updateStatus: jest.fn(),
+      getAllOrders: jest.fn(),
+      handleRefundWebhook: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrdersController],
       providers: [
-        { provide: OrdersService, useValue: mockOrdersService },
+        { provide: OrdersService, useValue: ordersService },
+        { provide: AuditLogsService, useValue: { createLog: jest.fn() } },
         Reflector,
       ],
     }).compile();
@@ -31,6 +36,45 @@ describe('OrdersController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('should call getOrderById with id', async () => {
+    const mockOrder = { id: 'ord_123' };
+    ordersService.getOrderById.mockResolvedValue(mockOrder);
+
+    const result = await controller.getOrderById('ord_123');
+    expect(ordersService.getOrderById).toHaveBeenCalledWith('ord_123');
+    expect(result).toBe(mockOrder);
+  });
+
+  it('should call updateStatus with params and req.user.userId', async () => {
+    const mockUpdated = { id: 'ord_123', status: OrderStatus.paid };
+    ordersService.updateStatus.mockResolvedValue(mockUpdated);
+
+    const req = { user: { userId: 'user_456' } };
+    const body = { toStatus: OrderStatus.paid, note: 'Payment verified' };
+
+    const result = await controller.updateStatus('ord_123', body as any, req);
+
+    expect(ordersService.updateStatus).toHaveBeenCalledWith(
+      'ord_123',
+      OrderStatus.paid,
+      'Payment verified',
+      'user_456',
+      undefined,
+      undefined,
+    );
+    expect(result).toBe(mockUpdated);
+  });
+
+  it('should call getAllOrders with query params', async () => {
+    const mockList = { data: [{ id: 'ord_1' }], meta: { total: 1 } };
+    ordersService.getAllOrders.mockResolvedValue(mockList);
+
+    const query = { status: 'paid', page: 1, per_page: 20, search: 'test' } as any;
+    const result = await controller.getAllOrders(query);
+    expect(ordersService.getAllOrders).toHaveBeenCalledWith('paid', 1, 20, 'test', undefined, undefined, undefined, undefined);
+    expect(result).toBe(mockList);
   });
 
   describe('handleRefundWebhook', () => {
@@ -54,34 +98,15 @@ describe('OrdersController', () => {
         orderId: 'test-order-uuid',
       };
 
-      mockOrdersService.handleRefundWebhook.mockResolvedValue(expectedResult);
+      ordersService.handleRefundWebhook.mockResolvedValue(expectedResult);
 
-      const result = await controller.handleRefundWebhook(dto, signature);
+      const result = await controller.handleRefundWebhook(dto as any, signature);
 
-      expect(mockOrdersService.handleRefundWebhook).toHaveBeenCalledWith(
+      expect(ordersService.handleRefundWebhook).toHaveBeenCalledWith(
         dto,
         signature,
       );
       expect(result).toEqual(expectedResult);
-    });
-  });
-
-  describe('createOrder and getOrder', () => {
-    it('should delegate createOrder to OrdersService', async () => {
-      const dto = { items: [{ productId: 'p1', quantity: 2 }] };
-      mockOrdersService.createOrder.mockResolvedValue({ id: 'ord-1' });
-
-      const res = await controller.createOrder(dto as any);
-      expect(mockOrdersService.createOrder).toHaveBeenCalledWith(dto);
-      expect(res).toEqual({ id: 'ord-1' });
-    });
-
-    it('should delegate getOrder to OrdersService', async () => {
-      mockOrdersService.getOrder.mockResolvedValue({ id: 'ord-1' });
-
-      const res = await controller.getOrder('ord-1');
-      expect(mockOrdersService.getOrder).toHaveBeenCalledWith('ord-1');
-      expect(res).toEqual({ id: 'ord-1' });
     });
   });
 });

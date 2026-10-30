@@ -5,10 +5,25 @@ import { usePathname } from 'next/navigation'
 
 export default function WhatsAppButton() {
   const pathname = usePathname()
+  const isSubdomain = typeof window !== 'undefined' && (
+    window.location.hostname.startsWith('admin.') ||
+    window.location.hostname.startsWith('admin-') ||
+    window.location.hostname.split(':')[0] === 'admin'
+  )
+
   if (
+    isSubdomain ||
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/staff') ||
-    pathname?.startsWith('/login')
+    pathname?.startsWith('/login') ||
+    pathname === '/orders' ||
+    pathname === '/payments' ||
+    pathname === '/products' ||
+    pathname === '/categories' ||
+    pathname === '/discounts' ||
+    pathname === '/users' ||
+    pathname === '/audit-logs' ||
+    pathname === '/overview'
   ) {
     return null
   }

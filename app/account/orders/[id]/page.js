@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getOrderById, getOrderByIdSync } from '@/lib/api/orders';
+import { getMyOrderById, getOrderByIdSync } from '@/lib/api/orders';
 import { useCart } from '@/lib/cart-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -45,7 +45,7 @@ export default function OrderDetailsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getOrderById(params.id);
+      const data = await getMyOrderById(params.id);
       if (!data) {
         setError('Order not found');
       } else {

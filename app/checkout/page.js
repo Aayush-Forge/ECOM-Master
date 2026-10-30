@@ -4,10 +4,18 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Lock, ChevronLeft, Loader2, ShieldCheck, CreditCard, Sparkles } from 'lucide-react'
+import { Lock, ChevronLeft, Loader2, ShieldCheck, CreditCard, Sparkles, Smartphone, CheckCircle2 } from 'lucide-react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -15,8 +23,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
 import { getActiveClubbings, calculateClubbingDiscount } from '@/lib/api/clubbings'
-
 import { isValidPhoneNumber } from 'libphonenumber-js'
+import { createOrder, calculateCheckoutPricing } from '@/lib/api/orders'
+import { createPaymentSession, verifyPaymentSession } from '@/lib/api/payments'
+import { calculateCartDiscount, getAllDiscounts } from '@/lib/api/discounts'
 
 const INDIAN_STATES = [
   'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat',
@@ -40,22 +50,48 @@ function loadRazorpayScript() {
 
 function CheckoutPage() {
   const router = useRouter()
-  const { items: cartItems, subtotal: cartSubtotal, clearCart, hydrated, cartKey } = useCart()
+  const {
+    items: cartItems,
+    subtotal: cartSubtotal,
+    clearCart,
+    hydrated,
+    cartKey,
+    cartId,
+    cartToken,
+    refreshCart,
+  } = useCart()
   const [isBuyNow, setIsBuyNow] = useState(false)
   const [buyNowItem, setBuyNowItem] = useState(null)
   const [initDone, setInitDone] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [stage, setStage] = useState('') // 'creating' | 'opening' | 'verifying'
+  const [stage, setStage] = useState('')
+  const [mockPaymentModal, setMockPaymentModal] = useState(null)
+  const [selectedMethod, setSelectedMethod] = useState('upi')
+  const [mockPaying, setMockPaying] = useState(false)
+
   const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '',
-    address_1: '', address_2: '', city: '', state: '', postcode: '', notes: ''
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    address_1: '',
+    address_2: '',
+    city: '',
+    state: '',
+    postcode: '',
+    notes: ''
   })
   const setF = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
+  const [autoDiscount, setAutoDiscount] = useState(0)
   const [couponCode, setCouponCode] = useState('')
   const [validatingCoupon, setValidatingCoupon] = useState(false)
   const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [couponDiscount, setCouponDiscount] = useState(0)
   const [couponError, setCouponError] = useState('')
+  const [shippingCharge, setShippingCharge] = useState(0)
+  const [shippingCarrier, setShippingCarrier] = useState('')
+  const [shippingError, setShippingError] = useState('')
 
   const handlePincodeChange = async (e) => {
     const code = e.target.value.replace(/\D/g, '').slice(0, 6)
@@ -66,7 +102,11 @@ function CheckoutPage() {
         const data = await res.json()
         if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
           const po = data[0].PostOffice[0]
-          setForm(prev => ({ ...prev, city: po.District || po.Block || prev.city, state: po.State || prev.state }))
+          setForm(prev => ({
+            ...prev,
+            city: po.District || po.Block || prev.city,
+            state: po.State || prev.state
+          }))
         }
       } catch {}
     }
@@ -85,53 +125,56 @@ function CheckoutPage() {
   }, [])
 
   const displayItems = isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems
-  const displaySubtotal = isBuyNow ? (buyNowItem ? buyNowItem.price * buyNowItem.quantity : 0) : cartSubtotal
+  const displaySubtotal = isBuyNow
+    ? (buyNowItem ? buyNowItem.price * buyNowItem.quantity : 0)
+    : cartSubtotal
 
-  const calculateDiscountForCoupon = (coupon) => {
-    if (!coupon) return 0
-    let discount = 0
-
-    if (coupon.discount_type === 'percent') {
-      let discountableAmount = 0
-      for (const item of displayItems) {
-        const isSale = (item.regular_price || item.price) > item.price
-        if (coupon.exclude_sale_items && isSale) continue
-        if (coupon.product_ids?.length > 0 && !coupon.product_ids.includes(item.product_id)) continue
-        if (coupon.excluded_product_ids?.length > 0 && coupon.excluded_product_ids.includes(item.product_id)) continue
-        
-        discountableAmount += item.price * item.quantity
-      }
-      discount = (discountableAmount * parseFloat(coupon.amount)) / 100
-    } else if (coupon.discount_type === 'fixed_cart') {
-      if (coupon.exclude_sale_items) {
-        let nonSaleTotal = 0
-        for (const item of displayItems) {
-          const isSale = (item.regular_price || item.price) > item.price
-          if (!isSale) {
-            nonSaleTotal += item.price * item.quantity
-          }
-        }
-        discount = Math.min(parseFloat(coupon.amount), nonSaleTotal)
-      } else {
-        discount = parseFloat(coupon.amount)
-      }
-    } else if (coupon.discount_type === 'fixed_product') {
-      let discSum = 0
-      for (const item of displayItems) {
-        const isSale = (item.regular_price || item.price) > item.price
-        if (coupon.exclude_sale_items && isSale) continue
-        if (coupon.product_ids?.length > 0 && !coupon.product_ids.includes(item.product_id)) continue
-        if (coupon.excluded_product_ids?.length > 0 && coupon.excluded_product_ids.includes(item.product_id)) continue
-        
-        discSum += parseFloat(coupon.amount) * item.quantity
-      }
-      discount = discSum
+  useEffect(() => {
+    if (!displayItems || displayItems.length === 0) {
+      setAutoDiscount(0)
+      setCouponDiscount(0)
+      setShippingCharge(0)
+      setShippingError('')
+      return
     }
 
-    return Math.min(discount, displaySubtotal)
-  }
+    let active = true
+    const activeCode = appliedCoupon || ''
+    calculateCartDiscount(displayItems, activeCode)
+      .then(res => {
+        if (active && res && typeof res.discountTotal === 'number') {
+          if (activeCode) {
+            setCouponDiscount(res.discountTotal)
+          } else {
+            setAutoDiscount(res.discountTotal)
+          }
+        }
+      })
+      .catch(() => {})
 
-  const couponDiscount = appliedCoupon ? calculateDiscountForCoupon(appliedCoupon) : 0
+    calculateCheckoutPricing(displayItems, activeCode)
+      .then(res => {
+        if (!active || !res) return
+        if (typeof res.shippingTotal === 'number') {
+          setShippingCharge(res.shippingTotal)
+        }
+        if (res.shippingCarrier) {
+          setShippingCarrier(res.shippingCarrier)
+        }
+        if (res.weightError) {
+          setShippingError(res.weightError)
+        } else {
+          setShippingError('')
+        }
+      })
+      .catch((err) => {
+        if (active && err.message && err.message.includes('weight limit')) {
+          setShippingError(err.message)
+        }
+      })
+
+    return () => { active = false }
+  }, [displayItems, appliedCoupon])
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim()
@@ -140,59 +183,20 @@ function CheckoutPage() {
     setCouponError('')
 
     try {
-      const res = await fetch('/api/coupons/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setCouponError(data.error || 'Failed to apply coupon.')
-        toast.error(data.error || 'Failed to apply coupon.')
+      const res = await calculateCartDiscount(displayItems, code)
+      if (!res.appliedCouponCode) {
+        setCouponError('Coupon code is not applicable to the items in your order.')
+        toast.error('Coupon code is not applicable.')
         return
       }
 
-      // Check spend restrictions
-      const minAmount = parseFloat(data.minimum_amount || 0)
-      const maxAmount = parseFloat(data.maximum_amount || 0)
-      if (minAmount > 0 && displaySubtotal < minAmount) {
-        const err = `This coupon requires a minimum spend of ₹${minAmount.toFixed(0)}.`
-        setCouponError(err)
-        toast.error(err)
-        return
-      }
-      if (maxAmount > 0 && displaySubtotal > maxAmount) {
-        const err = `This coupon is only valid for spends under ₹${maxAmount.toFixed(0)}.`
-        setCouponError(err)
-        toast.error(err)
-        return
-      }
-      
-      if (data.exclude_sale_items) {
-        const hasNonSale = displayItems.some(item => (item.regular_price || item.price) <= item.price)
-        if (!hasNonSale) {
-          const err = 'This coupon excludes items on sale.'
-          setCouponError(err)
-          toast.error(err)
-          return
-        }
-      }
-
-      // Check if it actually provides a discount
-      const checkDiscount = calculateDiscountForCoupon(data)
-      if (checkDiscount <= 0) {
-        const err = 'This coupon does not apply to the items in your cart.'
-        setCouponError(err)
-        toast.error(err)
-        return
-      }
-
-      setAppliedCoupon(data)
-      toast.success(`Coupon "${data.code}" applied successfully!`)
-    } catch (e) {
-      console.error(e)
-      setCouponError('Network error. Please try again.')
-      toast.error('Network error validating coupon.')
+      setAppliedCoupon(res.appliedCouponCode)
+      setCouponDiscount(res.discountTotal)
+      toast.success(`Coupon "${res.appliedCouponCode}" applied!`)
+    } catch (err) {
+      const msg = err.message || 'Invalid or expired coupon code.'
+      setCouponError(msg)
+      toast.error(msg)
     } finally {
       setValidatingCoupon(false)
     }
@@ -205,6 +209,13 @@ function CheckoutPage() {
 
   const clubbingResult = calculateClubbingDiscount(displayItems, activeClubbings)
   const clubbingDiscount = clubbingResult.discount || 0
+
+  const handleRemoveCoupon = async () => {
+    setAppliedCoupon(null)
+    setCouponDiscount(0)
+    setCouponCode('')
+    setCouponError('')
+  }
 
   // Dynamic Shipping Calculation from Backend Slabs
   const [dynamicShipping, setDynamicShipping] = useState(null)
@@ -257,21 +268,43 @@ function CheckoutPage() {
     ? dynamicShipping.shippingFee
     : ((displaySubtotal >= 499 || displaySubtotal === 0) ? 0 : 49)
 
+  const totalDiscount = clubbingDiscount + couponDiscount
   const finalTotal = Math.max(0, displaySubtotal - clubbingDiscount - couponDiscount + shippingCharge)
 
   useEffect(() => {
-    if (hydrated && initDone && displayItems.length === 0 && !submitting) router.replace('/cart')
+    if (hydrated && initDone && displayItems.length === 0 && !submitting) {
+      router.replace('/cart')
+    }
   }, [hydrated, initDone, displayItems, router, submitting])
 
-  // Pre-load Razorpay JS so it's ready when user clicks pay
-  useEffect(() => { loadRazorpayScript() }, [])
+  useEffect(() => {
+    loadRazorpayScript()
+  }, [])
 
   const validate = () => {
+    if (shippingError) {
+      toast.error(shippingError)
+      return false
+    }
     const required = ['first_name', 'last_name', 'email', 'phone', 'address_1', 'city', 'state', 'postcode']
-    for (const f of required) if (!form[f]?.trim()) { toast.error(`${f.replace('_', ' ')} is required`); return false }
-    if (!isValidPhoneNumber(form.phone || '', 'IN')) { toast.error('Enter a valid phone number'); return false }
-    if (!/^\d{6}$/.test(form.postcode)) { toast.error('Enter valid 6-digit pincode'); return false }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) { toast.error('Enter valid email'); return false }
+    for (const f of required) {
+      if (!form[f]?.trim()) {
+        toast.error(`${f.replace('_', ' ')} is required`)
+        return false
+      }
+    }
+    if (!isValidPhoneNumber(form.phone || '', 'IN')) {
+      toast.error('Enter a valid Indian phone number')
+      return false
+    }
+    if (!/^\d{6}$/.test(form.postcode)) {
+      toast.error('Enter valid 6-digit pincode')
+      return false
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) {
+      toast.error('Enter valid email')
+      return false
+    }
     return true
   }
 
@@ -281,136 +314,171 @@ function CheckoutPage() {
     setStage('creating')
 
     try {
-      const billing = {
-        first_name: form.first_name, last_name: form.last_name,
-        email: form.email, phone: form.phone,
-        address_1: form.address_1, address_2: form.address_2,
-        city: form.city, state: form.state, postcode: form.postcode, country: 'IN'
-      }
-      const line_items = displayItems.map(i => ({
-        product_id: i.product_id,
-        variation_id: i.variation_id || undefined,
-        quantity: i.quantity,
-        meta_data: [
-          { key: '_regular_price', value: String(i.regular_price || i.price) }
-        ]
-      }))
-
-      const shipping_lines = shippingCharge > 0 ? [{
-        method_id: 'flat_rate',
-        method_title: 'Calculated Shipping',
-        total: String(shippingCharge)
-      }] : []
-
-      // 1. Create WooCommerce order (status: pending)
-      const orderRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          billing,
-          shipping: billing,
-          line_items,
-          shipping_lines,
-          coupon_lines: appliedCoupon ? [{ code: appliedCoupon.code }] : [],
-          customer_note: form.notes
-        })
-      })
-      const orderData = await orderRes.json()
-      if (!orderRes.ok) {
-        toast.error(orderData.error || 'Could not create order')
-        setSubmitting(false); setStage(''); return
-      }
-      const { id: orderId, order_key: orderKey, payment_url: wcPaymentUrl } = orderData
-
-      // Save the key so confirmation page can fetch order securely
-      try { sessionStorage.setItem(`sd_order_${orderId}`, orderKey) } catch {}
-
-      // 2. Create Razorpay order
-      setStage('opening')
-      const rzpRes = await fetch('/api/payment/create-rzp-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, orderKey })
-      })
-      const rzp = await rzpRes.json()
-
-      if (!rzpRes.ok) {
-        // If Razorpay not configured, gracefully fall back to WC payment page
-        if (rzp.code === 'RZP_NOT_CONFIGURED' && wcPaymentUrl) {
-          toast.info('Razorpay keys missing — using WooCommerce checkout')
-          clearCart()
-          window.location.href = wcPaymentUrl
+      if (!isBuyNow) {
+        const freshCart = await refreshCart()
+        const itemsWithIssues = freshCart?.items?.filter(i => i.issues && i.issues.length > 0)
+        if (itemsWithIssues && itemsWithIssues.length > 0) {
+          toast.error('Some items in your cart have stock or availability issues. Please review your cart.')
+          setSubmitting(false)
+          setStage('')
           return
         }
-        toast.error(rzp.error || 'Could not initiate payment')
-        setSubmitting(false); setStage(''); return
       }
 
-      // 3. Open Razorpay checkout modal
+      const fullName = `${form.first_name} ${form.last_name}`.trim()
+      const address = {
+        fullName,
+        phone: form.phone,
+        addressLine1: form.address_1,
+        addressLine2: form.address_2 || '',
+        city: form.city,
+        state: form.state,
+        postalCode: form.postcode,
+        country: 'IN',
+      }
+
+      const items = displayItems.map(i => ({
+        productId: i.product_id || i.productId || i.id,
+        variationId: i.variation_id || i.variationId || undefined,
+        quantity: Number(i.quantity || 1),
+      }))
+
+      const order = await createOrder({
+        items,
+        email: form.email ? form.email.trim() : undefined,
+        shippingAddress: address,
+        billingAddress: address,
+        couponCode: appliedCoupon || (couponCode && couponCode.trim() ? couponCode.trim() : undefined),
+        cartId: !isBuyNow && cartId ? cartId : undefined,
+        cartToken: !isBuyNow && cartToken ? cartToken : undefined,
+      })
+
+      if (!order || !order.id) {
+        toast.error('Could not create order. Please try again.')
+        setSubmitting(false)
+        setStage('')
+        return
+      }
+
+      try {
+        sessionStorage.setItem('sd_guest_order_phone', form.phone);
+        sessionStorage.setItem('sd_guest_order_number', order.orderNumber);
+        sessionStorage.setItem('sd_last_order', JSON.stringify({ orderNumber: order.orderNumber, phone: form.phone, orderId: order.id }));
+      } catch {}
+
+      setStage('opening')
+      const session = await createPaymentSession(order.id)
+
+      if (session.isMock || !session.keyId || session.keyId === 'rzp_test_mock') {
+        setSubmitting(false)
+        setStage('')
+        setMockPaymentModal({
+          order,
+          session,
+          amount: Math.round(Number(session.amount || order.grandTotal || finalTotal)),
+        })
+        return
+      }
+
       const ok = await loadRazorpayScript()
       if (!ok) {
         toast.error('Could not load payment gateway. Please check your internet.')
-        setSubmitting(false); setStage(''); return
+        setSubmitting(false)
+        setStage('')
+        return
       }
 
       const options = {
-        key: rzp.key_id,
-        amount: rzp.amount,
-        currency: rzp.currency,
+        key: session.keyId,
+        amount: Math.round(Number(session.amount || order.grandTotal || finalTotal) * 100),
+        currency: session.currency || 'INR',
         name: 'SRIDATTAM',
-        description: `Order #${orderData.number || orderId}`,
-        order_id: rzp.rzp_order_id,
-        prefill: rzp.prefill || {
-          name: `${form.first_name} ${form.last_name}`,
+        description: `Order #${order.orderNumber || order.id}`,
+        order_id: session.razorpayOrderId,
+        prefill: {
+          name: fullName,
           email: form.email,
-          contact: form.phone
+          contact: form.phone,
         },
-        notes: { wc_order_id: String(orderId) },
         theme: { color: '#FF6B00' },
         handler: async (resp) => {
           setStage('verifying')
           try {
-            const verifyRes = await fetch('/api/payment/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId, orderKey,
-                razorpay_order_id: resp.razorpay_order_id,
-                razorpay_payment_id: resp.razorpay_payment_id,
-                razorpay_signature: resp.razorpay_signature
-              })
+            const v = await verifyPaymentSession({
+              orderId: order.id,
+              razorpayOrderId: resp.razorpay_order_id,
+              razorpayPaymentId: resp.razorpay_payment_id,
+              razorpaySignature: resp.razorpay_signature,
             })
-            const v = await verifyRes.json()
-            if (!verifyRes.ok || !v.success) {
-              toast.error(v.error || 'Payment verification failed')
-              setSubmitting(false); setStage(''); return
+            if (!v || !v.success) {
+              toast.error('Payment verification failed')
+              setSubmitting(false)
+              setStage('')
+              return
             }
-            if (!isBuyNow) clearCart(); else sessionStorage.removeItem('sd_buynow_item')
-            router.push(`/order-confirmation?orderId=${orderId}&key=${encodeURIComponent(orderKey)}`)
+            if (!isBuyNow) clearCart()
+            else sessionStorage.removeItem('sd_buynow_item')
+            router.push(`/order-confirmation?orderId=${order.id}&orderNumber=${order.orderNumber || ''}`)
           } catch (e) {
             console.error(e)
             toast.error('Could not verify payment. Please contact support.')
-            setSubmitting(false); setStage('')
+            setSubmitting(false)
+            setStage('')
           }
         },
         modal: {
           ondismiss: () => {
-            toast.info('Payment cancelled. Your order is on hold — you can retry payment.')
-            setSubmitting(false); setStage('')
-          }
-        }
+            toast.info('Payment cancelled. Your order is pending payment.')
+            setSubmitting(false)
+            setStage('')
+          },
+        },
       }
+
       const rzpInstance = new window.Razorpay(options)
       rzpInstance.on('payment.failed', (e) => {
         toast.error(e?.error?.description || 'Payment failed. Please try again.')
-        setSubmitting(false); setStage('')
+        setSubmitting(false)
+        setStage('')
       })
       rzpInstance.open()
     } catch (e) {
       console.error(e)
-      toast.error('Network error. Please try again.')
-      setSubmitting(false); setStage('')
+      toast.error(e?.message || 'Network error. Please try again.')
+      setSubmitting(false)
+      setStage('')
     }
+  }
+
+  const handleConfirmMockPayment = async () => {
+    if (!mockPaymentModal) return
+    setMockPaying(true)
+    try {
+      const verified = await verifyPaymentSession({
+        orderId: mockPaymentModal.order.id,
+        razorpayOrderId: mockPaymentModal.session.razorpayOrderId || `order_mock_${Date.now()}`,
+        razorpayPaymentId: `pay_mock_${Date.now()}`,
+        razorpaySignature: 'mock_signature',
+      })
+      if (verified && verified.success) {
+        if (!isBuyNow) clearCart()
+        else sessionStorage.removeItem('sd_buynow_item')
+        toast.success('Payment completed successfully!')
+        router.push(`/order-confirmation?orderId=${mockPaymentModal.order.id}&orderNumber=${mockPaymentModal.order.orderNumber || ''}`)
+      } else {
+        toast.error('Payment verification failed.')
+        setMockPaying(false)
+      }
+    } catch (e) {
+      console.error(e)
+      toast.error('Payment processing failed. Please try again.')
+      setMockPaying(false)
+    }
+  }
+
+  const handleCancelMockPayment = () => {
+    toast.info('Payment was cancelled. Your order remains pending.')
+    setMockPaymentModal(null)
   }
 
   if (!hydrated || !initDone || displayItems.length === 0) {
@@ -455,55 +523,79 @@ function CheckoutPage() {
                   <Label>Phone *</Label>
                   <Input type="tel" maxLength={20} value={form.phone} onChange={e => setF('phone', e.target.value)} placeholder="e.g. +91 98765 43210" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
                 </div>
-                <div className="md:col-span-2">
-                  <Label>Address Line 1 *</Label>
-                  <Input value={form.address_1} onChange={e => setF('address_1', e.target.value)} placeholder="House no, street" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Address Line 2</Label>
-                  <Input value={form.address_2} onChange={e => setF('address_2', e.target.value)} placeholder="Apartment, area (optional)" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Pincode *</Label>
-                  <Input inputMode="numeric" maxLength={6} value={form.postcode} onChange={handlePincodeChange} placeholder="Enter 6-digit pincode" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
-                  <p className="text-[10px] text-muted-foreground mt-1">City and State will autofill</p>
+              </div>
+
+              <div className="mt-4">
+                <Label>Address Line 1 *</Label>
+                <Input value={form.address_1} onChange={e => setF('address_1', e.target.value)} placeholder="House / Flat no., Building, Street" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
+              </div>
+
+              <div className="mt-4">
+                <Label>Address Line 2 (Optional)</Label>
+                <Input value={form.address_2} onChange={e => setF('address_2', e.target.value)} placeholder="Landmark, Area (optional)" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4 mt-4">
+                <div>
+                  <Label>PIN Code *</Label>
+                  <Input maxLength={6} value={form.postcode} onChange={handlePincodeChange} placeholder="6-digit pincode" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
                 </div>
                 <div>
                   <Label>City *</Label>
-                  <Input value={form.city} onChange={e => setF('city', e.target.value)} className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
+                  <Input value={form.city} onChange={e => setF('city', e.target.value)} placeholder="City / District" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
                 </div>
                 <div>
                   <Label>State *</Label>
                   <Select value={form.state} onValueChange={v => setF('state', v)}>
-                    <SelectTrigger className="mt-1 bg-stone-50 border-stone-200"><SelectValue placeholder="Select state" /></SelectTrigger>
-                    <SelectContent>{INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INDIAN_STATES.map(st => (
+                        <SelectItem key={st} value={st}>{st}</SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
-                <div className="md:col-span-2">
-                  <Label>Order Notes</Label>
-                  <Textarea value={form.notes} onChange={e => setF('notes', e.target.value)} placeholder="Any special instructions for your order (optional)" className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" />
-                </div>
               </div>
 
-              <div className="mt-8 p-5 rounded-xl bg-stone-50 border border-stone-200">
-                <div className="flex items-start gap-3">
-                  <Lock className="w-5 h-5 text-saffron-600 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-maroon-500">Direct &amp; Secure Razorpay Payment</p>
-                    <p className="text-xs text-muted-foreground mt-1">Razorpay opens instantly after you click Pay. UPI, Cards, NetBanking, Wallets supported. Your card details never touch this server.</p>
+              <div className="mt-4">
+                <Label>Order Notes (Optional)</Label>
+                <Textarea value={form.notes} onChange={e => setF('notes', e.target.value)} placeholder="Any special delivery instructions..." className="mt-1 bg-stone-50 border-stone-200 focus-visible:ring-saffron-500" rows={3} />
+              </div>
+
+              <div className="mt-8 border-t border-stone-100 pt-6">
+                <div className="bg-stone-50 rounded-xl p-4 flex items-center justify-between gap-4 border border-stone-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-saffron-100 flex items-center justify-center text-saffron-600">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm text-stone-800">Online Payment</p>
+                      <p className="text-xs text-stone-500">UPI, Cards, NetBanking, Wallets</p>
+                    </div>
                   </div>
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
                 </div>
+
+                <Button
+                  onClick={handlePlaceOrder}
+                  disabled={submitting}
+                  className="w-full mt-6 bg-[#6B1024] hover:bg-[#4D0013] text-white py-6 text-base font-semibold shadow-lg shadow-maroon-900/10"
+                >
+                  {submitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {stageLabel || 'Processing...'}
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <Lock className="w-4 h-4" /> Pay ₹{finalTotal.toFixed(0)} Securely
+                    </span>
+                  )}
+                </Button>
               </div>
 
-              <Button onClick={handlePlaceOrder} disabled={submitting}
-                className="w-full mt-5 bg-saffron-500 hover:bg-saffron-600 text-white py-7 text-base font-semibold shadow-lg shadow-saffron-200">
-                {submitting
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {stageLabel}</>
-                  : <><CreditCard className="w-4 h-4 mr-2" /> Pay ₹{finalTotal.toFixed(0)} Securely</>}
-              </Button>
-              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-3">
-                <ShieldCheck className="w-3 h-3" /> 256-bit SSL · PCI-DSS compliant payment by Razorpay
-              </div>
               <div className="flex justify-center gap-4 text-xs text-stone-500 mt-6 pt-4 border-t border-stone-100">
                 <Link href="/privacy-policy" className="hover:text-saffron-600 underline">Privacy Policy</Link>
                 <Link href="/terms-conditions" className="hover:text-saffron-600 underline">Terms &amp; Conditions</Link>
@@ -517,7 +609,7 @@ function CheckoutPage() {
                   <h2 className="font-display text-xl text-maroon-500 font-bold mb-4">Order Summary</h2>
                   <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
                     {displayItems.map(it => {
-                      const key = cartKey(it.product_id, it.variation_id)
+                      const key = cartKey(it.product_id || it.productId || it.id, it.variation_id)
                       const itemRegular = it.regular_price || it.price
                       const hasDiscount = itemRegular > it.price
                       return (
@@ -555,7 +647,6 @@ function CheckoutPage() {
                     })}
                   </div>
 
-                  {/* Coupon Card */}
                   <div className="border-t border-stone-200 mt-5 pt-4">
                     {!appliedCoupon ? (
                       <div className="space-y-2">
@@ -605,14 +696,11 @@ function CheckoutPage() {
                     ) : (
                       <div className="bg-emerald-50/50 border border-emerald-200/60 rounded-xl p-3 flex justify-between items-center text-xs text-emerald-800">
                         <div>
-                          <p className="font-semibold text-emerald-700">Coupon applied: {appliedCoupon.code}</p>
-                          <p className="text-[10px] text-emerald-600">₹{couponDiscount.toFixed(0)} discount applied to order</p>
+                          <p className="font-semibold text-emerald-700">Coupon applied: {appliedCoupon}</p>
+                          <p className="text-[10px] text-emerald-600">₹{totalDiscount.toFixed(0)} discount applied to order</p>
                         </div>
                         <Button
-                          onClick={() => {
-                            setAppliedCoupon(null)
-                            setCouponCode('')
-                          }}
+                          onClick={handleRemoveCoupon}
                           variant="ghost"
                           className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-1.5 h-auto text-[11px] font-semibold"
                         >
@@ -624,17 +712,19 @@ function CheckoutPage() {
 
                   {(() => {
                     const displayRegularSubtotal = displayItems.reduce((s, i) => s + (i.regular_price || i.price) * i.quantity, 0)
-                    const displayDiscountDiff = displayRegularSubtotal - displaySubtotal
+                    const displayProductSavings = displayRegularSubtotal - displaySubtotal
+                    const grandSavings = displayProductSavings + totalDiscount
+
                     return (
                       <div className="border-t border-stone-200 mt-5 pt-4 space-y-2 text-sm text-stone-600">
                         <div className="flex justify-between">
                           <span>Subtotal (MRP)</span>
                           <span className="text-stone-800 font-medium">₹{displayRegularSubtotal.toFixed(0)}</span>
                         </div>
-                        {displayDiscountDiff > 0 && (
+                        {displayProductSavings > 0 && (
                           <div className="flex justify-between text-emerald-600 font-semibold">
                             <span>Product Discount</span>
-                            <span>-₹{displayDiscountDiff.toFixed(0)}</span>
+                            <span>-₹{displayProductSavings.toFixed(0)}</span>
                           </div>
                         )}
                         {clubbingDiscount > 0 && (
@@ -648,7 +738,7 @@ function CheckoutPage() {
                         )}
                         {couponDiscount > 0 && (
                           <div className="flex justify-between text-emerald-600 font-semibold">
-                            <span>Coupon Discount {appliedCoupon ? `(${appliedCoupon.code})` : ''}</span>
+                            <span>Coupon Savings ({appliedCoupon})</span>
                             <span>-₹{couponDiscount.toFixed(0)}</span>
                           </div>
                         )}
@@ -680,6 +770,11 @@ function CheckoutPage() {
                             )}
                           </div>
                         </div>
+                        {shippingError && (
+                          <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded mt-1">
+                            {shippingError}
+                          </div>
+                        )}
                         <div className="flex justify-between text-xl font-display text-maroon-500 pt-2 border-t border-stone-200 mt-2 font-bold">
                           <span>Total</span>
                           <span className="text-saffron-600">₹{finalTotal.toFixed(0)}</span>
@@ -698,6 +793,102 @@ function CheckoutPage() {
           </div>
         </div>
       </div>
+      {mockPaymentModal && (
+        <Dialog open={true} onOpenChange={(open) => !open && handleCancelMockPayment()}>
+          <DialogContent className="sm:max-w-md bg-white border border-stone-200 shadow-2xl p-6">
+            <DialogHeader>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 uppercase tracking-wide">
+                  Test Gateway
+                </span>
+              </div>
+              <DialogTitle className="text-xl font-display text-maroon-700">
+                Complete Payment
+              </DialogTitle>
+              <DialogDescription className="text-stone-600 text-sm">
+                Choose a payment method to complete order #{mockPaymentModal.order.orderNumber || mockPaymentModal.order.id.slice(0, 8)}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 my-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs uppercase font-medium text-stone-500 tracking-wider">Amount Due</span>
+                <span className="text-2xl font-bold font-display text-maroon-600">
+                  ₹{mockPaymentModal.amount}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 my-2">
+              <label
+                onClick={() => setSelectedMethod('upi')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedMethod === 'upi'
+                    ? 'border-saffron-500 bg-saffron-50/50 shadow-sm'
+                    : 'border-stone-200 hover:border-stone-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${selectedMethod === 'upi' ? 'bg-saffron-500 text-white' : 'bg-stone-100 text-stone-600'}`}>
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-stone-800">UPI / QR Code</p>
+                    <p className="text-xs text-stone-500">Google Pay, PhonePe, Paytm, BHIM</p>
+                  </div>
+                </div>
+                {selectedMethod === 'upi' && <CheckCircle2 className="w-5 h-5 text-saffron-600" />}
+              </label>
+
+              <label
+                onClick={() => setSelectedMethod('card')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedMethod === 'card'
+                    ? 'border-saffron-500 bg-saffron-50/50 shadow-sm'
+                    : 'border-stone-200 hover:border-stone-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${selectedMethod === 'card' ? 'bg-saffron-500 text-white' : 'bg-stone-100 text-stone-600'}`}>
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-stone-800">Credit / Debit Card</p>
+                    <p className="text-xs text-stone-500">Visa, Mastercard, RuPay</p>
+                  </div>
+                </div>
+                {selectedMethod === 'card' && <CheckCircle2 className="w-5 h-5 text-saffron-600" />}
+              </label>
+            </div>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={handleCancelMockPayment}
+                disabled={mockPaying}
+                className="w-full sm:w-auto border-stone-200 text-stone-600 hover:bg-stone-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmMockPayment}
+                disabled={mockPaying}
+                className="w-full sm:flex-1 bg-[#6B1024] hover:bg-[#4D0013] text-white font-semibold py-2.5"
+              >
+                {mockPaying ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Authorizing...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Lock className="w-4 h-4" /> Pay ₹{mockPaymentModal.amount}
+                  </span>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       <Footer />
     </main>
   )

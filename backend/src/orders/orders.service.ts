@@ -1,82 +1,707 @@
 import {
-  Injectable,
+  HttpStatus,
   BadRequestException,
+  Injectable,
+  InternalServerErrorException,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
-import * as crypto from 'crypto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Prisma, OrderStatus, ProductType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClubbingService } from '../clubbing/clubbing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { RefundWebhookDto } from './dto/refund-webhook.dto';
-import {
-  OrderStatus,
-  PaymentStatus,
-  PaymentWebhookStatus,
-} from '../generated/prisma';
+
+import * as crypto from 'crypto';
+import { CartStatus, PaymentWebhookStatus, PaymentStatus } from '@prisma/client';
+import { PricingService } from '../pricing/pricing.service';
+
+const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  [OrderStatus.payment_pending]: [OrderStatus.paid, OrderStatus.cancelled],
+  [OrderStatus.paid]: [OrderStatus.processing, OrderStatus.cancelled],
+  [OrderStatus.processing]: [OrderStatus.shipped, OrderStatus.cancelled],
+  [OrderStatus.shipped]: [OrderStatus.delivered],
+  [OrderStatus.delivered]: [],
+  [OrderStatus.cancelled]: [],
+  [OrderStatus.refunded]: [],
+  [OrderStatus.cart]: [],
+};
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly clubbingService: ClubbingService,
+    private readonly pricingService: PricingService,
+  ) {}
 
-  async createOrder(dto: CreateOrderDto) {
+  async createOrder(dto: CreateOrderDto, customerId?: string) {
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Order must contain at least one item');
     }
 
-    const productIds = dto.items.map((item) => item.productId);
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds } },
-    });
+    const pricing = await this.pricingService.calculatePricing(
+      dto.items.map((item) => ({
+        productId: item.productId,
+        variationId: item.variationId || null,
+        quantity: item.quantity,
+      })),
+      { throwOnError: true, couponCode: dto.couponCode },
+    );
 
-    if (products.length !== productIds.length) {
-      throw new NotFoundException('One or more products were not found');
+    const orderItemsData = pricing.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variationId,
+      attributesSnapshot: item.attributesSnapshot,
+      titleSnapshot: item.titleSnapshot,
+      skuSnapshot: item.skuSnapshot,
+      unitPriceSnapshot: item.unitPrice,
+      quantity: item.quantity,
+      lineTotal: item.lineTotal,
+    }));
+
+    const subtotal = pricing.subtotal;
+    const discountTotal = pricing.discountTotal;
+    const shippingTotal = pricing.shippingTotal;
+    const grandTotal = pricing.grandTotal;
+
+    let validCartToConvert: string | null = null;
+    if (dto.cartId && dto.cartToken) {
+      try {
+        const cart = await this.prismaService.cart.findUnique({
+          where: { id: dto.cartId },
+        });
+        if (cart && cart.status === CartStatus.active) {
+          const hashedProvided = crypto
+            .createHash('sha256')
+            .update(dto.cartToken)
+            .digest('hex');
+          const expectedBuf = Buffer.from(cart.sessionToken, 'utf8');
+          const providedBuf = Buffer.from(hashedProvided, 'utf8');
+          if (
+            expectedBuf.length === providedBuf.length &&
+            crypto.timingSafeEqual(expectedBuf, providedBuf)
+          ) {
+            validCartToConvert = cart.id;
+          }
+        }
+      } catch {
+        // An invalid or missing cart token must never block guest checkout (ignore it)
+      }
     }
 
-    const productMap = new Map(products.map((p) => [p.id, p]));
-    let subtotal = 0;
+    const orderNumber = await this.generateOrderNumber();
+    const effectiveCustomerId = customerId || null;
 
-    const orderItemsData = dto.items.map((item) => {
-      const product = productMap.get(item.productId)!;
-      const unitPrice = Number(product.salePrice ?? product.basePrice);
-      const lineTotal = unitPrice * item.quantity;
-      subtotal += lineTotal;
+    let orderEmail: string | null = null;
+    if (!effectiveCustomerId) {
+      if (!dto.email || !dto.email.trim()) {
+        throw new BadRequestException('Email is required for guest checkout');
+      }
+      orderEmail = dto.email.trim().toLowerCase();
+    } else {
+      if (dto.email && dto.email.trim()) {
+        orderEmail = dto.email.trim().toLowerCase();
+      } else {
+        const customer = this.prismaService.user
+          ? await this.prismaService.user.findUnique({
+              where: { id: effectiveCustomerId },
+              select: { email: true },
+            })
+          : null;
+        orderEmail = customer?.email?.toLowerCase() || null;
+      }
+    }
 
-      return {
-        productId: product.id,
-        titleSnapshot: product.title,
-        skuSnapshot: product.sku,
-        unitPriceSnapshot: unitPrice,
-        quantity: item.quantity,
-        lineTotal: lineTotal,
-      };
+    const addressCreates: any[] = [];
+    if (dto.shippingAddress) {
+      addressCreates.push({
+        type: 'shipping',
+        fullName: dto.shippingAddress.fullName,
+        phone: dto.shippingAddress.phone,
+        addressLine1: dto.shippingAddress.addressLine1,
+        addressLine2: dto.shippingAddress.addressLine2 || null,
+        city: dto.shippingAddress.city,
+        state: dto.shippingAddress.state,
+        postalCode: dto.shippingAddress.postalCode,
+        country: dto.shippingAddress.country || 'IN',
+      });
+    }
+
+    if (dto.billingAddress) {
+      addressCreates.push({
+        type: 'billing',
+        fullName: dto.billingAddress.fullName,
+        phone: dto.billingAddress.phone,
+        addressLine1: dto.billingAddress.addressLine1,
+        addressLine2: dto.billingAddress.addressLine2 || null,
+        city: dto.billingAddress.city,
+        state: dto.billingAddress.state,
+        postalCode: dto.billingAddress.postalCode,
+        country: dto.billingAddress.country || 'IN',
+      });
+    }
+
+    const order = await this.prismaService.$transaction(async (tx) => {
+      if (validCartToConvert) {
+        await tx.cart.update({
+          where: { id: validCartToConvert },
+          data: { status: CartStatus.converted },
+        });
+      }
+
+      if (pricing.appliedCouponCode || (dto.couponCode && dto.couponCode.trim())) {
+        const targetCode = (pricing.appliedCouponCode || dto.couponCode)!.trim();
+        const updated = await tx.$executeRaw`
+          UPDATE "clubbing_rules"
+          SET "usage_count" = "usage_count" + 1
+          WHERE (LOWER("code") = LOWER(${targetCode}) OR LOWER("name") = LOWER(${targetCode}))
+            AND ("usage_limit" IS NULL OR "usage_count" < "usage_limit")
+            AND "is_active" = true
+        `;
+        if (updated === 0) {
+          throw new BadRequestException('Coupon is invalid or usage limit reached');
+        }
+      }
+
+      return tx.order.create({
+        data: {
+          orderNumber,
+          customerId: effectiveCustomerId,
+          email: orderEmail,
+          status: OrderStatus.payment_pending,
+          subtotal,
+          discountTotal,
+          taxTotal: 0,
+          shippingTotal,
+          grandTotal,
+          couponCode: dto.couponCode || null,
+          shippingTemplateName: pricing.shippingTemplateName || null,
+          shippingCarrier: pricing.shippingCarrier || null,
+          shippingSnapshot: (pricing.shippingSnapshot as Prisma.InputJsonValue) || Prisma.JsonNull,
+          items: {
+            create: orderItemsData,
+          },
+          addresses: addressCreates.length > 0 ? { create: addressCreates } : undefined,
+        },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          addresses: true,
+        },
+      });
     });
 
-    const orderNumber = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    this.eventEmitter.emit('order.created', { orderId: order.id });
 
-    return this.prisma.order.create({
-      data: {
-        orderNumber,
-        customerId: dto.customerId || null,
-        status: OrderStatus.payment_pending,
-        subtotal,
-        discountTotal: 0,
-        taxTotal: 0,
-        shippingTotal: 0,
-        grandTotal: subtotal,
-        items: { create: orderItemsData },
-      },
-      include: { items: true },
-    });
-  }
-
-  async getOrder(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: true, payments: true, statusHistory: true },
-    });
-    if (!order) throw new NotFoundException('Order not found');
     return order;
   }
+
+  async getOrderById(id: string) {
+    const order = await this.prismaService.order.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        addresses: true,
+        statusHistory: {
+          include: {
+            changedByUser: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { changedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      return this.getOrderOrMock(id);
+    }
+
+    return order;
+  }
+
+  async getAllOrders(
+    status?: string,
+    page = 1,
+    perPage = 20,
+    search?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    sortBy?: string,
+    sortOrder?: string,
+  ) {
+    const skip = (page - 1) * perPage;
+    const where: any = {};
+
+    if (status && status !== 'all') {
+      where.status = status as OrderStatus;
+    }
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        if (dateTo.length <= 10) {
+          to.setUTCHours(23, 59, 59, 999);
+        }
+        where.createdAt.lte = to;
+      }
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      where.OR = [
+        { orderNumber: { contains: term, mode: 'insensitive' } },
+        { customer: { firstName: { contains: term, mode: 'insensitive' } } },
+        { customer: { lastName: { contains: term, mode: 'insensitive' } } },
+        { customer: { email: { contains: term, mode: 'insensitive' } } },
+        { addresses: { some: { fullName: { contains: term, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const direction: 'asc' | 'desc' = sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+    let orderBy: any = { createdAt: direction };
+    if (sortBy === 'grandTotal' || sortBy === 'total') {
+      orderBy = { grandTotal: direction };
+    } else if (sortBy === 'createdAt' || sortBy === 'date') {
+      orderBy = { createdAt: direction };
+    }
+
+    const [data, total] = await Promise.all([
+      this.prismaService.order.findMany({
+        where,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          addresses: true,
+          statusHistory: {
+            orderBy: { changedAt: 'desc' },
+          },
+        },
+        orderBy,
+        skip,
+        take: perPage,
+      }),
+      this.prismaService.order.count({ where }),
+    ]);
+
+    if (total === 0 && !status && !search && !dateFrom && !dateTo) {
+      const mocks = this.getMockOrders();
+      return {
+        data: mocks,
+        meta: {
+          total: mocks.length,
+          page: 1,
+          perPage,
+          totalPages: 1,
+        },
+      };
+    }
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+      },
+    };
+  }
+
+  async updateStatus(
+    orderId: string,
+    toStatus: OrderStatus,
+    note: string | undefined,
+    userId: string,
+    trackingUrl?: string,
+    trackingNumber?: string,
+  ) {
+    const order = await this.prismaService.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (toStatus === OrderStatus.refunded) {
+      throw new BadRequestException(
+        'Status refunded cannot be set directly; this status is webhook-only',
+      );
+    }
+
+    const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
+    if (!allowed.includes(toStatus)) {
+      throw new BadRequestException(
+        `Invalid status transition from '${order.status}' to '${toStatus}'`,
+      );
+    }
+
+    if (toStatus === OrderStatus.cancelled && (!note || !note.trim())) {
+      throw new BadRequestException('Note is required for cancellation');
+    }
+
+    let cleanTrackingUrl: string | null = null;
+    let cleanTrackingNumber: string | null = null;
+
+    if (toStatus === OrderStatus.shipped) {
+      if (!trackingUrl || !trackingUrl.trim()) {
+        throw new BadRequestException('Tracking URL is required when status is shipped');
+      }
+      const trimmedUrl = trackingUrl.trim();
+      if (trimmedUrl.length > 500) {
+        throw new BadRequestException('Tracking URL cannot exceed 500 characters');
+      }
+      try {
+        const parsed = new URL(trimmedUrl);
+        if (parsed.protocol !== 'https:') {
+          throw new BadRequestException('Tracking URL must be a valid https URL');
+        }
+      } catch {
+        throw new BadRequestException('Tracking URL must be a valid https URL');
+      }
+      cleanTrackingUrl = trimmedUrl;
+
+      if (trackingNumber && trackingNumber.trim()) {
+        const trimmedNumber = trackingNumber.trim();
+        if (trimmedNumber.length > 100) {
+          throw new BadRequestException('Tracking number cannot exceed 100 characters');
+        }
+        cleanTrackingNumber = trimmedNumber;
+      }
+    } else {
+      if (trackingUrl || trackingNumber) {
+        throw new BadRequestException('Tracking fields can only be set when status is shipped');
+      }
+    }
+
+    const fromStatus = order.status;
+
+    let historyNote = note ?? null;
+    if (cleanTrackingUrl) {
+      const trackingInfo = `Tracking: ${cleanTrackingUrl}${cleanTrackingNumber ? ` (${cleanTrackingNumber})` : ''}`;
+      historyNote = historyNote ? `${historyNote} | ${trackingInfo}` : trackingInfo;
+    }
+
+    const updatedOrder = await this.prismaService.$transaction(async (tx) => {
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          fromStatus,
+          toStatus,
+          changedById: userId,
+          note: historyNote,
+        },
+      });
+
+      if (toStatus === OrderStatus.cancelled && order.couponCode && order.couponCode.trim()) {
+        const targetCode = order.couponCode.trim();
+        await tx.$executeRaw`
+          UPDATE "clubbing_rules"
+          SET "usage_count" = GREATEST(0, "usage_count" - 1)
+          WHERE (LOWER("code") = LOWER(${targetCode}) OR LOWER("name") = LOWER(${targetCode}))
+        `;
+      }
+
+      const updateData: any = { status: toStatus };
+      if (toStatus === OrderStatus.shipped) {
+        updateData.trackingUrl = cleanTrackingUrl;
+        updateData.trackingNumber = cleanTrackingNumber;
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: updateData,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+          items: true,
+          addresses: true,
+          statusHistory: {
+            include: {
+              changedByUser: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+            orderBy: { changedAt: 'desc' },
+          },
+        },
+      });
+    });
+
+    this.eventEmitter.emit('order.status_changed', {
+      orderId,
+      fromStatus,
+      toStatus,
+      changedById: userId,
+    });
+
+    const statusEventMap: Partial<Record<OrderStatus, string>> = {
+      [OrderStatus.paid]: 'order.paid',
+      [OrderStatus.processing]: 'order.processing',
+      [OrderStatus.shipped]: 'order.shipped',
+      [OrderStatus.delivered]: 'order.delivered',
+      [OrderStatus.cancelled]: 'order.cancelled',
+      [OrderStatus.refunded]: 'order.refunded',
+    };
+    const specificEvent = statusEventMap[toStatus];
+    if (specificEvent) {
+      this.eventEmitter.emit(specificEvent, { orderId });
+    }
+
+    return updatedOrder;
+  }
+
+  async getMyOrders(customerId: string, page = 1, perPage = 10) {
+    const skip = (page - 1) * perPage;
+    const [data, total] = await Promise.all([
+      this.prismaService.order.findMany({
+        where: { customerId },
+        include: {
+          items: true,
+          addresses: true,
+          statusHistory: {
+            orderBy: { changedAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: perPage,
+      }),
+      this.prismaService.order.count({ where: { customerId } }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+      },
+    };
+  }
+
+  async getMyOrderById(customerId: string, id: string) {
+    const order = await this.prismaService.order.findFirst({
+      where: { id, customerId },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                images: true,
+              },
+            },
+          },
+        },
+        addresses: true,
+        statusHistory: {
+          orderBy: { changedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
+  }
+
+  async getMyOrderByNumber(customerId: string, orderNumber: string) {
+    const cleanNumber = orderNumber?.trim();
+    if (!cleanNumber) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const order = await this.prismaService.order.findFirst({
+      where: { orderNumber: cleanNumber, customerId },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                images: true,
+              },
+            },
+          },
+        },
+        addresses: true,
+        statusHistory: {
+          orderBy: { changedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
+  }
+
+  async trackOrder(orderNumber: string, phone: string, email?: string) {
+    const cleanNumber = orderNumber?.trim();
+    const cleanPhone = phone?.replace(/\D/g, '').slice(-10);
+
+    if (!cleanNumber || !cleanPhone) {
+      throw new BadRequestException('Order number and phone number are required');
+    }
+
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        cleanNumber,
+      );
+
+    const order = await this.prismaService.order.findFirst({
+      where: isUuid
+        ? { OR: [{ id: cleanNumber }, { orderNumber: cleanNumber }] }
+        : { orderNumber: cleanNumber },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                images: true,
+              },
+            },
+          },
+        },
+        addresses: true,
+        statusHistory: {
+          orderBy: { changedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('No order found matching the provided details');
+    }
+
+    const matchesPhone =
+      order.addresses.some((addr) => {
+        const addrPhone = addr.phone?.replace(/\D/g, '').slice(-10);
+        return addrPhone === cleanPhone;
+      }) ||
+      (order.customer?.phone &&
+        order.customer.phone.replace(/\D/g, '').slice(-10) === cleanPhone);
+
+    const matchesEmail =
+      email &&
+      order.customer?.email &&
+      order.customer.email.toLowerCase() === email.trim().toLowerCase();
+
+    if (!matchesPhone && !matchesEmail) {
+      throw new NotFoundException('No order found matching the provided details');
+    }
+
+    return order;
+  }
+
+  async generateOrderNumber(): Promise<string> {
+    const fetchNextVal = async () => {
+      const result = await this.prismaService.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
+        `SELECT nextval('order_number_seq') AS nextval`,
+      );
+      if (result?.[0]?.nextval != null) {
+        return `SDO${result[0].nextval}`;
+      }
+      throw new Error('Empty sequence value returned');
+    };
+
+    try {
+      return await fetchNextVal();
+    } catch {
+      // Retry once after ensuring sequence exists
+      try {
+        await this.prismaService.$executeRawUnsafe(
+          `CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1000 INCREMENT BY 1;`,
+        );
+        return await fetchNextVal();
+      } catch (retryError: any) {
+        throw new InternalServerErrorException(
+          `Failed to generate sequence-based order number: ${retryError?.message || 'Sequence error'}`,
+        );
+      }
+    }
+  }
+
 
   async handleRefundWebhook(dto: RefundWebhookDto, signature?: string) {
     // 1. Signature validation (if secret is configured in environment)
@@ -238,22 +863,7 @@ export class OrdersService {
     };
   }
 
-  async getAllOrders(): Promise<any[]> {
-    try {
-      const orders = await this.prisma.order.findMany({
-        include: {
-          items: true,
-          addresses: true,
-          payments: true,
-          customer: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (orders.length > 0) return orders;
-    } catch {}
 
-    return this.getMockOrders();
-  }
 
   async getOrderOrMock(id: string): Promise<any> {
     try {

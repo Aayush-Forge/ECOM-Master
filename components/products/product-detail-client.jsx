@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Plus, Minus, ShoppingBag, Leaf, Truck, Sparkles, Check, Star } from 'lucide-react'
+import { Plus, Minus, ShoppingBag, Leaf, Truck, Sparkles, Check, Star, CheckCircle2 } from 'lucide-react'
 import ProductCard from '@/components/products/product-card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea'
 export default function ProductDetailClient({ initialProduct }) {
   const { slug } = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { addItem } = useCart()
   const [product, setProduct] = useState(initialProduct)
   const [loading, setLoading] = useState(!initialProduct)
@@ -33,8 +34,31 @@ export default function ProductDetailClient({ initialProduct }) {
   // Reviews state and methods
   const [reviews, setReviews] = useState([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
-  const [newReview, setNewReview] = useState({ rating: 5, review: '', reviewer: '', reviewer_email: '' })
+  const [newReview, setNewReview] = useState({
+    rating: 5,
+    review: '',
+    reviewer: '',
+    emailOrPhone: '',
+  })
   const [submittingReview, setSubmittingReview] = useState(false)
+  const [openAccordion, setOpenAccordion] = useState('desc')
+
+  useEffect(() => {
+    if (searchParams) {
+      const shouldReview = searchParams.get('review') === '1'
+      const prefilledEmail = searchParams.get('email')
+      if (prefilledEmail) {
+        setNewReview(prev => ({ ...prev, emailOrPhone: prefilledEmail }))
+      }
+      if (shouldReview) {
+        setOpenAccordion('reviews')
+        setTimeout(() => {
+          const el = document.getElementById('reviews-section')
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 300)
+      }
+    }
+  }, [searchParams])
 
   const fetchReviews = (productId) => {
     setReviewsLoading(true)
@@ -66,8 +90,24 @@ export default function ProductDetailClient({ initialProduct }) {
   const handleReviewSubmit = async (e) => {
     e.preventDefault()
     if (!newReview.reviewer.trim() || !newReview.review.trim()) {
-      toast.error('Please fill out all fields.')
+      toast.error('Please enter your name and review.')
       return
+    }
+
+    const trimmedInput = newReview.emailOrPhone?.trim() || ''
+    if (!trimmedInput) {
+      toast.error('Please enter the email or phone number used during your order.')
+      return
+    }
+
+    const isEmail = trimmedInput.includes('@')
+    const payload = {
+      product_id: product.id,
+      rating: newReview.rating,
+      review: newReview.review,
+      reviewer: newReview.reviewer,
+      email: isEmail ? trimmedInput : undefined,
+      phone: !isEmail ? trimmedInput : undefined,
     }
 
     setSubmittingReview(true)
@@ -75,20 +115,15 @@ export default function ProductDetailClient({ initialProduct }) {
       const res = await fetch('/api/products/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_id: product.id,
-          rating: newReview.rating,
-          review: newReview.review,
-          reviewer: newReview.reviewer
-        })
+        body: JSON.stringify(payload),
       })
 
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.error || 'Failed to submit review.')
       } else {
-        toast.success('Thank you! Your review has been submitted successfully.')
-        setNewReview({ rating: 5, review: '', reviewer: '', reviewer_email: '' })
+        toast.success('Thank you! Your verified review has been published.')
+        setNewReview({ rating: 5, review: '', reviewer: '', emailOrPhone: '' })
         fetchReviews(product.id)
       }
     } catch (err) {
@@ -180,8 +215,8 @@ export default function ProductDetailClient({ initialProduct }) {
 
   const isVariable = product?.type === 'variable'
 
-  // Variation attributes shown to user (only those flagged variation: true)
-  const variationAttrs = useMemo(() => (product?.attributes || []).filter(a => a.variation), [product])
+  // Variation attributes shown to user (only those not explicitly disabled)
+  const variationAttrs = useMemo(() => (product?.attributes || []).filter(a => a.variation !== false), [product])
 
   // Find matching variation given current selectedAttrs
   const matchedVariation = useMemo(() => {
@@ -189,12 +224,37 @@ export default function ProductDetailClient({ initialProduct }) {
     return product.variationsData.find(v => {
       return variationAttrs.every(va => {
         const sel = selectedAttrs[va.name]
-        const va_match = v.attributes.find(x => x.name === va.name)
-        if (!va_match || !va_match.option) return true // "any"
-        return va_match.option === sel
+        const va_match = (v.attributes || []).find(
+          x => (x.name || '').toLowerCase() === (va.name || '').toLowerCase()
+        )
+        if (!va_match) return true
+        const val = va_match.option ?? va_match.value
+        if (val === undefined || val === null || val === '') return true // "any"
+        return String(val).toLowerCase() === String(sel || '').toLowerCase()
       })
     }) || null
   }, [isVariable, product, variationAttrs, selectedAttrs])
+
+  // Pre-select first available variation by default if none selected
+  useEffect(() => {
+    if (isVariable && Array.isArray(product?.variationsData) && product.variationsData.length > 0) {
+      if (Object.keys(selectedAttrs).length === 0) {
+        const firstValid =
+          product.variationsData.find(v => v.stock_status !== 'outofstock' && Number(v.stock_quantity ?? 1) > 0) ||
+          product.variationsData[0]
+        if (firstValid && Array.isArray(firstValid.attributes)) {
+          const initial = {}
+          firstValid.attributes.forEach(a => {
+            const val = a.option ?? a.value
+            if (a.name && val !== undefined && val !== null) initial[a.name] = val
+          })
+          if (Object.keys(initial).length > 0) {
+            setSelectedAttrs(initial)
+          }
+        }
+      }
+    }
+  }, [isVariable, product, selectedAttrs])
 
   const features = useMemo(() => {
     if (!product?.acf) return []
@@ -245,7 +305,11 @@ export default function ProductDetailClient({ initialProduct }) {
   const stockStatus = isVariable
     ? (matchedVariation?.stock_status || product?.stock_status || 'instock')
     : (product?.stock_status || 'instock')
-  const inStock = stockStatus === 'instock'
+  const inStock = isVariable
+    ? (matchedVariation
+        ? (matchedVariation.stock_status === 'instock' || matchedVariation.stock_status === 'in_stock' || Number(matchedVariation.stock_quantity ?? 1) > 0)
+        : (product?.stock_status === 'instock' || product?.in_stock !== false))
+    : (stockStatus === 'instock' || product?.in_stock !== false)
 
   const handleAdd = (buyNow = false) => {
     if (!product) return
@@ -364,10 +428,10 @@ export default function ProductDetailClient({ initialProduct }) {
                 </span>
               </div>
 
-              {product.short_description && (
+              {(product.shortDescription || product.short_description) && (
                 <div
-                  className="text-base text-muted-foreground italic mt-2 prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: product.short_description }}
+                  className="text-base text-muted-foreground italic mt-2 rich-text prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                  dangerouslySetInnerHTML={{ __html: product.shortDescription || product.short_description }}
                 />
               )}
             </div>
@@ -401,17 +465,28 @@ export default function ProductDetailClient({ initialProduct }) {
                 <div className="flex flex-wrap gap-2">
                   {attr.options.map(opt => {
                     const selected = selectedAttrs[attr.name] === opt
-                    const possible = product.variationsData?.some(v => {
-                      const a = v.attributes.find(x => x.name === attr.name)
-                      if (a?.option && a.option !== opt) return false
-                      if (v.stock_status === 'outofstock') return false
-                      return Object.entries(selectedAttrs).every(([n, val]) => {
-                        if (n === attr.name) return true
-                        const x = v.attributes.find(p => p.name === n)
-                        if (!x?.option) return true
-                        return x.option === val
-                      })
-                    }) ?? true
+                    const possible =
+                      Array.isArray(product.variationsData) && product.variationsData.length > 0
+                        ? product.variationsData.some(v => {
+                            const a = (v.attributes || []).find(
+                              x => (x.name || '').toLowerCase() === (attr.name || '').toLowerCase()
+                            )
+                            const aVal = a?.option ?? a?.value
+                            if (aVal !== undefined && aVal !== null && String(aVal).toLowerCase() !== String(opt).toLowerCase()) {
+                              return false
+                            }
+                            if (v.stock_status === 'outofstock' && Number(v.stock_quantity ?? 0) <= 0) return false
+                            return Object.entries(selectedAttrs).every(([n, val]) => {
+                              if (n.toLowerCase() === attr.name.toLowerCase()) return true
+                              const x = (v.attributes || []).find(
+                                p => (p.name || '').toLowerCase() === n.toLowerCase()
+                              )
+                              const xVal = x?.option ?? x?.value
+                              if (xVal === undefined || xVal === null || xVal === '') return true
+                              return String(xVal).toLowerCase() === String(val || '').toLowerCase()
+                            })
+                          })
+                        : true
                     return (
                       <button
                         key={opt}
@@ -445,13 +520,19 @@ export default function ProductDetailClient({ initialProduct }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Button onClick={() => handleAdd(false)} disabled={added || !inStock || (isVariable && !matchedVariation)}
+              <Button onClick={() => handleAdd(false)} disabled={added || !inStock}
                 className="bg-[#6B1024] hover:bg-[#4D0013] text-white font-bold py-6 text-base shadow-lg shadow-stone-100">
-                {added ? <><Check className="w-4 h-4 mr-2" /> Added</> : <><ShoppingBag className="w-4 h-4 mr-2" /> Add to Cart</>}
+                {added ? (
+                  <><Check className="w-4 h-4 mr-2" /> Added</>
+                ) : (isVariable && !matchedVariation) ? (
+                  'Select Options'
+                ) : (
+                  <><ShoppingBag className="w-4 h-4 mr-2" /> Add to Cart</>
+                )}
               </Button>
-              <Button onClick={() => handleAdd(true)} variant="outline" disabled={!inStock || (isVariable && !matchedVariation)}
+              <Button onClick={() => handleAdd(true)} variant="outline" disabled={!inStock}
                 className="border-[#D7A65B] text-[#6B1024] hover:bg-stone-100 font-bold py-6 text-base bg-white">
-                Buy Now — ₹{(displayPrice * qty).toFixed(0)}
+                {isVariable && !matchedVariation ? 'Select Options' : `Buy Now — ₹${(displayPrice * qty).toFixed(0)}`}
               </Button>
             </div>
 
@@ -468,11 +549,18 @@ export default function ProductDetailClient({ initialProduct }) {
               ))}
             </div>
 
-            <Accordion type="single" collapsible defaultValue="desc" className="pt-3">
+            <Accordion
+              type="single"
+              collapsible
+              value={openAccordion}
+              onValueChange={setOpenAccordion}
+              defaultValue="desc"
+              className="pt-3"
+            >
               <AccordionItem value="desc" className="border-stone-200">
                 <AccordionTrigger className="font-display text-[#6B1024] font-bold">Full Description</AccordionTrigger>
                 <AccordionContent>
-                  <div className="text-sm leading-relaxed prose prose-sm max-w-none text-[#6B1024]/85" dangerouslySetInnerHTML={{ __html: product.description || product.short_description || '' }} />
+                  <div className="text-sm leading-relaxed rich-text prose prose-sm max-w-none text-[#6B1024]/85 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5" dangerouslySetInnerHTML={{ __html: product.description || product.shortDescription || product.short_description || '' }} />
                   
                   {/* ACF Features placed vertically below full description */}
                   {features.length > 0 && (
@@ -505,7 +593,7 @@ export default function ProductDetailClient({ initialProduct }) {
                   for details.
                 </AccordionContent>
               </AccordionItem>
-              <AccordionItem value="reviews" className="border-stone-200">
+              <AccordionItem value="reviews" className="border-stone-200" id="reviews-section">
                 <AccordionTrigger className="font-display text-[#6B1024] font-bold">Customer Reviews ({reviews.length})</AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-6 pt-2">
@@ -516,12 +604,20 @@ export default function ProductDetailClient({ initialProduct }) {
                           <Skeleton className="h-20 w-full bg-stone-50" />
                         </div>
                       ) : reviews.length === 0 ? (
-                        <p className="text-sm text-stone-500 italic py-2">No reviews yet. Be the first to share your experience!</p>
+                        <p className="text-sm text-stone-500 italic py-2">No reviews yet. Delivered customers can share their experience below!</p>
                       ) : (
                         reviews.map((rev) => (
                           <div key={rev.id} className="p-4 border border-stone-200 bg-stone-50/30 rounded-xl space-y-1.5 text-left">
                             <div className="flex items-center justify-between">
-                              <span className="font-semibold text-sm text-[#6B1024]">{rev.reviewer}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-sm text-[#6B1024]">{rev.reviewer}</span>
+                                {rev.is_verified_buyer && (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-full">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                    Verified Purchase
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-stone-500">{new Date(rev.date_created).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
                             </div>
                             <div className="flex gap-0.5">
@@ -542,7 +638,12 @@ export default function ProductDetailClient({ initialProduct }) {
                     </div>
 
                     <div className="border-t border-stone-200 pt-6 space-y-4 text-left">
-                      <h4 className="font-display text-base text-[#6B1024] font-bold">Share Your Experience</h4>
+                      <div>
+                        <h4 className="font-display text-base text-[#6B1024] font-bold">Share Your Experience</h4>
+                        <p className="text-[11px] text-stone-500 mt-0.5">
+                          Reviews are verified against completed orders. Please provide the email or phone number used during checkout.
+                        </p>
+                      </div>
                       <form onSubmit={handleReviewSubmit} className="space-y-3.5">
                         <div className="space-y-1">
                           <Label className="text-xs font-semibold text-stone-700">Rating *</Label>
@@ -564,16 +665,32 @@ export default function ProductDetailClient({ initialProduct }) {
                           </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <Label htmlFor="reviewer_name" className="text-xs font-semibold text-stone-700">Your Name *</Label>
-                          <Input 
-                            id="reviewer_name"
-                            value={newReview.reviewer}
-                            onChange={(e) => setNewReview(prev => ({ ...prev, reviewer: e.target.value }))}
-                            placeholder="e.g. Meera"
-                            required
-                            className="bg-stone-50 border-stone-200 focus-visible:ring-saffron-500 h-9 text-xs"
-                          />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="reviewer_name" className="text-xs font-semibold text-stone-700">Your Name *</Label>
+                            <Input 
+                              id="reviewer_name"
+                              value={newReview.reviewer}
+                              onChange={(e) => setNewReview(prev => ({ ...prev, reviewer: e.target.value }))}
+                              placeholder="e.g. Meera Sharma"
+                              required
+                              className="bg-stone-50 border-stone-200 focus-visible:ring-saffron-500 h-9 text-xs"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label htmlFor="reviewer_contact" className="text-xs font-semibold text-stone-700">
+                              Order Email or Phone *
+                            </Label>
+                            <Input 
+                              id="reviewer_contact"
+                              value={newReview.emailOrPhone}
+                              onChange={(e) => setNewReview(prev => ({ ...prev, emailOrPhone: e.target.value }))}
+                              placeholder="e.g. meera@gmail.com or 9876543210"
+                              required
+                              className="bg-stone-50 border-stone-200 focus-visible:ring-saffron-500 h-9 text-xs"
+                            />
+                          </div>
                         </div>
 
                         <div className="space-y-1">
@@ -582,7 +699,7 @@ export default function ProductDetailClient({ initialProduct }) {
                             id="reviewer_comment"
                             value={newReview.review}
                             onChange={(e) => setNewReview(prev => ({ ...prev, review: e.target.value }))}
-                            placeholder="Write your feedback..."
+                            placeholder="Describe your sacred experience with this item..."
                             required
                             rows={3}
                             className="bg-stone-50 border-stone-200 focus-visible:ring-saffron-500 text-xs"
@@ -594,7 +711,7 @@ export default function ProductDetailClient({ initialProduct }) {
                           disabled={submittingReview}
                           className="bg-[#6B1024] hover:bg-[#4D0013] text-white px-5 py-2.5 font-bold uppercase tracking-wider text-[10px] rounded-none transition"
                         >
-                          {submittingReview ? 'Submitting...' : 'Submit Review'}
+                          {submittingReview ? 'Verifying & Submitting...' : 'Submit Verified Review'}
                         </Button>
                       </form>
                     </div>

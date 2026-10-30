@@ -1,20 +1,46 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { currentUser } from '@/lib/mock-user';
-import { getMyOrdersSync } from '@/lib/api/orders';
-import { getAddressesSync } from '@/lib/api/addresses';
+import { useAuth } from '@/lib/auth-context';
+import { getMyOrders } from '@/lib/api/orders';
+import { getAddresses } from '@/lib/api/addresses';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Package, MapPin, ArrowRight } from 'lucide-react';
 
 export default function AccountLandingPage() {
-  const orders = getMyOrdersSync() || [];
-  const addresses = getAddressesSync() || [];
+  const { user } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [addresses, setAddresses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [ordersData, addressesData] = await Promise.all([
+          getMyOrders(),
+          getAddresses(),
+        ]);
+        setOrders(ordersData || []);
+        setAddresses(addressesData || []);
+      } catch (err) {
+        console.error('Error loading account overview data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0];
   const latestOrder = orders[0];
-  const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Aayush';
+  const fullName =
+    user?.name ||
+    `${user?.firstName || ''} ${user?.lastName || ''}`.trim() ||
+    user?.email ||
+    '';
+  const firstName = user?.firstName || fullName.split(' ')[0] || 'Devotee';
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -24,11 +50,11 @@ export default function AccountLandingPage() {
           Welcome back, {firstName}
         </h1>
         <p className="text-sm font-inter text-stone-500">
-          Manage your account and orders.
+          Manage your account, shipments, and addresses.
         </p>
       </div>
 
-      {/* 3 Minimal Cards Grid with Uniform Action Buttons */}
+      {/* 3 Minimal Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Card 1: Profile */}
         <Card className="bg-white border border-stone-200/80 shadow-2xs hover:border-stone-300 transition-all rounded-xl overflow-hidden flex flex-col justify-between">
@@ -46,15 +72,21 @@ export default function AccountLandingPage() {
               <div className="space-y-2 text-sm font-inter pt-2 border-t border-stone-100">
                 <div>
                   <span className="text-xs text-stone-400 block font-medium">Name</span>
-                  <span className="font-semibold text-stone-900">{currentUser?.name || 'Aayush Sharma'}</span>
+                  <span className="font-semibold text-stone-900 truncate block">
+                    {fullName || '—'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-xs text-stone-400 block font-medium">Email</span>
-                  <span className="text-stone-700 font-medium truncate block">{currentUser?.email || 'aayush@sridattam.com'}</span>
+                  <span className="text-stone-700 font-medium truncate block">
+                    {user?.email || '—'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-xs text-stone-400 block font-medium">Phone</span>
-                  <span className="text-stone-700 font-medium">{currentUser?.phone || '+91 98765 43210'}</span>
+                  <span className="text-stone-700 font-medium">
+                    {user?.phone || 'No phone number set'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -87,7 +119,11 @@ export default function AccountLandingPage() {
               <div className="space-y-2 text-sm font-inter pt-2 border-t border-stone-100">
                 <div>
                   <span className="text-xs text-stone-400 block font-medium">Total Orders</span>
-                  <span className="font-semibold text-stone-900">{orders.length} orders placed</span>
+                  <span className="font-semibold text-stone-900">
+                    {loading
+                      ? 'Loading...'
+                      : `${orders.length} ${orders.length === 1 ? 'order' : 'orders'} placed`}
+                  </span>
                 </div>
                 {latestOrder ? (
                   <div>
@@ -133,7 +169,9 @@ export default function AccountLandingPage() {
               <div className="space-y-2 text-sm font-inter pt-2 border-t border-stone-100">
                 <div>
                   <span className="text-xs text-stone-400 block font-medium">Saved Addresses</span>
-                  <span className="font-semibold text-stone-900">{addresses.length} saved</span>
+                  <span className="font-semibold text-stone-900">
+                    {loading ? 'Loading...' : `${addresses.length} saved`}
+                  </span>
                 </div>
                 {defaultAddress ? (
                   <div>

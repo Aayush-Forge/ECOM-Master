@@ -12,7 +12,11 @@ enum ProductStatus {
   archived
 }
 
-// Your teammate already started the Clubbing Module here!
+enum ProductType {
+  simple
+  variable
+}
+
 enum ClubbingRuleType {
   fixed_price_bundle
   percentage_off_bundle
@@ -41,11 +45,11 @@ enum OrderAddressType {
 }
 
 enum PaymentStatus {
-  created
-  authorized
-  captured
-  failed
-  refunded
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
 }
 
 enum PaymentWebhookStatus {
@@ -56,7 +60,8 @@ enum PaymentWebhookStatus {
 
 enum UserRole {
   admin
-  employee
+  editor
+  read_only
   customer
 }
 
@@ -65,62 +70,101 @@ enum NotificationStatus {
   failed
 }
 
-// Kept the proper, e-commerce ready User model
-model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  phone        String?
-  passwordHash String   @map("password_hash")
-  role         UserRole @default(customer)
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  carts         Cart[]
-  orders        Order[]
-  addresses     Address[]
-  notifications NotificationLog[]
-
-  @@map("users")
+enum ShippingRateType {
+  weight
+  order_value
 }
 
 model Product {
-  id               String        @id @default(uuid()) @db.Uuid
-  sku              String        @unique
-  title            String
-  slug             String        @unique
-  description      String
-  shortDescription String        @map("short_description")
-  basePrice        Decimal       @map("base_price")
-  compareAtPrice   Decimal?      @map("compare_at_price")
-  salePrice        Decimal?      @map("sale_price")
-  weight           Decimal?
-  length           Decimal?
-  width            Decimal?
-  height           Decimal?
-  categoryId       String        @map("category_id") @db.Uuid
-  status           ProductStatus
-  images           String[]
-  customFields     Json          @map("custom_fields")
-  stockQuantity    Int           @map("stock_quantity")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id                 String        @id @default(uuid()) @db.Uuid
+  sku                String        @unique
+  title              String
+  slug               String        @unique
+  description        String
+  shortDescription   String        @map("short_description")
+  basePrice          Decimal       @map("base_price")
+  compareAtPrice     Decimal?      @map("compare_at_price")
+  salePrice          Decimal?      @map("sale_price")
+  weight             Decimal?
+  length             Decimal?
+  width              Decimal?
+  height             Decimal?
+  categoryId         String        @map("category_id") @db.Uuid
+  status             ProductStatus
+  images             String[]
+  customFields       Json          @map("custom_fields")
+  stockQuantity      Int           @map("stock_quantity")
+  productType        ProductType   @default(simple) @map("product_type")
+  attributes         Json?
+  variations         Json?
+  metaTitle          String?       @map("meta_title")
+  metaDescription    String?       @map("meta_description")
+  metaKeywords       String?       @map("meta_keywords")
+  version            Int           @default(1)
+  shippingTemplateId String?       @map("shipping_template_id") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
 
-  category   Category    @relation(fields: [categoryId], references: [id])
-  cartItems  CartItem[]
-  orderItems OrderItem[]
+  category         Category              @relation(fields: [categoryId], references: [id])
+  shippingTemplate ShippingTemplate?     @relation(fields: [shippingTemplateId], references: [id], onDelete: SetNull)
+  cartItems        CartItem[]
+  orderItems       OrderItem[]
+  clubbingRules    ClubbingRuleProduct[]
+  reviews          Review[]
 
   @@index([categoryId])
   @@index([status])
+  @@index([shippingTemplateId])
   @@map("products")
 }
 
+model ShippingTemplate {
+  id                    String           @id @default(uuid()) @db.Uuid
+  name                  String
+  carrierName           String?          @default("") @map("carrier_name")
+  rateType              ShippingRateType @default(order_value) @map("rate_type")
+  slabs                 Json
+  freeShippingThreshold Decimal?         @map("free_shipping_threshold") @db.Decimal(10, 2)
+  isDefault             Boolean          @default(false) @map("is_default")
+  isEnabled             Boolean          @default(true) @map("is_enabled")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("shipping_templates")
+}
+
+model Review {
+  id              String   @id @default(uuid()) @db.Uuid
+  productId       String   @map("product_id") @db.Uuid
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerName    String   @map("customer_name")
+  customerEmail   String?  @map("customer_email")
+  customerPhone   String?  @map("customer_phone")
+  orderId         String?  @map("order_id") @db.Uuid
+  order           Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  stars           Int
+  description     String
+  isVerifiedBuyer Boolean  @default(true) @map("is_verified_buyer")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@index([customerEmail])
+  @@index([customerPhone])
+  @@index([orderId])
+  @@map("reviews")
+}
+
 model Category {
-  id       String  @id @default(uuid()) @db.Uuid
-  parentId String? @map("parent_id") @db.Uuid
-  name     String
-  slug     String  @unique
+  id              String  @id @default(uuid()) @db.Uuid
+  parentId        String? @map("parent_id") @db.Uuid
+  name            String
+  slug            String  @unique
+  description     String?
+  image           String?
+  metaTitle       String? @map("meta_title")
+  metaDescription String? @map("meta_description")
 
   parent        Category?      @relation("CategoryTree", fields: [parentId], references: [id])
   children      Category[]     @relation("CategoryTree")
@@ -130,24 +174,43 @@ model Category {
   @@map("categories")
 }
 
-// This is the Clubbing Module data layer
 model ClubbingRule {
   id                   String           @id @default(uuid()) @db.Uuid
   name                 String
+  description          String?
   type                 ClubbingRuleType
+  code                 String?          @unique
   requiredQuantity     Int              @map("required_quantity")
-  fixedPrice           Decimal?         @map("fixed_price")
-  percentageOff        Decimal?         @map("percentage_off")
+  fixedPrice           Decimal?         @map("fixed_price") @db.Decimal(10, 2)
+  percentageOff        Decimal?         @map("percentage_off") @db.Decimal(5, 2)
   applicableCategoryId String?          @map("applicable_category_id") @db.Uuid
-  applicableProductIds String[]         @map("applicable_product_ids") @db.Uuid
   startsAt             DateTime?        @map("starts_at")
   endsAt               DateTime?        @map("ends_at")
-  isActive             Boolean          @map("is_active")
+  usageLimit           Int?             @map("usage_limit")
+  usageCount           Int              @default(0) @map("usage_count")
+  isActive             Boolean          @default(true) @map("is_active")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
 
-  applicableCategory Category? @relation(fields: [applicableCategoryId], references: [id])
+  applicableCategory Category?             @relation(fields: [applicableCategoryId], references: [id])
+  products           ClubbingRuleProduct[]
 
   @@index([applicableCategoryId])
+  @@index([isActive])
+  @@index([startsAt])
+  @@index([endsAt])
   @@map("clubbing_rules")
+}
+
+model ClubbingRuleProduct {
+  ruleId    String @map("rule_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+
+  rule    ClubbingRule @relation(fields: [ruleId], references: [id])
+  product Product      @relation(fields: [productId], references: [id])
+
+  @@id([ruleId, productId])
+  @@map("clubbing_rule_products")
 }
 
 model Cart {
@@ -169,33 +232,42 @@ model CartItem {
   id                String  @id @default(uuid()) @db.Uuid
   cartId            String  @map("cart_id") @db.Uuid
   productId         String  @map("product_id") @db.Uuid
+  variationId       String? @map("variation_id")
   quantity          Int
   unitPriceSnapshot Decimal @map("unit_price_snapshot")
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 
+  @@unique([cartId, productId, variationId])
   @@index([cartId])
   @@index([productId])
   @@map("cart_items")
 }
 
 model Order {
-  id                  String      @id @default(uuid()) @db.Uuid
-  orderNumber         String      @unique @map("order_number")
-  invoiceNumber       String?     @map("invoice_number")
-  customerId          String?     @map("customer_id") @db.Uuid
-  status              OrderStatus
-  subtotal            Decimal
-  discountTotal       Decimal     @map("discount_total")
-  taxTotal            Decimal     @map("tax_total")
-  shippingTotal       Decimal     @map("shipping_total")
-  grandTotal          Decimal     @map("grand_total")
-  shippingLabelStatus String?     @default("pending") @map("shipping_label_status")
-  currency            String      @default("INR")
-  placedAt            DateTime?   @map("placed_at")
-  updatedAt           DateTime    @updatedAt @map("updated_at")
-  createdAt           DateTime    @default(now()) @map("created_at")
+  id                   String      @id @default(uuid()) @db.Uuid
+  orderNumber          String      @unique @map("order_number")
+  invoiceNumber        String?     @map("invoice_number")
+  customerId           String?     @map("customer_id") @db.Uuid
+  status               OrderStatus
+  subtotal             Decimal
+  discountTotal        Decimal     @map("discount_total")
+  taxTotal             Decimal     @map("tax_total")
+  shippingTotal        Decimal     @map("shipping_total")
+  grandTotal           Decimal     @map("grand_total")
+  shippingLabelStatus  String?     @default("pending") @map("shipping_label_status")
+  couponCode           String?     @map("coupon_code")
+  email                String?
+  currency             String      @default("INR")
+  trackingUrl          String?     @map("tracking_url")
+  trackingNumber       String?     @map("tracking_number")
+  shippingTemplateName String?     @map("shipping_template_name")
+  shippingCarrier      String?     @map("shipping_carrier")
+  shippingSnapshot     Json?       @map("shipping_snapshot")
+  placedAt             DateTime?   @map("placed_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+  createdAt            DateTime    @default(now()) @map("created_at")
 
   customer      User?                @relation(fields: [customerId], references: [id])
   items         OrderItem[]
@@ -203,6 +275,7 @@ model Order {
   addresses     OrderAddress[]
   payments      Payment[]
   notifications NotificationLog[]
+  reviews       Review[]
 
   @@index([customerId])
   @@index([status])
@@ -210,14 +283,16 @@ model Order {
 }
 
 model OrderItem {
-  id                String  @id @default(uuid()) @db.Uuid
-  orderId           String  @map("order_id") @db.Uuid
-  productId         String  @map("product_id") @db.Uuid
-  titleSnapshot     String  @map("title_snapshot")
-  skuSnapshot       String  @map("sku_snapshot")
-  unitPriceSnapshot Decimal @map("unit_price_snapshot")
-  quantity          Int
-  lineTotal         Decimal @map("line_total")
+  id                 String  @id @default(uuid()) @db.Uuid
+  orderId            String  @map("order_id") @db.Uuid
+  productId          String  @map("product_id") @db.Uuid
+  titleSnapshot      String  @map("title_snapshot")
+  skuSnapshot        String  @map("sku_snapshot")
+  unitPriceSnapshot  Decimal @map("unit_price_snapshot")
+  quantity           Int
+  lineTotal          Decimal @map("line_total")
+  variantId          String? @map("variant_id")
+  attributesSnapshot Json?   @map("attributes_snapshot")
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -228,16 +303,20 @@ model OrderItem {
 }
 
 model OrderStatusHistory {
-  id        String   @id @default(uuid()) @db.Uuid
-  orderId   String   @map("order_id") @db.Uuid
-  status    String
-  changedBy String   @map("changed_by")
-  changedAt DateTime @default(now()) @map("changed_at")
-  note      String?
+  id              String       @id @default(uuid()) @db.Uuid
+  orderId         String       @map("order_id") @db.Uuid
+  fromStatus      OrderStatus? @map("from_status")
+  toStatus        OrderStatus  @map("to_status")
+  changedById     String?      @map("changed_by_id") @db.Uuid
+  changedBySystem String?      @map("changed_by_system")
+  note            String?
+  changedAt       DateTime     @default(now()) @map("changed_at")
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order         Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedByUser User? @relation(fields: [changedById], references: [id])
 
   @@index([orderId])
+  @@index([toStatus])
   @@map("order_status_history")
 }
 
@@ -263,21 +342,20 @@ model OrderAddress {
 model Payment {
   id                String        @id @default(uuid()) @db.Uuid
   orderId           String        @map("order_id") @db.Uuid
-  razorpayOrderId   String        @map("razorpay_order_id")
+  order             Order         @relation(fields: [orderId], references: [id])
+  razorpayOrderId   String        @unique @map("razorpay_order_id")
   razorpayPaymentId String?       @map("razorpay_payment_id")
   razorpaySignature String?       @map("razorpay_signature")
-  status            PaymentStatus
+  status            PaymentStatus @default(CREATED)
   amount            Decimal
-  currency          String
+  currency          String        @default("INR")
   method            String?
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  order         Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
   webhookEvents PaymentWebhookEvent[]
 
   @@index([orderId])
-  @@index([razorpayOrderId])
   @@map("payments")
 }
 
@@ -291,7 +369,28 @@ model PaymentWebhookEvent {
   payment         Payment?             @relation(fields: [paymentId], references: [id])
   paymentId       String?              @db.Uuid
 
+  @@index([paymentId])
   @@map("payment_webhook_events")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  phone        String?
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(customer)
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  carts              Cart[]
+  orders             Order[]
+  addresses          Address[]
+  notifications      NotificationLog[]
+  orderStatusChanges OrderStatusHistory[]
+
+  @@map("users")
 }
 
 model Address {
@@ -315,22 +414,29 @@ model Address {
 }
 
 model EmailTemplate {
-  id              String @id @default(uuid()) @db.Uuid
-  key             String @unique
+  id              String   @id @default(uuid()) @db.Uuid
+  key             String   @unique
   subject         String
-  htmlBody        String @map("html_body")
-  variablesSchema Json   @map("variables_schema")
+  htmlBody        String   @map("html_body")
+  variablesSchema Json     @map("variables_schema")
+  heading         String?
+  intro           String?
+  footer          String?
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("email_templates")
 }
 
 model NotificationLog {
-  id          String             @id @default(uuid()) @db.Uuid
-  orderId     String?            @map("order_id") @db.Uuid
-  userId      String?            @map("user_id") @db.Uuid
-  templateKey String             @map("template_key")
-  sentAt      DateTime           @default(now()) @map("sent_at")
-  status      NotificationStatus
+  id             String             @id @default(uuid()) @db.Uuid
+  idempotencyKey String             @unique @map("idempotency_key")
+  orderId        String?            @map("order_id") @db.Uuid
+  userId         String?            @map("user_id") @db.Uuid
+  recipient      String?
+  templateKey    String             @map("template_key")
+  sentAt         DateTime           @default(now()) @map("sent_at")
+  status         NotificationStatus
+  error          String?
 
   order Order? @relation(fields: [orderId], references: [id])
   user  User?  @relation(fields: [userId], references: [id])
@@ -352,4 +458,82 @@ model ShippingSlab {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("shipping_slabs")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  userId      String   @map("user_id")
+  userRole    String   @map("user_role")
+  actionType  String   @map("action_type")
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  beforeValue Json?    @map("before_value")
+  afterValue  Json?    @map("after_value")
+  ipAddress   String?  @map("ip_address")
+
+  @@index([userId])
+  @@index([actionType])
+  @@index([timestamp])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model CompanyProfile {
+  id           String  @id @default(uuid()) @db.Uuid
+  legalName    String  @map("legal_name") @db.VarChar(255)
+  tradeName    String? @map("trade_name") @db.VarChar(255)
+  gstin        String  @db.VarChar(15)
+  pan          String? @db.VarChar(10)
+  cin          String? @db.VarChar(21)
+  phone        String  @db.VarChar(20)
+  email        String  @db.VarChar(120)
+  website      String? @db.VarChar(255)
+  logoUrl      String? @map("logo_url") @db.VarChar(500)
+  signatureUrl String? @map("signature_url") @db.VarChar(500)
+
+  addressLine1 String  @map("address_line1") @db.VarChar(255)
+  addressLine2 String? @map("address_line2") @db.VarChar(255)
+  city         String  @db.VarChar(100)
+  state        String  @db.VarChar(100)
+  stateCode    String  @map("state_code") @db.VarChar(5)
+  pincode      String  @db.VarChar(10)
+  country      String  @default("India") @db.VarChar(50)
+
+  bankName      String? @map("bank_name") @db.VarChar(150)
+  accountNumber String? @map("account_number") @db.VarChar(50)
+  accountHolder String? @map("account_holder") @db.VarChar(255)
+  accountType   String? @map("account_type") @db.VarChar(30)
+  ifscCode      String? @map("ifsc_code") @db.VarChar(20)
+  branchName    String? @map("branch_name") @db.VarChar(150)
+  upiId         String? @map("upi_id") @db.VarChar(100)
+
+  invoicePrefix   String  @default("INV-") @map("invoice_prefix") @db.VarChar(20)
+  invoiceNotes    String? @map("invoice_notes") @db.Text
+  termsConditions String? @map("terms_conditions") @db.Text
+
+  documents CompanyDocument[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("company_profiles")
+}
+
+model CompanyDocument {
+  id               String   @id @default(uuid()) @db.Uuid
+  companyProfileId String   @map("company_profile_id") @db.Uuid
+  title            String   @db.VarChar(255)
+  fileUrl          String   @map("file_url") @db.VarChar(500)
+  fileKey          String   @map("file_key") @db.VarChar(255)
+  fileName         String   @map("file_name") @db.VarChar(255)
+  fileSize         Int      @map("file_size")
+  mimeType         String   @map("mime_type") @db.VarChar(100)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  companyProfile CompanyProfile @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+
+  @@index([companyProfileId])
+  @@map("company_documents")
 }

@@ -4,8 +4,4 @@ export class RefreshTokenDto {
   @IsString()
   @IsNotEmpty()
   refreshToken!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  userId!: string;
 }

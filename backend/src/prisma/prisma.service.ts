@@ -21,8 +21,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     try {
       await this.$connect();
       this.logger.log('Prisma connected to PostgreSQL (ecom_db) successfully.');
+      await this.initializeSequences();
     } catch (err: any) {
-      this.logger.warn(`Prisma $connect failed: ${err.message}`);
+      this.logger.warn(`Prisma onModuleInit failed: ${err.message}`);
+    }
+  }
+
+  private async initializeSequences() {
+    try {
+      await this.$executeRawUnsafe(`
+        CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1000 INCREMENT BY 1;
+        CREATE SEQUENCE IF NOT EXISTS product_sku_seq START WITH 10001 INCREMENT BY 1;
+      `);
+    } catch (error) {
+      this.logger.error('Failed to initialize database sequences:', error);
     }
   }
 }

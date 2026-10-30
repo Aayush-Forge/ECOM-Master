@@ -8,21 +8,29 @@ import {
   IsBoolean,
   IsArray,
   IsDateString,
+  Min,
 } from 'class-validator';
-export enum ClubbingRuleType {
-  fixed_price_bundle = 'fixed_price_bundle',
-  percentage_off_bundle = 'percentage_off_bundle',
-}
+import { ClubbingRuleType } from '@prisma/client';
+export { ClubbingRuleType };
 
 export class CreateClubbingRuleDto {
   @IsString()
   @IsNotEmpty()
   name!: string;
 
+  @IsString()
+  @IsOptional()
+  code?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @IsEnum(ClubbingRuleType)
   type!: ClubbingRuleType;
 
   @IsInt()
+  @Min(1)
   requiredQuantity!: number;
 
   @IsNumber()
@@ -50,6 +58,12 @@ export class CreateClubbingRuleDto {
   @IsOptional()
   endsAt?: string;
 
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  usageLimit?: number;
+
   @IsBoolean()
-  isActive!: boolean;
+  @IsOptional()
+  isActive?: boolean;
 }

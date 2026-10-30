@@ -1,168 +1,1066 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import sanitizeHtml from 'sanitize-html';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { BACKEND_PRODUCTS_SEED, ProductItem } from './products.seed';
+import { PrismaService } from '../prisma/prisma.service';
+import { Prisma, ProductStatus, ProductType } from '@prisma/client';
+import { AuditLogsService } from '../audit/audit-logs.service';
+import { CacheService } from '../redis/cache.service.js';
+
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: ['b', 'strong', 'i', 'em', 'ul', 'ol', 'li', 'p', 'br'],
+  allowedAttributes: {},
+};
+
+export function sanitizeRichText(html?: string): string {
+  if (!html) return '';
+  return sanitizeHtml(html, SANITIZE_OPTIONS).trim();
+}
 
 @Injectable()
 export class ProductsService {
-  private readonly logger = new Logger(ProductsService.name);
+  constructor(
+    private readonly prismaService: PrismaService,
+    @Optional() private readonly cacheService?: CacheService,
+    @Optional() private readonly auditLogsService?: AuditLogsService,
+  ) {}
 
-  constructor(private readonly prisma: PrismaService) {}
+  async invalidateCache(slug?: string): Promise<void> {
+    if (this.cacheService) {
+      await this.cacheService.invalidatePattern('cache:products:*');
+    }
 
-  async findAll(query?: any): Promise<ProductItem[]> {
+    const storefrontUrl = process.env.STOREFRONT_INTERNAL_URL || process.env.STOREFRONT_URL || 'http://localhost:3000';
+    const secret = process.env.REVALIDATE_SECRET || 'sridattam-revalidate-secret-2026';
     try {
-      const dbProducts = await this.prisma.product.findMany({
-        include: { category: true },
-        orderBy: { createdAt: 'desc' },
+      await fetch(`${storefrontUrl}/api/revalidate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-revalidate-secret': secret,
+        },
+        body: JSON.stringify({ slug, tag: 'products' }),
       });
+    } catch {
+      // Best-effort non-blocking storefront ISR notification
+    }
+  }
 
-      if (dbProducts && dbProducts.length > 0) {
-        let mapped = dbProducts.map((p) => {
-          const imgs = Array.isArray(p.images)
-            ? p.images.map((img: any) =>
-                typeof img === 'string' ? { src: img } : img,
-              )
-            : [];
+  async create(createProductDto: CreateProductDto) {
+    const category = await this.prismaService.category.findUnique({
+      where: { id: createProductDto.categoryId },
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
 
-          return {
-            id: p.id,
-            name: p.title,
-            title: p.title,
-            slug: p.slug,
-            price: Number(p.salePrice || p.basePrice),
-            regular_price: Number(p.compareAtPrice || p.basePrice),
-            compareAt: Number(p.compareAtPrice || p.basePrice),
-            categories: p.category
-              ? [{ id: p.category.id, name: p.category.name, slug: p.category.slug }]
-              : [],
-            description: p.description,
-            short_description: p.shortDescription,
-            images: imgs.length > 0 ? imgs : [{ src: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=800&q=80' }],
-            stock_status: p.stockQuantity > 0 ? 'instock' : 'outofstock',
-            weight: p.weight ? String(p.weight) : '0.25',
-            featured: true,
-            average_rating: '4.9',
-            rating_count: 20,
-          };
+    const isVariable = createProductDto.productType === ProductType.variable;
+
+    if (!isVariable) {
+      if (createProductDto.basePrice === undefined || createProductDto.basePrice === null) {
+        throw new BadRequestException('basePrice is required for simple products');
+      }
+    }
+
+    const result = await this.prismaService.$transaction(async (tx) => {
+      // Transaction-level guard against concurrent duplicate SKU creations
+      await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext('product_sku_lock'));`);
+
+      const parentSku = createProductDto.sku?.trim()
+        ? createProductDto.sku.trim().toUpperCase()
+        : await this.generateSku();
+
+      // Check parent SKU uniqueness vs Product.sku
+      const existingParent = await tx.product.findUnique({
+        where: { sku: parentSku },
+      });
+      if (existingParent) {
+        throw new ConflictException(`Product SKU "${parentSku}" already exists`);
+      }
+
+      // Check parent SKU uniqueness vs any existing variation SKU in DB
+      const parentVarConflict = await tx.$queryRawUnsafe<any[]>(
+        `SELECT id FROM products WHERE variations @> $1::jsonb LIMIT 1`,
+        JSON.stringify([{ sku: parentSku }]),
+      );
+      if (parentVarConflict && parentVarConflict.length > 0) {
+        throw new ConflictException(`Product SKU "${parentSku}" conflicts with an existing variation SKU`);
+      }
+
+      let variationsData: any[] | null = null;
+      let attributesData: any[] | null = null;
+      let finalBasePrice = createProductDto.basePrice ?? 0;
+      let finalStockQuantity = createProductDto.stockQuantity ?? 0;
+
+      if (isVariable) {
+        if (!createProductDto.variations || createProductDto.variations.length === 0) {
+          throw new BadRequestException('Variable product must have at least one variation');
+        }
+        if (!createProductDto.attributes || createProductDto.attributes.length === 0) {
+          throw new BadRequestException('Variable product must declare attributes');
+        }
+
+        this.validateVariableAttributesAndCombinations(createProductDto.attributes, createProductDto.variations);
+
+        // Process variations
+        const processedVariations: any[] = [];
+        let maxSuffix = 0;
+
+        // First pass: identify max numeric suffix among provided SKUs matching parentSku-XX
+        for (const v of createProductDto.variations) {
+          if (v.sku && v.sku.trim()) {
+            const match = v.sku.trim().toUpperCase().match(new RegExp(`^${parentSku}-(\\d+)$`));
+            if (match) {
+              const suffixNum = parseInt(match[1], 10);
+              if (!isNaN(suffixNum) && suffixNum > maxSuffix) {
+                maxSuffix = suffixNum;
+              }
+            }
+          }
+        }
+
+        // Second pass: assign server-side UUID, generate blank SKUs, format
+        for (const v of createProductDto.variations) {
+          const variantId = randomUUID();
+          let variantSku: string;
+
+          if (v.sku && v.sku.trim()) {
+            variantSku = v.sku.trim().toUpperCase();
+          } else {
+            maxSuffix += 1;
+            variantSku = await this.generateSku(parentSku, maxSuffix);
+          }
+
+          const regPrice = Number(v.regularPrice);
+          const salePrice = v.salePrice !== undefined && v.salePrice !== null ? Number(v.salePrice) : null;
+          const stock = v.stockQuantity !== undefined && v.stockQuantity !== null ? Number(v.stockQuantity) : 0;
+
+          processedVariations.push({
+            id: variantId,
+            sku: variantSku,
+            regularPrice: regPrice,
+            salePrice,
+            stockQuantity: stock,
+            weight: v.weight !== undefined && v.weight !== null ? Number(v.weight) : null,
+            length: v.length !== undefined && v.length !== null ? Number(v.length) : null,
+            width: v.width !== undefined && v.width !== null ? Number(v.width) : null,
+            height: v.height !== undefined && v.height !== null ? Number(v.height) : null,
+            image: v.image ?? null,
+            attributes: v.attributes.map((a) => ({
+              name: a.name.trim(),
+              option: a.option.trim(),
+            })),
+            isActive: true,
+          });
+        }
+
+        // Validate SKU uniqueness for all variations in this batch
+        await this.assertVariationSkuUniqueness(tx, parentSku, processedVariations);
+
+        // Recompute parent basePrice and stockQuantity from active variations
+        const effectivePrices = processedVariations.map((v) => {
+          return v.salePrice !== null && v.salePrice < v.regularPrice ? v.salePrice : v.regularPrice;
+        });
+        finalBasePrice = Math.min(...effectivePrices);
+        finalStockQuantity = processedVariations.reduce((sum, v) => sum + (v.stockQuantity || 0), 0);
+
+        variationsData = processedVariations;
+        attributesData = createProductDto.attributes;
+      }
+
+      try {
+        const created = await tx.product.create({
+          data: {
+            sku: parentSku,
+            title: createProductDto.title,
+            slug: createProductDto.slug,
+            description: createProductDto.description
+              ? sanitizeRichText(createProductDto.description)
+              : '',
+            shortDescription: createProductDto.shortDescription
+              ? sanitizeRichText(createProductDto.shortDescription)
+              : '',
+            basePrice: finalBasePrice,
+            compareAtPrice: createProductDto.compareAtPrice,
+            salePrice: createProductDto.salePrice,
+            weight: createProductDto.weight,
+            length: createProductDto.length,
+            width: createProductDto.width,
+            height: createProductDto.height,
+            categoryId: createProductDto.categoryId,
+            shippingTemplateId: createProductDto.shippingTemplateId || null,
+            status: createProductDto.status ?? ProductStatus.draft,
+            images: createProductDto.images ?? [],
+            customFields: (createProductDto.customFields ?? {}) as Prisma.InputJsonValue,
+            stockQuantity: finalStockQuantity,
+            productType: createProductDto.productType ?? ProductType.simple,
+            attributes: attributesData ? (attributesData as Prisma.InputJsonValue) : Prisma.JsonNull,
+            variations: variationsData ? (variationsData as Prisma.InputJsonValue) : Prisma.JsonNull,
+            metaTitle: createProductDto.metaTitle ? sanitizeRichText(createProductDto.metaTitle) : null,
+            metaDescription: createProductDto.metaDescription ? sanitizeRichText(createProductDto.metaDescription) : null,
+            metaKeywords: createProductDto.metaKeywords ? sanitizeRichText(createProductDto.metaKeywords) : null,
+            version: 1,
+          },
         });
 
-        // Category filter
-        if (query?.category) {
-          const cat = String(query.category).toLowerCase();
-          mapped = mapped.filter((p) =>
-            p.categories.some((c: any) =>
-              typeof c === 'string'
-                ? c.toLowerCase() === cat
-                : c.slug?.toLowerCase() === cat || c.name?.toLowerCase() === cat,
-            ),
-          );
+        return this.transformProductResponse(created, true);
+      } catch (err: any) {
+        if (err instanceof ConflictException || err instanceof BadRequestException) {
+          throw err;
         }
-
-        // Search filter
-        if (query?.search) {
-          const term = String(query.search).toLowerCase();
-          mapped = mapped.filter(
-            (p) =>
-              p.name.toLowerCase().includes(term) ||
-              p.description.toLowerCase().includes(term),
-          );
+        if (err.code === 'P2002') {
+          throw new ConflictException('SKU or slug already exists');
         }
-
-        return mapped;
+        throw err;
       }
-    } catch (err: any) {
-      this.logger.warn(`Could not query database products: ${err.message}. Returning seed products.`);
-    }
-
-    // Fallback to rich seed products catalog
-    let list = [...BACKEND_PRODUCTS_SEED];
-
-    if (query?.category) {
-      const cat = String(query.category).toLowerCase();
-      list = list.filter((p) =>
-        p.categories.some((c: any) =>
-          typeof c === 'string'
-            ? c.toLowerCase() === cat
-            : c.slug?.toLowerCase() === cat,
-        ),
-      );
-    }
-
-    if (query?.search) {
-      const term = String(query.search).toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          p.description.toLowerCase().includes(term),
-      );
-    }
-
-    if (query?.limit) {
-      const limit = parseInt(query.limit, 10);
-      if (!isNaN(limit) && limit > 0) {
-        list = list.slice(0, limit);
-      }
-    }
-
-    return list;
+    });
+    await this.invalidateCache(result?.slug);
+    return result;
   }
 
-  async findOne(idOrSlug: string): Promise<ProductItem> {
-    try {
-      const dbProduct = await this.prisma.product.findFirst({
-        where: {
-          OR: [{ id: idOrSlug }, { slug: idOrSlug }],
-        },
-        include: { category: true },
+  async update(
+    id: string,
+    updateProductDto: UpdateProductDto,
+    currentUser?: { userId?: string; role?: string },
+  ) {
+    if (updateProductDto.categoryId) {
+      const category = await this.prismaService.category.findUnique({
+        where: { id: updateProductDto.categoryId },
       });
-
-      if (dbProduct) {
-        const imgs = Array.isArray(dbProduct.images)
-          ? dbProduct.images.map((img: any) =>
-              typeof img === 'string' ? { src: img } : img,
-            )
-          : [];
-
-        return {
-          id: dbProduct.id,
-          name: dbProduct.title,
-          title: dbProduct.title,
-          slug: dbProduct.slug,
-          price: Number(dbProduct.salePrice || dbProduct.basePrice),
-          regular_price: Number(dbProduct.compareAtPrice || dbProduct.basePrice),
-          compareAt: Number(dbProduct.compareAtPrice || dbProduct.basePrice),
-          categories: dbProduct.category
-            ? [{ id: dbProduct.category.id, name: dbProduct.category.name, slug: dbProduct.category.slug }]
-            : [],
-          description: dbProduct.description,
-          short_description: dbProduct.shortDescription,
-          images: imgs.length > 0 ? imgs : [{ src: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=800&q=80' }],
-          stock_status: dbProduct.stockQuantity > 0 ? 'instock' : 'outofstock',
-          weight: dbProduct.weight ? String(dbProduct.weight) : '0.25',
-          featured: true,
-          average_rating: '4.9',
-          rating_count: 20,
-        };
+      if (!category) {
+        throw new NotFoundException('Category not found');
       }
-    } catch {}
+    }
 
-    const seed = BACKEND_PRODUCTS_SEED.find(
-      (p) => p.id === idOrSlug || p.slug === idOrSlug,
-    );
-    if (!seed) throw new NotFoundException(`Product ${idOrSlug} not found`);
-    return seed;
+    const result = await this.prismaService.$transaction(async (tx) => {
+      // Transaction-level guard against concurrent SKU / update conflicts
+      await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext('product_sku_lock'));`);
+
+      const existing = await tx.product.findUnique({
+        where: { id },
+      });
+      if (!existing) {
+        throw new NotFoundException('Product not found');
+      }
+
+      const targetType = updateProductDto.productType ?? existing.productType;
+      const isVariable = targetType === ProductType.variable;
+
+      // Optimistic lock check: variable-product update requires version; mismatch -> 409
+      if (isVariable) {
+        if (updateProductDto.version === undefined) {
+          throw new ConflictException('Product version is required for variable product updates');
+        }
+        if (existing.version !== updateProductDto.version) {
+          throw new ConflictException(
+            `Product version mismatch. Current version: ${existing.version}, provided: ${updateProductDto.version}`,
+          );
+        }
+      }
+
+      const nextVersion = existing.version + 1;
+
+      const parentSku = updateProductDto.sku?.trim()
+        ? updateProductDto.sku.trim().toUpperCase()
+        : existing.sku;
+
+      // If parent SKU changed, check uniqueness
+      if (parentSku !== existing.sku) {
+        const skuConflict = await tx.product.findFirst({
+          where: { sku: parentSku, id: { not: id } },
+        });
+        if (skuConflict) {
+          throw new ConflictException(`Product SKU "${parentSku}" already exists`);
+        }
+        const parentVarConflict = await tx.$queryRawUnsafe<any[]>(
+          `SELECT id FROM products WHERE id != $1::uuid AND variations @> $2::jsonb LIMIT 1`,
+          id,
+          JSON.stringify([{ sku: parentSku }]),
+        );
+        if (parentVarConflict && parentVarConflict.length > 0) {
+          throw new ConflictException(`Product SKU "${parentSku}" conflicts with an existing variation SKU`);
+        }
+      }
+
+      let variationsData: any[] | null = existing.variations as any[];
+      let attributesData: any[] | null = existing.attributes as any[];
+      let finalBasePrice = updateProductDto.basePrice ?? existing.basePrice;
+      let finalStockQuantity = updateProductDto.stockQuantity ?? existing.stockQuantity;
+
+      if (isVariable) {
+        const incomingAttributes = updateProductDto.attributes ?? attributesData ?? [];
+        const incomingVariations = updateProductDto.variations;
+
+        if (incomingVariations !== undefined) {
+          if (incomingVariations.length === 0) {
+            throw new BadRequestException('Variable product must have at least one variation');
+          }
+          if (incomingAttributes.length === 0) {
+            throw new BadRequestException('Variable product must declare attributes');
+          }
+
+          this.validateVariableAttributesAndCombinations(incomingAttributes, incomingVariations);
+
+          const existingVariationsList = Array.isArray(existing.variations)
+            ? (existing.variations as any[])
+            : [];
+          const existingVariationsMap = new Map<string, any>(
+            existingVariationsList.map((v) => [v.id, v]),
+          );
+
+          // Find max suffix among existing variations and incoming variations
+          let maxSuffix = 0;
+          for (const ev of existingVariationsList) {
+            if (ev.sku) {
+              const match = ev.sku.toUpperCase().match(new RegExp(`^${parentSku}-(\\d+)$`));
+              if (match) {
+                const s = parseInt(match[1], 10);
+                if (!isNaN(s) && s > maxSuffix) maxSuffix = s;
+              }
+            }
+          }
+          for (const iv of incomingVariations) {
+            if (iv.sku && iv.sku.trim()) {
+              const match = iv.sku.trim().toUpperCase().match(new RegExp(`^${parentSku}-(\\d+)$`));
+              if (match) {
+                const s = parseInt(match[1], 10);
+                if (!isNaN(s) && s > maxSuffix) maxSuffix = s;
+              }
+            }
+          }
+
+          const processedActiveVariations: any[] = [];
+          const incomingIds = new Set<string>();
+
+          for (const iv of incomingVariations) {
+            let variantId: string;
+            let variantSku: string;
+
+            if (iv.id && existingVariationsMap.has(iv.id)) {
+              // Existing variation: preserve immutable ID
+              variantId = iv.id;
+              incomingIds.add(variantId);
+              const exVar = existingVariationsMap.get(variantId)!;
+
+              if (iv.sku && iv.sku.trim()) {
+                variantSku = iv.sku.trim().toUpperCase();
+              } else {
+                variantSku = exVar.sku; // Never regenerate existing SKU
+              }
+            } else {
+              // New variation: id = randomUUID
+              variantId = randomUUID();
+              if (iv.sku && iv.sku.trim()) {
+                variantSku = iv.sku.trim().toUpperCase();
+              } else {
+                maxSuffix += 1;
+                variantSku = await this.generateSku(parentSku, maxSuffix);
+              }
+            }
+
+            const regPrice = Number(iv.regularPrice);
+            const salePrice =
+              iv.salePrice !== undefined && iv.salePrice !== null ? Number(iv.salePrice) : null;
+            const stock =
+              iv.stockQuantity !== undefined && iv.stockQuantity !== null
+                ? Number(iv.stockQuantity)
+                : 0;
+
+            processedActiveVariations.push({
+              id: variantId,
+              sku: variantSku,
+              regularPrice: regPrice,
+              salePrice,
+              stockQuantity: stock,
+              weight: iv.weight !== undefined && iv.weight !== null ? Number(iv.weight) : null,
+              length: iv.length !== undefined && iv.length !== null ? Number(iv.length) : null,
+              width: iv.width !== undefined && iv.width !== null ? Number(iv.width) : null,
+              height: iv.height !== undefined && iv.height !== null ? Number(iv.height) : null,
+              image: iv.image ?? null,
+              attributes: iv.attributes.map((a) => ({
+                name: a.name.trim(),
+                option: a.option.trim(),
+              })),
+              isActive: iv.isActive !== undefined ? Boolean(iv.isActive) : true,
+            });
+          }
+
+          // Rule: Variations omitted from an update payload are set isActive=false, never deleted.
+          const inactiveOmittedVariations: any[] = [];
+          for (const exVar of existingVariationsList) {
+            if (!incomingIds.has(exVar.id)) {
+              inactiveOmittedVariations.push({
+                ...exVar,
+                isActive: false,
+              });
+            }
+          }
+
+          const allVariations = [...processedActiveVariations, ...inactiveOmittedVariations];
+
+          // Variable product must retain at least one active variation
+          const activeVariations = allVariations.filter((v: any) => v.isActive !== false);
+          if (activeVariations.length === 0) {
+            throw new BadRequestException('Variable product must have at least one active variation');
+          }
+
+          // Check SKU uniqueness across all active + inactive variations of this product
+          await this.assertVariationSkuUniqueness(tx, parentSku, allVariations, id);
+
+          // Recompute parent basePrice and stockQuantity from active variations only
+          const effectivePrices = activeVariations.map((v) => {
+            return v.salePrice !== null && v.salePrice < v.regularPrice
+              ? v.salePrice
+              : v.regularPrice;
+          });
+          finalBasePrice = Math.min(...effectivePrices);
+          finalStockQuantity = activeVariations.reduce(
+            (sum, v) => sum + (v.stockQuantity || 0),
+            0,
+          );
+
+          variationsData = allVariations;
+          attributesData = incomingAttributes;
+
+          // Audit log for variant sku/price/stock changes
+          if (this.auditLogsService) {
+            const beforeSnap = existingVariationsList.map((v) => ({
+              id: v.id,
+              sku: v.sku,
+              regularPrice: v.regularPrice,
+              salePrice: v.salePrice,
+              stockQuantity: v.stockQuantity,
+              isActive: v.isActive,
+            }));
+            const afterSnap = allVariations.map((v) => ({
+              id: v.id,
+              sku: v.sku,
+              regularPrice: v.regularPrice,
+              salePrice: v.salePrice,
+              stockQuantity: v.stockQuantity,
+              isActive: v.isActive,
+            }));
+
+            if (JSON.stringify(beforeSnap) !== JSON.stringify(afterSnap)) {
+              await this.auditLogsService.createLog({
+                userId: currentUser?.userId || 'system',
+                userRole: currentUser?.role || 'admin',
+                actionType: 'PRODUCT_VARIATION_UPDATE',
+                entityType: 'product',
+                entityId: id,
+                beforeValue: { variations: beforeSnap, version: existing.version },
+                afterValue: { variations: afterSnap, version: nextVersion },
+              });
+            }
+          }
+        }
+      }
+
+      if (!isVariable && this.auditLogsService) {
+        const priceChanged =
+          (updateProductDto.basePrice !== undefined && Number(updateProductDto.basePrice) !== Number(existing.basePrice)) ||
+          (updateProductDto.salePrice !== undefined && Number(updateProductDto.salePrice) !== Number(existing.salePrice));
+        const stockChanged =
+          updateProductDto.stockQuantity !== undefined && Number(updateProductDto.stockQuantity) !== existing.stockQuantity;
+
+        if (priceChanged || stockChanged) {
+          await this.auditLogsService.createLog({
+            userId: currentUser?.userId || 'system',
+            userRole: currentUser?.role || 'admin',
+            actionType:
+              priceChanged && stockChanged
+                ? 'PRODUCT_PRICE_STOCK_UPDATE'
+                : priceChanged
+                  ? 'PRODUCT_PRICE_UPDATE'
+                  : 'PRODUCT_STOCK_UPDATE',
+            entityType: 'product',
+            entityId: id,
+            beforeValue: {
+              basePrice: existing.basePrice,
+              salePrice: existing.salePrice,
+              stockQuantity: existing.stockQuantity,
+            },
+            afterValue: {
+              basePrice: finalBasePrice,
+              salePrice: updateProductDto.salePrice !== undefined ? updateProductDto.salePrice : existing.salePrice,
+              stockQuantity: finalStockQuantity,
+            },
+          });
+        }
+      }
+
+      const dataToUpdate: any = {
+        ...updateProductDto,
+        sku: parentSku,
+        version: nextVersion,
+        basePrice: finalBasePrice,
+        stockQuantity: finalStockQuantity,
+        productType: targetType,
+        attributes: attributesData ? (attributesData as Prisma.InputJsonValue) : undefined,
+        variations: variationsData ? (variationsData as Prisma.InputJsonValue) : undefined,
+      };
+
+      if (updateProductDto.description !== undefined) {
+        dataToUpdate.description = sanitizeRichText(updateProductDto.description);
+      }
+      if (updateProductDto.shortDescription !== undefined) {
+        dataToUpdate.shortDescription = sanitizeRichText(updateProductDto.shortDescription);
+      }
+      if (updateProductDto.customFields !== undefined) {
+        dataToUpdate.customFields = updateProductDto.customFields as Prisma.InputJsonValue;
+      }
+      if (updateProductDto.metaTitle !== undefined) {
+        dataToUpdate.metaTitle = updateProductDto.metaTitle ? sanitizeRichText(updateProductDto.metaTitle) : null;
+      }
+      if (updateProductDto.metaDescription !== undefined) {
+        dataToUpdate.metaDescription = updateProductDto.metaDescription ? sanitizeRichText(updateProductDto.metaDescription) : null;
+      }
+      if (updateProductDto.metaKeywords !== undefined) {
+        dataToUpdate.metaKeywords = updateProductDto.metaKeywords ? sanitizeRichText(updateProductDto.metaKeywords) : null;
+      }
+
+      try {
+        const updated = await tx.product.update({
+          where: { id },
+          data: dataToUpdate,
+        });
+
+        return this.transformProductResponse(updated, true);
+      } catch (err: any) {
+        if (err instanceof ConflictException || err instanceof BadRequestException) {
+          throw err;
+        }
+        if (err.code === 'P2002') {
+          throw new ConflictException('SKU or slug already exists');
+        }
+        throw err;
+      }
+    });
+    await this.invalidateCache(result?.slug);
+    return result;
   }
 
-  create(createProductDto: CreateProductDto) {
-    return { success: true, message: 'Product created successfully' };
+  async findAll(
+    page = 1,
+    perPage = 20,
+    isAdmin = false,
+    filters?: { search?: string; category?: string; status?: string },
+  ) {
+    const whereConditions: any[] = [];
+
+    if (!isAdmin) {
+      whereConditions.push({ status: ProductStatus.active });
+    } else if (filters?.status && filters.status !== 'all') {
+      const validStatuses = Object.values(ProductStatus);
+      if (validStatuses.includes(filters.status as ProductStatus)) {
+        whereConditions.push({ status: filters.status as ProductStatus });
+      }
+    } else {
+      whereConditions.push({ status: { not: ProductStatus.archived } });
+    }
+
+    if (filters?.category && filters.category !== 'all') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(filters.category);
+      if (isUuid) {
+        whereConditions.push({ categoryId: filters.category });
+      } else {
+        whereConditions.push({
+          category: {
+            OR: [
+              { slug: filters.category },
+              { name: { contains: filters.category, mode: 'insensitive' } },
+            ],
+          },
+        });
+      }
+    }
+
+    if (filters?.search && filters.search.trim()) {
+      const term = filters.search.trim();
+      whereConditions.push({
+        OR: [
+          { title: { contains: term, mode: 'insensitive' } },
+          { sku: { contains: term, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    const whereClause = whereConditions.length > 0 ? { AND: whereConditions } : {};
+
+    if (!isAdmin && this.cacheService) {
+      const cacheKey = `cache:products:list:p${page || 1}:l${perPage || 20}:s${filters?.search || ''}:c${filters?.category || ''}`;
+      return this.cacheService.getOrSet(cacheKey, 300, async () => {
+        const [data, total] = await this.prismaService.$transaction([
+          this.prismaService.product.findMany({
+            where: whereClause,
+            include: { category: true, shippingTemplate: true },
+            orderBy: { createdAt: 'desc' },
+            skip: ((page || 1) - 1) * (perPage || 20),
+            take: perPage || 20,
+          }),
+          this.prismaService.product.count({
+            where: whereClause,
+          }),
+        ]);
+        return {
+          data: data.map((p) => this.transformProductResponse(p, false)),
+          meta: { page: page || 1, per_page: perPage || 20, total },
+        };
+      });
+    }
+
+    const [data, total] = await this.prismaService.$transaction([
+      this.prismaService.product.findMany({
+        where: whereClause,
+        include: { category: true, shippingTemplate: true },
+        orderBy: { createdAt: 'desc' },
+        skip: ((page || 1) - 1) * (perPage || 20),
+        take: perPage || 20,
+      }),
+      this.prismaService.product.count({
+        where: whereClause,
+      }),
+    ]);
+    const mappedData = data.map((p) => this.transformProductResponse(p, isAdmin));
+    if (mappedData.length === 0 && !isAdmin && !filters?.search && !filters?.category) {
+      return {
+        data: BACKEND_PRODUCTS_SEED,
+        meta: { page: 1, per_page: perPage || 20, total: BACKEND_PRODUCTS_SEED.length },
+      };
+    }
+
+    return {
+      data: mappedData,
+      meta: { page: page || 1, per_page: perPage || 20, total },
+    };
   }
 
-  update(id: string, updateProductDto: UpdateProductDto) {
-    return { success: true, id, message: 'Product updated successfully' };
+  private async attachReviewStats(productId: string) {
+    const [reviewStats, approvedReviews] = await Promise.all([
+      this.prismaService.review.aggregate({
+        where: { productId },
+        _count: { id: true },
+        _avg: { stars: true },
+      }),
+      this.prismaService.review.findMany({
+        where: { productId },
+        select: {
+          id: true,
+          customerName: true,
+          stars: true,
+          description: true,
+          isVerifiedBuyer: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      ratingCount: reviewStats._count.id || 0,
+      averageRating: reviewStats._avg.stars ? Number(reviewStats._avg.stars.toFixed(2)) : 0,
+      reviews: approvedReviews,
+    };
   }
 
-  remove(id: string) {
-    return { success: true, id, message: 'Product removed successfully' };
+  async findOne(idOrSlug: string, isAdmin = false) {
+    if (!isAdmin && this.cacheService) {
+      const normalizedKey = idOrSlug.trim().toLowerCase();
+      const cacheKey = `cache:products:item:${normalizedKey}`;
+      return this.cacheService.getOrSet(cacheKey, 300, async () => {
+        const isUuid =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+        const baseWhere = isUuid
+          ? { OR: [{ id: idOrSlug }, { slug: idOrSlug }, { sku: idOrSlug }] }
+          : { OR: [{ slug: idOrSlug }, { sku: idOrSlug }] };
+
+        const where = { AND: [baseWhere, { status: ProductStatus.active }] };
+
+        const product = await this.prismaService.product.findFirst({
+          where,
+          include: { category: true, shippingTemplate: true },
+        });
+
+        if (!product) {
+          throw new NotFoundException('Product not found');
+        }
+
+        const reviewStats = await this.attachReviewStats(product.id);
+        const transformed = this.transformProductResponse(product, false);
+        return {
+          ...transformed,
+          ...reviewStats,
+        };
+      });
+    }
+
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+    const baseWhere = isUuid
+      ? { OR: [{ id: idOrSlug }, { slug: idOrSlug }, { sku: idOrSlug }] }
+      : { OR: [{ slug: idOrSlug }, { sku: idOrSlug }] };
+
+    const where = isAdmin
+      ? baseWhere
+      : { AND: [baseWhere, { status: ProductStatus.active }] };
+
+    const product = await this.prismaService.product.findFirst({
+      where,
+      include: { category: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const reviewStats = await this.attachReviewStats(product.id);
+    const transformed = this.transformProductResponse(product, isAdmin);
+    return {
+      ...transformed,
+      ...reviewStats,
+    };
+  }
+
+  async remove(id: string, currentUser?: { userId?: string; role?: string }) {
+    const existing = await this.prismaService.product.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException('Product not found');
+    }
+
+    let result;
+    try {
+      result = await this.prismaService.$transaction(async (tx) => {
+        // Clean up uncommitted cart items and bundle associations
+        await tx.cartItem.deleteMany({ where: { productId: id } });
+        await tx.clubbingRuleProduct.deleteMany({ where: { productId: id } });
+
+        // Check if product is part of historical order items
+        const orderItemCount = await tx.orderItem.count({ where: { productId: id } });
+        if (orderItemCount > 0) {
+          return tx.product.update({
+            where: { id },
+            data: { status: ProductStatus.archived },
+          });
+        }
+
+        return tx.product.delete({
+          where: { id },
+        });
+      });
+    } catch (error: any) {
+      console.error('Failed to hard delete product, soft-archiving:', error);
+      result = await this.prismaService.product.update({
+        where: { id },
+        data: { status: ProductStatus.archived },
+      });
+    }
+
+    if (this.auditLogsService) {
+      await this.auditLogsService.createLog({
+        userId: currentUser?.userId || 'system',
+        userRole: currentUser?.role || 'admin',
+        actionType: 'PRODUCT_DELETE',
+        entityType: 'product',
+        entityId: id,
+        beforeValue: {
+          id: existing.id,
+          title: existing.title,
+          sku: existing.sku,
+          status: existing.status,
+          basePrice: existing.basePrice,
+        },
+        afterValue: null,
+      });
+    }
+
+    await this.invalidateCache(result?.slug);
+    return result;
+  }
+
+  async generateSku(parentSku?: string, variantIndex?: number): Promise<string> {
+    if (parentSku && variantIndex !== undefined) {
+      const suffix = String(variantIndex).padStart(2, '0');
+      return `${parentSku}-${suffix}`;
+    }
+
+    try {
+      const result = await this.prismaService.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
+        `SELECT nextval('product_sku_seq') AS nextval`,
+      );
+      if (result?.[0]?.nextval != null) {
+        return `SME${result[0].nextval}`;
+      }
+    } catch {
+      try {
+        await this.prismaService.$executeRawUnsafe(
+          `CREATE SEQUENCE IF NOT EXISTS product_sku_seq START WITH 10001 INCREMENT BY 1;`,
+        );
+        const result = await this.prismaService.$queryRawUnsafe<{ nextval: string | number | bigint }[]>(
+          `SELECT nextval('product_sku_seq') AS nextval`,
+        );
+        if (result?.[0]?.nextval != null) {
+          return `SME${result[0].nextval}`;
+        }
+      } catch (retryError) {
+        console.error('Failed to generate sequence-based SKU:', retryError);
+      }
+    }
+
+    const count = await this.prismaService.product.count();
+    const fallbackNumber = 10001 + count;
+    return `SME${fallbackNumber}`;
+  }
+
+  async getNextSuggestedSku(): Promise<{ sku: string }> {
+    try {
+      const result = await this.prismaService.$queryRawUnsafe<{
+        last_value: string | number | bigint;
+        is_called: boolean;
+      }[]>(`SELECT last_value, is_called FROM product_sku_seq`);
+      if (result?.[0]) {
+        const nextVal = result[0].is_called
+          ? Number(result[0].last_value) + 1
+          : Number(result[0].last_value);
+        return { sku: `SME${nextVal}` };
+      }
+    } catch {
+      // Sequence might not be queried yet or uninitialized
+    }
+    const count = await this.prismaService.product.count();
+    return { sku: `SME${10001 + count}` };
+  }
+
+  transformProductResponse(product: any, isAdmin = false) {
+    if (!product) return null;
+
+    const isVariable = product.productType === ProductType.variable;
+    const rawVariations = Array.isArray(product.variations) ? (product.variations as any[]) : [];
+    const rawAttributes = Array.isArray(product.attributes) ? (product.attributes as any[]) : [];
+
+    const variationsToInclude = isAdmin
+      ? rawVariations
+      : rawVariations.filter((v: any) => v.isActive !== false);
+
+    const formattedAttributes = rawAttributes.map((attr: any, idx: number) => ({
+      id: attr.id ?? idx + 1,
+      name: attr.name,
+      slug: attr.slug || attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      options: Array.isArray(attr.options) ? attr.options : [],
+      variation: attr.variation !== undefined ? attr.variation : true,
+      visible: attr.visible !== undefined ? attr.visible : true,
+    }));
+
+    const formattedVariations = variationsToInclude.map((v: any) => {
+      const regPrice = Number(v.regularPrice);
+      const salePrice =
+        v.salePrice !== undefined && v.salePrice !== null ? Number(v.salePrice) : null;
+      const effectivePrice =
+        salePrice !== null && salePrice < regPrice ? salePrice : regPrice;
+      const stock = Number(v.stockQuantity) || 0;
+
+      return {
+        id: String(v.id),
+        sku: v.sku,
+        price: effectivePrice,
+        regular_price: regPrice,
+        sale_price: salePrice,
+        stock_status: stock > 0 ? 'instock' : 'outofstock',
+        stock_quantity: stock,
+        weight: v.weight !== undefined && v.weight !== null ? String(v.weight) : null,
+        length: v.length !== undefined && v.length !== null ? String(v.length) : null,
+        width: v.width !== undefined && v.width !== null ? String(v.width) : null,
+        height: v.height !== undefined && v.height !== null ? String(v.height) : null,
+        image: this.resolveImageObject(v.image),
+        attributes: Array.isArray(v.attributes)
+          ? v.attributes.map((a: any) => ({
+              name: a.name,
+              option: a.option,
+            }))
+          : [],
+        ...(isAdmin ? { isActive: v.isActive !== false } : {}),
+      };
+    });
+
+    const effectivePrice = Number(product.salePrice ?? product.basePrice);
+    const regularPrice = Number(product.compareAtPrice ?? product.basePrice);
+    const resolvedImages = Array.isArray(product.images) && product.images.length > 0
+      ? product.images.map((img: any) => typeof img === 'string' ? { src: this.formatImageUrl(img) } : img)
+      : [{ src: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=800&q=80' }];
+
+    const result: any = {
+      ...product,
+      name: product.title,
+      price: effectivePrice,
+      regular_price: regularPrice,
+      compareAt: regularPrice,
+      images: resolvedImages,
+      categories: product.category
+        ? [{ id: product.category.id, name: product.category.name, slug: product.category.slug }]
+        : [],
+      stock_status: product.stockQuantity > 0 ? 'instock' : 'outofstock',
+      type: product.productType ?? (isVariable ? 'variable' : 'simple'),
+      attributes: formattedAttributes,
+      variationsData: formattedVariations,
+    };
+
+    if (!isAdmin) {
+      delete result.variations;
+      delete result.version;
+    }
+
+    return result;
+  }
+
+  private resolveImageObject(image: any): { src: string } {
+    if (!image) return { src: '' };
+    if (typeof image === 'object' && image.src) {
+      return { src: this.formatImageUrl(image.src) };
+    }
+    if (typeof image === 'string') {
+      return { src: this.formatImageUrl(image) };
+    }
+    return { src: '' };
+  }
+
+  private formatImageUrl(urlOrKey: string): string {
+    if (!urlOrKey) return '';
+    if (
+      urlOrKey.startsWith('http://') ||
+      urlOrKey.startsWith('https://') ||
+      urlOrKey.startsWith('data:')
+    ) {
+      return urlOrKey;
+    }
+    const baseUrl = process.env.R2_PUBLIC_BASE_URL;
+    if (baseUrl) {
+      return `${baseUrl.replace(/\/+$/, '')}/${urlOrKey.replace(/^\/+/, '')}`;
+    }
+    return urlOrKey;
+  }
+
+  private validateVariableAttributesAndCombinations(attributes: any[], variations: any[]) {
+    const allowedAttrs = new Map<string, Set<string>>();
+    for (const attr of attributes || []) {
+      if (!attr.name || !Array.isArray(attr.options) || attr.options.length === 0) {
+        throw new BadRequestException(`Attribute "${attr.name || 'unnamed'}" must have options`);
+      }
+      allowedAttrs.set(
+        attr.name.toLowerCase().trim(),
+        new Set(attr.options.map((o: string) => String(o).toLowerCase().trim())),
+      );
+    }
+
+    const combinationSet = new Set<string>();
+
+    for (const v of variations) {
+      const reg = Number(v.regularPrice);
+      if (isNaN(reg) || reg <= 0) {
+        throw new BadRequestException('Variation regular price must be greater than 0');
+      }
+
+      if (v.salePrice !== undefined && v.salePrice !== null) {
+        const sale = Number(v.salePrice);
+        if (isNaN(sale) || sale >= reg || sale <= 0) {
+          throw new BadRequestException(
+            'Variation sale price must be lower than regular price and greater than 0',
+          );
+        }
+      }
+
+      if (v.stockQuantity !== undefined && v.stockQuantity !== null) {
+        const stock = Number(v.stockQuantity);
+        if (isNaN(stock) || stock < 0) {
+          throw new BadRequestException('Variation stock quantity must be 0 or more');
+        }
+      }
+
+      if (!Array.isArray(v.attributes) || v.attributes.length === 0) {
+        throw new BadRequestException('Each variation must have attributes');
+      }
+
+      for (const vAttr of v.attributes) {
+        const optSet = allowedAttrs.get(vAttr.name.toLowerCase().trim());
+        if (!optSet) {
+          throw new BadRequestException(
+            `Attribute "${vAttr.name}" in variation is not declared in product attributes`,
+          );
+        }
+        if (!optSet.has(String(vAttr.option).toLowerCase().trim())) {
+          throw new BadRequestException(
+            `Option "${vAttr.option}" for attribute "${vAttr.name}" is not declared in product attribute options`,
+          );
+        }
+      }
+
+      const comboKey = [...v.attributes]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((a) => `${a.name.toLowerCase().trim()}:${a.option.toLowerCase().trim()}`)
+        .join('|');
+
+      if (combinationSet.has(comboKey)) {
+        throw new BadRequestException('Duplicate variation attribute combinations are not allowed');
+      }
+      combinationSet.add(comboKey);
+    }
+  }
+
+  private async assertVariationSkuUniqueness(
+    tx: Prisma.TransactionClient,
+    parentSku: string,
+    variations: any[],
+    currentProductId?: string,
+  ) {
+    const variantSkus = variations.map((v) => v.sku.toUpperCase());
+    const seen = new Set<string>();
+    for (const s of variantSkus) {
+      if (seen.has(s)) {
+        throw new ConflictException(`Duplicate variation SKU "${s}" within product`);
+      }
+      seen.add(s);
+    }
+
+    if (variantSkus.includes(parentSku.toUpperCase())) {
+      throw new ConflictException(`Variation SKU cannot match parent SKU "${parentSku}"`);
+    }
+
+    // Check vs any Product.sku in database
+    const productConflict = await tx.product.findFirst({
+      where: {
+        sku: { in: variantSkus },
+        id: currentProductId ? { not: currentProductId } : undefined,
+      },
+      select: { sku: true },
+    });
+    if (productConflict) {
+      throw new ConflictException(
+        `Variation SKU "${productConflict.sku}" conflicts with an existing product SKU`,
+      );
+    }
+
+    // Check vs any other product's variations using JSONB containment (backed by GIN index)
+    for (const vSku of variantSkus) {
+      const otherConflict = await tx.$queryRawUnsafe<{ id: string; sku: string }[]>(
+        `SELECT id, sku FROM products WHERE ($1::uuid IS NULL OR id != $1::uuid) AND variations @> $2::jsonb LIMIT 1`,
+        currentProductId || null,
+        JSON.stringify([{ sku: vSku }]),
+      );
+      if (otherConflict && otherConflict.length > 0) {
+        throw new ConflictException(
+          `Variation SKU "${vSku}" is already used by another product (ID: ${otherConflict[0].id})`,
+        );
+      }
+    }
   }
 }

@@ -1,40 +1,93 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { ClubbingService } from './clubbing.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ClubbingService, CartItemDiscountInput } from './clubbing.service';
 import { CreateClubbingRuleDto } from './dto/create-clubbing-rule.dto';
+import { UpdateClubbingRuleDto } from './dto/update-clubbing-rule.dto';
+import { BulkIdsDto, BulkStatusDto, CalculateDiscountDto } from './dto/clubbing-bulk.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
+import { AuditLog } from '../audit/decorators/audit-log.decorator';
+import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 
-@Public()
 @Controller(['clubbing-rules', 'clubbing'])
+@UseInterceptors(AuditLogInterceptor)
 export class ClubbingController {
   constructor(private readonly clubbingService: ClubbingService) {}
 
-  @Public()
   @Post()
-  createRule(@Body() dto: CreateClubbingRuleDto): Promise<any> {
+  @Public()
+  @AuditLog('clubbing_rule.create')
+  createRule(@Body() dto: CreateClubbingRuleDto) {
     return this.clubbingService.createRule(dto);
   }
 
-  @Public()
   @Get()
-  getAllRules(): Promise<any> {
+  @Public()
+  getAllRules() {
     return this.clubbingService.getAllRules();
   }
 
-  @Public()
   @Get('active')
-  getActiveRules(): Promise<any> {
+  @Public()
+  getActiveRules() {
     return this.clubbingService.getActiveRules();
   }
 
+  @Get(':id')
   @Public()
+  getRuleById(@Param('id') id: string) {
+    return this.clubbingService.getRuleById(id);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.EDITOR)
+  @AuditLog('clubbing_rule.update')
+  updateRule(@Param('id') id: string, @Body() dto: UpdateClubbingRuleDto) {
+    return this.clubbingService.updateRule(id, dto);
+  }
+
   @Delete(':id')
-  deleteRule(@Param('id') id: string): Promise<any> {
+  @Public()
+  @AuditLog('clubbing_rule.delete')
+  deleteRule(@Param('id') id: string) {
     return this.clubbingService.deleteRule(id);
   }
 
-  @Public()
+  @Post('bulk-delete')
+  @Roles(ROLES.EDITOR)
+  @AuditLog('clubbing_rule.bulk_delete')
+  bulkDelete(@Body() body: BulkIdsDto) {
+    return this.clubbingService.bulkDelete(body.ids || []);
+  }
+
+  @Post('bulk-status')
+  @Roles(ROLES.EDITOR)
+  @AuditLog('clubbing_rule.bulk_status')
+  bulkUpdateStatus(@Body() body: BulkStatusDto) {
+    return this.clubbingService.bulkUpdateStatus(body.ids || [], body.isActive);
+  }
+
   @Post('calculate')
-  calculateDiscount(@Body() cartData: { cartItems: { productId: string; quantity: number; price: number }[] }): Promise<any> {
-    return this.clubbingService.calculateCartDiscount(cartData.cartItems);
+  @Public()
+  async calculateDiscount(@Body() body: any) {
+    const cartItems = body.cartItems || [];
+    const result = await this.clubbingService.calculateCartDiscount(
+      cartItems,
+      body.couponCode,
+    );
+    return {
+      discountTotal: result.discountTotal,
+      appliedCouponCode: result.appliedCouponCode,
+      appliedRuleId: result.appliedRuleId,
+    };
   }
 }

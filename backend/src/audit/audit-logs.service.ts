@@ -1,5 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { AuditLogEntry, AuditLogFilterDto } from './audit-log.constants';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuditLogsService {
@@ -7,7 +8,7 @@ export class AuditLogsService {
   private inMemoryLogs: AuditLogEntry[] = [];
   private prismaClient: any = null;
 
-  constructor(@Optional() prisma?: any) {
+  constructor(@Optional() prisma?: PrismaService) {
     this.prismaClient = prisma || null;
   }
 
