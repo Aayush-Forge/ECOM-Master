@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getAllUsers, getAllUsersSync, updateUserRole, createUser } from '@/lib/api/users'
+import {
+  getAllUsers,
+  getAllUsersSync,
+  updateUserRole,
+  createUser,
+  resetUserPassword,
+} from '@/lib/api/users'
 import { useAuth } from '@/lib/auth-context'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -31,7 +37,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Shield, UserCog, FilterX, RefreshCw, UserPlus } from 'lucide-react'
+import {
+  Shield,
+  UserCog,
+  FilterX,
+  RefreshCw,
+  UserPlus,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+} from 'lucide-react'
 import { getRoleLabel, ROLES, hasRole } from '@/lib/roles'
 
 export default function AdminUsersPage() {
@@ -55,6 +72,14 @@ export default function AdminUsersPage() {
     role: 'editor',
   })
 
+  // Reset Password dialog state
+  const [resetTargetUser, setResetTargetUser] = useState(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [copied, setCopied] = useState(false)
+
   const fetchUsers = async () => {
     setLoading(true)
     setError(null)
@@ -72,7 +97,6 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchUsers()
   }, [])
-
 
   const handleOpenCreate = () => {
     setCreateForm({
@@ -127,6 +151,69 @@ export default function AdminUsersPage() {
     }
   }
 
+  const handleOpenResetPassword = (user) => {
+    setResetTargetUser(user)
+    setResetPassword('')
+    setConfirmPassword('')
+    setShowPassword(false)
+    setCopied(false)
+  }
+
+  const handleGenerateStrongPassword = () => {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*'
+    let generated = ''
+    for (let i = 0; i < 12; i++) {
+      generated += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setResetPassword(generated)
+    setConfirmPassword(generated)
+    setShowPassword(true)
+  }
+
+  const handleCopyPassword = async () => {
+    if (!resetPassword) return
+    try {
+      await navigator.clipboard.writeText(resetPassword)
+      setCopied(true)
+      toast.success('Password copied to clipboard')
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Failed to copy password')
+    }
+  }
+
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault()
+    if (!resetTargetUser) return
+
+    if (!resetPassword) {
+      toast.error('Please enter a new password')
+      return
+    }
+
+    if (resetPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long')
+      return
+    }
+
+    if (resetPassword !== confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+
+    setResetSubmitting(true)
+    try {
+      await resetUserPassword(resetTargetUser.id, resetPassword)
+      toast.success(`Password reset successfully for ${resetTargetUser.name}`)
+      setResetTargetUser(null)
+    } catch (err) {
+      console.error('Failed to reset password:', err)
+      toast.error(err.message || 'Failed to reset password')
+    } finally {
+      setResetSubmitting(false)
+    }
+  }
+
   const getRoleBadge = (role) => {
     switch (role?.toLowerCase()) {
       case 'admin':
@@ -163,7 +250,6 @@ export default function AdminUsersPage() {
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="editor">Editor Employee</SelectItem>
               <SelectItem value="read_only">Viewer Employee</SelectItem>
-              
             </SelectContent>
           </Select>
           {isAdmin && (
@@ -203,7 +289,7 @@ export default function AdminUsersPage() {
                 <TableHead className="font-semibold text-stone-700">Email</TableHead>
                 <TableHead className="font-semibold text-stone-700">Current Role</TableHead>
                 <TableHead className="font-semibold text-stone-700">Joined Date</TableHead>
-                <TableHead className="text-right font-semibold text-stone-700">Change Role</TableHead>
+                <TableHead className="text-right font-semibold text-stone-700">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-stone-100">
@@ -214,7 +300,7 @@ export default function AdminUsersPage() {
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-28 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-48 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : filteredUsers.length === 0 ? (
@@ -247,24 +333,38 @@ export default function AdminUsersPage() {
                       })}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Select
-                        value={user.role}
-                        onValueChange={(newRole) => {
-                          if (newRole !== user.role) {
-                            setRoleChangeTarget({ user, currentRole: user.role, newRole })
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-[155px] ml-auto h-8 text-xs bg-white border-stone-200">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white">
-                          
-                          <SelectItem value="read_only">Viewer Employee</SelectItem>
-                          <SelectItem value="editor">Editor Employee</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center justify-end gap-2">
+                        <Select
+                          value={user.role}
+                          onValueChange={(newRole) => {
+                            if (newRole !== user.role) {
+                              setRoleChangeTarget({ user, currentRole: user.role, newRole })
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-[150px] h-8 text-xs bg-white border-stone-200">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="read_only">Viewer Employee</SelectItem>
+                            <SelectItem value="editor">Editor Employee</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenResetPassword(user)}
+                            className="h-8 px-2.5 text-xs text-stone-700 hover:text-stone-900 border-stone-200 hover:bg-stone-50"
+                            title="Reset Password"
+                          >
+                            <KeyRound className="h-3.5 w-3.5 mr-1 text-stone-500" />
+                            Reset Password
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -298,6 +398,113 @@ export default function AdminUsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={Boolean(resetTargetUser)} onOpenChange={(open) => !open && setResetTargetUser(null)}>
+        <DialogContent className="bg-white sm:max-w-md">
+          <form onSubmit={handleResetPasswordSubmit}>
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl text-stone-900 flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-saffron" />
+                Reset Password
+              </DialogTitle>
+              <DialogDescription className="font-inter text-stone-600">
+                Set a new password for{' '}
+                <span className="font-semibold text-stone-900">{resetTargetUser?.name}</span> ({resetTargetUser?.email}).
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4 font-inter">
+              <div className="flex items-center justify-between text-xs text-stone-600 bg-stone-50 p-2.5 rounded-md border border-stone-200">
+                <span>Account Role: {getRoleBadge(resetTargetUser?.role)}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleGenerateStrongPassword}
+                  className="h-7 px-2 text-xs text-[#FF6B00] hover:text-[#e05e00] hover:bg-[#FF6B00]/10 font-semibold"
+                >
+                  Generate Strong Password
+                </Button>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="reset-password" className="text-stone-700 font-medium text-sm">
+                    New Password <span className="text-red-500">*</span>
+                  </Label>
+                  {resetPassword && (
+                    <button
+                      type="button"
+                      onClick={handleCopyPassword}
+                      className="text-xs text-stone-500 hover:text-stone-800 flex items-center gap-1 font-medium"
+                    >
+                      {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <Input
+                    id="reset-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="At least 8 characters"
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    className="bg-white border-stone-200 pr-10"
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 focus:outline-hidden"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-password" className="text-stone-700 font-medium text-sm">
+                  Confirm New Password <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="confirm-password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Re-enter new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="bg-white border-stone-200"
+                  required
+                  minLength={8}
+                />
+                {confirmPassword && resetPassword !== confirmPassword && (
+                  <p className="text-xs text-red-500">Passwords do not match</p>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setResetTargetUser(null)}
+                disabled={resetSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-inter"
+                disabled={resetSubmitting || !resetPassword || resetPassword !== confirmPassword}
+              >
+                {resetSubmitting ? 'Updating...' : 'Update Password'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Staff / User Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -397,7 +604,6 @@ export default function AdminUsersPage() {
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="editor">Editor Employee</SelectItem>
                     <SelectItem value="read_only">Viewer Employee</SelectItem>
-                    
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-stone-400">

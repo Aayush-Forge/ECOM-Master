@@ -29,3 +29,10 @@ export class UpdateUserRoleDto {
   @IsNotEmpty()
   role!: UserRole;
 }
+
+export class ResetUserPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  password!: string;
+}

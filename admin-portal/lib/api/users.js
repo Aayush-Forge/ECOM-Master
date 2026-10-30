@@ -190,3 +190,42 @@ export async function createUser(data) {
   return normalizeUser(user);
 }
 
+/**
+ * Reset a staff or admin user's password.
+ * Requires admin role.
+ * @param {string} userId
+ * @param {string} newPassword
+ */
+export async function resetUserPassword(userId, newPassword) {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/admin/users/${userId}/password`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ password: newPassword }),
+  });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      headers = { ...headers, Authorization: `Bearer ${newToken}` };
+      res = await fetch(`${BACKEND_URL}/admin/users/${userId}/password`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ password: newPassword }),
+      });
+    }
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const message = Array.isArray(err.message)
+      ? err.message.join(', ')
+      : err.message ||
+        (res.status === 401
+          ? 'Session expired or unauthorized. Please sign in as an admin.'
+          : `Failed to reset password (${res.status})`);
+    throw new Error(message);
+  }
+
+  return await res.json();
+}

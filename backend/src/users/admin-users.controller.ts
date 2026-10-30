@@ -16,7 +16,11 @@ import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateStaffUserDto, UpdateUserRoleDto } from './dto/admin-users.dto';
+import {
+  CreateStaffUserDto,
+  ResetUserPasswordDto,
+  UpdateUserRoleDto,
+} from './dto/admin-users.dto';
 import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 import { AuditLog } from '../audit/decorators/audit-log.decorator';
 
@@ -32,11 +36,8 @@ const USER_SELECT_FIELDS = {
 
 /**
  * Admin-only Users Controller.
- * Provides endpoints for creating staff accounts and managing user roles.
+ * Provides endpoints for creating staff accounts, managing user roles, and resetting passwords.
  * Protected by @Roles(ADMIN) at the class level — only admin users can access.
- *
- * Note: Global JwtAuthGuard + RolesGuard are applied via APP_GUARD,
- * so no explicit @UseGuards() is needed.
  */
 @Controller('admin/users')
 @Roles(ROLES.ADMIN)
@@ -60,13 +61,10 @@ export class AdminUsersController {
 
   /**
    * POST /admin/users — Create a new user with any role.
-   * This is the only way to create admin/editor/read_only accounts.
    */
   @Post()
   @AuditLog('user.created')
-  async createUser(
-    @Body() body: CreateStaffUserDto,
-  ) {
+  async createUser(@Body() body: CreateStaffUserDto) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: body.email },
     });
@@ -124,5 +122,43 @@ export class AdminUsersController {
       data: { role: body.role as UserRole },
       select: USER_SELECT_FIELDS,
     });
+  }
+
+  /**
+   * PATCH /admin/users/:id/password — Reset a staff or admin user's password.
+   */
+  @Patch(':id/password')
+  @AuditLog('user.password_reset')
+  async resetUserPassword(
+    @Param('id') id: string,
+    @Body() body: ResetUserPasswordDto,
+    @Req() req: any,
+  ) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id },
+    });
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (req) {
+      req.beforeValue = {
+        id: existingUser.id,
+        email: existingUser.email,
+        role: existingUser.role,
+      };
+    }
+
+    const hashedPassword = await bcrypt.hash(body.password, 10);
+    await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash: hashedPassword },
+    });
+
+    return {
+      success: true,
+      message: 'Password reset successfully',
+      id: existingUser.id,
+    };
   }
 }
