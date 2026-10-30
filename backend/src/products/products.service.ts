@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, ProductStatus, ProductType } from '@prisma/client';
 import { AuditLogsService } from '../audit/audit-logs.service';
 import { CacheService } from '../redis/cache.service.js';
+import { BACKEND_PRODUCTS_SEED } from './products.seed';
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: ['b', 'strong', 'i', 'em', 'ul', 'ol', 'li', 'p', 'br'],

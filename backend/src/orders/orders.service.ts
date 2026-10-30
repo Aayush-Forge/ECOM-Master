@@ -4,6 +4,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, OrderStatus, ProductType } from '@prisma/client';
@@ -35,6 +36,10 @@ export class OrdersService {
     private readonly clubbingService: ClubbingService,
     private readonly pricingService: PricingService,
   ) {}
+
+  private get prisma(): PrismaService {
+    return this.prismaService;
+  }
 
   async createOrder(dto: CreateOrderDto, customerId?: string) {
     if (!dto.items || dto.items.length === 0) {
@@ -819,7 +824,7 @@ export class OrdersService {
       await tx.payment.updateMany({
         where: { orderId: resolvedOrderId },
         data: {
-          status: PaymentStatus.refunded,
+          status: PaymentStatus.REFUNDED,
         },
       });
 
@@ -827,8 +832,8 @@ export class OrdersService {
       await tx.orderStatusHistory.create({
         data: {
           orderId: resolvedOrderId,
-          status: OrderStatus.refunded,
-          changedBy: 'webhook:refund.processed',
+          fromStatus: order.status,
+          toStatus: OrderStatus.refunded,
           note: `Order automatically marked as refunded via webhook event ${eventId}`,
         },
       });

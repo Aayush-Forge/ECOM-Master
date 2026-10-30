@@ -62,7 +62,7 @@ export class ProductsController {
       },
     }),
   )
-  async uploadImage(@UploadedFile() file?: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file?: any) {
     if (!file || !file.buffer) {
       throw new BadRequestException('No image file provided.');
     }
@@ -152,7 +152,7 @@ export class ProductsController {
   @Roles(ROLES.EDITOR)
   @UseInterceptors(FileInterceptor('file'))
   async importCsv(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Body('updateExisting') updateExisting?: string,
   ) {
     if (!file || !file.buffer) {
