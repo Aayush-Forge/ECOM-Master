@@ -1,3 +1,4 @@
+import './instrument';
 import 'dotenv/config';
 import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';

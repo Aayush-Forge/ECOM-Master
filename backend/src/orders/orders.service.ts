@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { OrderStatus, ProductType } from '@prisma/client';
+import { Prisma, OrderStatus, ProductType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClubbingService } from '../clubbing/clubbing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -175,6 +175,9 @@ export class OrdersService {
           shippingTotal,
           grandTotal,
           couponCode: dto.couponCode || null,
+          shippingTemplateName: pricing.shippingTemplateName || null,
+          shippingCarrier: pricing.shippingCarrier || null,
+          shippingSnapshot: (pricing.shippingSnapshot as Prisma.InputJsonValue) || Prisma.JsonNull,
           items: {
             create: orderItemsData,
           },
@@ -244,6 +247,8 @@ export class OrdersService {
     search?: string,
     dateFrom?: string,
     dateTo?: string,
+    sortBy?: string,
+    sortOrder?: string,
   ) {
     const skip = (page - 1) * perPage;
     const where: any = {};
@@ -277,6 +282,14 @@ export class OrdersService {
       ];
     }
 
+    const direction: 'asc' | 'desc' = sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+    let orderBy: any = { createdAt: direction };
+    if (sortBy === 'grandTotal' || sortBy === 'total') {
+      orderBy = { grandTotal: direction };
+    } else if (sortBy === 'createdAt' || sortBy === 'date') {
+      orderBy = { createdAt: direction };
+    }
+
     const [data, total] = await Promise.all([
       this.prismaService.order.findMany({
         where,
@@ -300,7 +313,7 @@ export class OrdersService {
             orderBy: { changedAt: 'desc' },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: perPage,
       }),

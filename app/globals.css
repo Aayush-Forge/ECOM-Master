@@ -210,3 +210,56 @@
   animation: marquee 25s linear infinite;
 }
 
+
+@keyframes marquee-reviews {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee-reviews {
+  display: flex;
+  width: max-content;
+  animation: marquee-reviews 38s linear infinite;
+}
+
+.animate-marquee-reviews:hover {
+  animation-play-state: paused;
+}
+
+/* Rich text formatting inside product description and user content */
+.rich-text strong,
+.rich-text b {
+  font-weight: 700 !important;
+}
+
+.rich-text em,
+.rich-text i {
+  font-style: italic !important;
+}
+
+.rich-text u {
+  text-decoration: underline !important;
+}
+
+.rich-text ul {
+  list-style-type: disc !important;
+  padding-left: 1.25rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.rich-text ol {
+  list-style-type: decimal !important;
+  padding-left: 1.25rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.rich-text p {
+  margin-bottom: 0.5rem !important;
+}
+

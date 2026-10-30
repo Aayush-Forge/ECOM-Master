@@ -95,12 +95,14 @@ export default function ProductCard({ product, compact = false }) {
           {/* Price Block */}
           <div className="flex items-baseline justify-between flex-wrap gap-1.5">
             <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-lg text-saffron-600 font-bold">₹{price.toFixed(0)}</span>
-              {onSale && (
+              <span className="font-display text-lg text-saffron-600 font-bold">
+                {isVariable ? `From ₹${price.toFixed(0)}` : `₹${price.toFixed(0)}`}
+              </span>
+              {onSale && !isVariable && (
                 <span className="text-xs text-muted-foreground line-through">₹{regular.toFixed(0)}</span>
               )}
             </div>
-            {onSale && (
+            {onSale && !isVariable && (
               <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-sm">
                 Save ₹{(regular - price).toFixed(0)} ({Math.round(((regular - price) / regular) * 100)}%)
               </span>

@@ -7,7 +7,7 @@ import { getAdminCustomerByPhoneKey } from '@/lib/api/admin-customers'
 import OrderListView from '@/components/orders/order-list-view'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Mail, Phone, User, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, User, AlertCircle, ShoppingBag, IndianRupee } from 'lucide-react'
 
 export default function CustomerDetailPage() {
   const params = useParams()
@@ -101,8 +101,8 @@ export default function CustomerDetailPage() {
         </Link>
       </Button>
 
-      <div className="bg-white p-6 rounded-lg border border-stone-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white p-6 rounded-lg border border-stone-200 shadow-sm space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-[#FF6B00]" />
@@ -121,6 +121,28 @@ export default function CustomerDetailPage() {
                   {customer.email}
                 </span>
               )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="bg-stone-50 border border-stone-200 rounded-lg p-3.5 min-w-[130px]">
+              <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
+                <ShoppingBag className="w-3.5 h-3.5 text-[#FF6B00]" />
+                Total Orders
+              </div>
+              <div className="text-xl font-bold text-stone-900 mt-1 font-display">
+                {customer.totalOrders ?? 0}
+              </div>
+            </div>
+
+            <div className="bg-stone-50 border border-stone-200 rounded-lg p-3.5 min-w-[150px]">
+              <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
+                <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
+                Total Spent
+              </div>
+              <div className="text-xl font-bold text-stone-900 mt-1 font-mono">
+                ₹{Number(customer.totalSpent || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </div>
           </div>
         </div>

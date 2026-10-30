@@ -765,10 +765,30 @@ export function renderStatusDelivered(order: any, overrides?: EmailWordingOverri
     ? renderFooterHtml(footerText)
     : defaultFooterHtml;
 
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://sridattam.com').replace(/\/+$/, '');
+  const encodedEmail = encodeURIComponent(order.email || '');
+  const orderNumber = escapeHtml(order.orderNumber || '');
+
+  const reviewCtaHtml = `
+    <div style="margin: 24px 0 20px 0; padding: 20px 24px; background-color: #FDF4F6; border: 1px solid #FBCFE8; border-radius: 8px; text-align: center;">
+      <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #6B1024; font-family: 'Inter', -apple-system, sans-serif;">
+        How was your purchase?
+      </h3>
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: #4B5563; line-height: 1.5; font-family: 'Inter', -apple-system, sans-serif;">
+        Since your order has been safely delivered, we would love to hear your thoughts! Share your experience to help other devotees.
+      </p>
+      <a href="${frontendUrl}/products?review=1&email=${encodedEmail}&order=${orderNumber}#reviews"
+         style="display: inline-block; padding: 10px 20px; background-color: #6B1024; color: #FFFFFF; font-size: 13px; font-weight: 600; text-decoration: none; border-radius: 6px; font-family: 'Inter', -apple-system, sans-serif;">
+        ★ Write a Review
+      </a>
+    </div>
+  `;
+
   const bodyHtml = `
     <p style="margin: 0 0 12px 0; font-size: 15px; font-weight: 500; color: #0D0D0D;">${getCustomerGreeting(order)}</p>
     ${introHtml}
     ${renderProgressStripHtml('Delivered')}
+    ${reviewCtaHtml}
     ${renderItemsTableHtml(order.items)}
     ${renderTotalsHtml(order)}
     ${renderShippingAddressHtml(order)}

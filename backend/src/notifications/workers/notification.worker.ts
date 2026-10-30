@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Job, Worker } from 'bullmq';
+import * as Sentry from '@sentry/nestjs';
 import { NotificationProcessor } from '../notification-processor.js';
 import type { NotificationJob } from '../publishers/notification-publisher.interface.js';
 
@@ -46,6 +47,14 @@ export class NotificationWorker implements OnModuleInit, OnModuleDestroy {
           `[NotificationWorker] Job ${job?.id} failed with error: ${err.message}`,
           err.stack,
         );
+        Sentry.captureException(err, {
+          tags: { queue: 'notifications', jobId: job?.id },
+          extra: {
+            attemptsMade: job?.attemptsMade,
+            orderId: job?.data?.orderId,
+            templateKey: job?.data?.templateKey,
+          },
+        });
       });
 
       this.worker.on('error', (err) => {

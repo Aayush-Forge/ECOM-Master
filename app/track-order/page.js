@@ -16,7 +16,8 @@ import {
   MapPin,
   Calendar,
   RotateCcw,
-  Phone
+  Phone,
+  ExternalLink
 } from 'lucide-react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
@@ -328,15 +329,51 @@ function TrackOrderContent() {
                     })}
                   </div>
 
-                  {order.statusHistory?.[0]?.note && (
-                    <div className="mt-6 p-3.5 bg-stone-50 rounded-xl border border-stone-200/80 text-xs text-stone-700 flex items-start gap-2.5 max-w-xl mx-auto font-inter">
-                      <Truck className="w-4 h-4 text-[#FF6B00] shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-stone-900">Dispatch / Transit Note</p>
-                        <p className="text-stone-600 mt-0.5">{order.statusHistory[0].note}</p>
+                  {(() => {
+                    const latestNote = order.statusHistory?.[0]?.note || ''
+                    // Extract tracking info from note or order fields
+                    const trackingMatch = latestNote.match(/Tracking:\s*(https?:\/\/[^\s)]+)(?:\s*\(([^)]+)\))?/i)
+                    const trackingUrl = order.trackingUrl || trackingMatch?.[1] || null
+                    const trackingNumber = order.trackingNumber || trackingMatch?.[2] || null
+                    
+                    let cleanNote = latestNote
+                    if (trackingMatch) {
+                      cleanNote = cleanNote.replace(/\|?\s*Tracking:\s*https?:\/\/[^\s)]+(?:\s*\([^)]+\))?/i, '').trim()
+                      cleanNote = cleanNote.replace(/\|\s*$/, '').trim()
+                    }
+
+                    if (!cleanNote && !trackingUrl) return null
+
+                    return (
+                      <div className="mt-6 p-4 bg-stone-50 rounded-xl border border-stone-200/80 text-xs text-stone-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 max-w-xl mx-auto font-inter">
+                        <div className="flex items-start gap-2.5">
+                          <Truck className="w-4 h-4 text-[#FF6B00] shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-stone-900">Dispatch / Transit Note</p>
+                            {cleanNote && <p className="text-stone-600 mt-0.5">{cleanNote}</p>}
+                            {trackingNumber && (
+                              <p className="text-stone-500 font-mono text-[11px] mt-1">
+                                Tracking No: <span className="text-stone-800 font-semibold">{trackingNumber}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {trackingUrl && (
+                          <Button
+                            asChild
+                            size="sm"
+                            className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-medium text-xs shadow-xs shrink-0 self-start sm:self-center"
+                          >
+                            <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5">
+                              <span>Track Package</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </Button>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
               ) : (
                 /* Terminal Status Banner (Cancelled / Refunded) */

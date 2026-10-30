@@ -75,6 +75,18 @@ export class VariationDto {
   @IsOptional()
   weight?: number;
 
+  @IsNumber()
+  @IsOptional()
+  length?: number;
+
+  @IsNumber()
+  @IsOptional()
+  width?: number;
+
+  @IsNumber()
+  @IsOptional()
+  height?: number;
+
   @IsOptional()
   image?: string | { src: string };
 

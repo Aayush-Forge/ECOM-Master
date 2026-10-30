@@ -32,9 +32,24 @@ export class ProductsService {
     @Optional() private readonly auditLogsService?: AuditLogsService,
   ) {}
 
-  async invalidateCache(): Promise<void> {
+  async invalidateCache(slug?: string): Promise<void> {
     if (this.cacheService) {
       await this.cacheService.invalidatePattern('cache:products:*');
+    }
+
+    const storefrontUrl = process.env.STOREFRONT_INTERNAL_URL || process.env.STOREFRONT_URL || 'http://localhost:3000';
+    const secret = process.env.REVALIDATE_SECRET || 'sridattam-revalidate-secret-2026';
+    try {
+      await fetch(`${storefrontUrl}/api/revalidate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-revalidate-secret': secret,
+        },
+        body: JSON.stringify({ slug, tag: 'products' }),
+      });
+    } catch {
+      // Best-effort non-blocking storefront ISR notification
     }
   }
 
@@ -134,6 +149,9 @@ export class ProductsService {
             salePrice,
             stockQuantity: stock,
             weight: v.weight !== undefined && v.weight !== null ? Number(v.weight) : null,
+            length: v.length !== undefined && v.length !== null ? Number(v.length) : null,
+            width: v.width !== undefined && v.width !== null ? Number(v.width) : null,
+            height: v.height !== undefined && v.height !== null ? Number(v.height) : null,
             image: v.image ?? null,
             attributes: v.attributes.map((a) => ({
               name: a.name.trim(),
@@ -177,6 +195,7 @@ export class ProductsService {
             width: createProductDto.width,
             height: createProductDto.height,
             categoryId: createProductDto.categoryId,
+            shippingTemplateId: createProductDto.shippingTemplateId || null,
             status: createProductDto.status ?? ProductStatus.draft,
             images: createProductDto.images ?? [],
             customFields: (createProductDto.customFields ?? {}) as Prisma.InputJsonValue,
@@ -202,7 +221,7 @@ export class ProductsService {
         throw err;
       }
     });
-    await this.invalidateCache();
+    await this.invalidateCache(result?.slug);
     return result;
   }
 
@@ -361,6 +380,9 @@ export class ProductsService {
               salePrice,
               stockQuantity: stock,
               weight: iv.weight !== undefined && iv.weight !== null ? Number(iv.weight) : null,
+              length: iv.length !== undefined && iv.length !== null ? Number(iv.length) : null,
+              width: iv.width !== undefined && iv.width !== null ? Number(iv.width) : null,
+              height: iv.height !== undefined && iv.height !== null ? Number(iv.height) : null,
               image: iv.image ?? null,
               attributes: iv.attributes.map((a) => ({
                 name: a.name.trim(),
@@ -521,7 +543,7 @@ export class ProductsService {
         throw err;
       }
     });
-    await this.invalidateCache();
+    await this.invalidateCache(result?.slug);
     return result;
   }
 
@@ -578,7 +600,7 @@ export class ProductsService {
         const [data, total] = await this.prismaService.$transaction([
           this.prismaService.product.findMany({
             where: whereClause,
-            include: { category: true },
+            include: { category: true, shippingTemplate: true },
             orderBy: { createdAt: 'desc' },
             skip: ((page || 1) - 1) * (perPage || 20),
             take: perPage || 20,
@@ -597,7 +619,7 @@ export class ProductsService {
     const [data, total] = await this.prismaService.$transaction([
       this.prismaService.product.findMany({
         where: whereClause,
-        include: { category: true },
+        include: { category: true, shippingTemplate: true },
         orderBy: { createdAt: 'desc' },
         skip: ((page || 1) - 1) * (perPage || 20),
         take: perPage || 20,
@@ -609,6 +631,35 @@ export class ProductsService {
     return {
       data: data.map((p) => this.transformProductResponse(p, isAdmin)),
       meta: { page: page || 1, per_page: perPage || 20, total },
+    };
+  }
+
+  private async attachReviewStats(productId: string) {
+    const [reviewStats, approvedReviews] = await Promise.all([
+      this.prismaService.review.aggregate({
+        where: { productId },
+        _count: { id: true },
+        _avg: { stars: true },
+      }),
+      this.prismaService.review.findMany({
+        where: { productId },
+        select: {
+          id: true,
+          customerName: true,
+          stars: true,
+          description: true,
+          isVerifiedBuyer: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      ratingCount: reviewStats._count.id || 0,
+      averageRating: reviewStats._avg.stars ? Number(reviewStats._avg.stars.toFixed(2)) : 0,
+      reviews: approvedReviews,
     };
   }
 
@@ -628,14 +679,19 @@ export class ProductsService {
 
         const product = await this.prismaService.product.findFirst({
           where,
-          include: { category: true },
+          include: { category: true, shippingTemplate: true },
         });
 
         if (!product) {
           throw new NotFoundException('Product not found');
         }
 
-        return this.transformProductResponse(product, false);
+        const reviewStats = await this.attachReviewStats(product.id);
+        const transformed = this.transformProductResponse(product, false);
+        return {
+          ...transformed,
+          ...reviewStats,
+        };
       });
     }
 
@@ -659,7 +715,12 @@ export class ProductsService {
       throw new NotFoundException('Product not found');
     }
 
-    return this.transformProductResponse(product, isAdmin);
+    const reviewStats = await this.attachReviewStats(product.id);
+    const transformed = this.transformProductResponse(product, isAdmin);
+    return {
+      ...transformed,
+      ...reviewStats,
+    };
   }
 
   async remove(id: string, currentUser?: { userId?: string; role?: string }) {
@@ -716,7 +777,7 @@ export class ProductsService {
       });
     }
 
-    await this.invalidateCache();
+    await this.invalidateCache(result?.slug);
     return result;
   }
 
@@ -810,6 +871,9 @@ export class ProductsService {
         stock_status: stock > 0 ? 'instock' : 'outofstock',
         stock_quantity: stock,
         weight: v.weight !== undefined && v.weight !== null ? String(v.weight) : null,
+        length: v.length !== undefined && v.length !== null ? String(v.length) : null,
+        width: v.width !== undefined && v.width !== null ? String(v.width) : null,
+        height: v.height !== undefined && v.height !== null ? String(v.height) : null,
         image: this.resolveImageObject(v.image),
         attributes: Array.isArray(v.attributes)
           ? v.attributes.map((a: any) => ({

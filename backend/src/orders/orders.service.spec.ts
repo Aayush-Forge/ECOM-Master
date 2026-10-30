@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClubbingService } from '../clubbing/clubbing.service';
+import { ShippingService } from '../shipping/shipping.service';
 import { OrdersService } from './orders.service';
 import { PricingService } from '../pricing/pricing.service';
 
@@ -42,6 +43,17 @@ describe('OrdersService', () => {
           provide: ClubbingService,
           useValue: {
             calculateCartDiscount: jest.fn().mockResolvedValue({ discountTotal: 0 }),
+          },
+        },
+        {
+          provide: ShippingService,
+          useValue: {
+            calculateShipping: jest.fn().mockResolvedValue({
+              shippingTotal: 49,
+              shippingTemplateName: 'Standard Delivery',
+              shippingCarrier: 'Standard Delivery',
+              shippingSnapshot: { templates: [], totalShippingCharge: 49 },
+            }),
           },
         },
       ],

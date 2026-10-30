@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -110,6 +111,10 @@ export default function AdminCategoriesPage() {
   const [formName, setFormName] = useState('')
   const [formSlug, setFormSlug] = useState('')
   const [formParentId, setFormParentId] = useState('none')
+  const [formDescription, setFormDescription] = useState('')
+  const [formImage, setFormImage] = useState('')
+  const [formMetaTitle, setFormMetaTitle] = useState('')
+  const [formMetaDescription, setFormMetaDescription] = useState('')
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
 
@@ -157,6 +162,10 @@ export default function AdminCategoriesPage() {
     setFormName('')
     setFormSlug('')
     setFormParentId(presetParentId || 'none')
+    setFormDescription('')
+    setFormImage('')
+    setFormMetaTitle('')
+    setFormMetaDescription('')
     setSlugManuallyEdited(false)
     setIsCreateOpen(true)
   }
@@ -166,6 +175,10 @@ export default function AdminCategoriesPage() {
     setFormName(category.name)
     setFormSlug(category.slug)
     setFormParentId(category.parentId || 'none')
+    setFormDescription(category.description || '')
+    setFormImage(category.image || '')
+    setFormMetaTitle(category.metaTitle || '')
+    setFormMetaDescription(category.metaDescription || '')
     setSlugManuallyEdited(true)
     setIsEditOpen(true)
   }
@@ -195,6 +208,10 @@ export default function AdminCategoriesPage() {
         name: formName,
         slug: formSlug,
         parentId: formParentId === 'none' ? null : formParentId,
+        description: formDescription || null,
+        image: formImage || null,
+        metaTitle: formMetaTitle || null,
+        metaDescription: formMetaDescription || null,
       })
       toast.success(`Category "${formName}" created successfully`)
       setIsCreateOpen(false)
@@ -225,6 +242,10 @@ export default function AdminCategoriesPage() {
         name: formName,
         slug: formSlug,
         parentId: formParentId === 'none' ? null : formParentId,
+        description: formDescription || null,
+        image: formImage || null,
+        metaTitle: formMetaTitle || null,
+        metaDescription: formMetaDescription || null,
       })
       toast.success(`Category "${formName}" updated successfully`)
       setIsEditOpen(false)
@@ -519,7 +540,7 @@ export default function AdminCategoriesPage() {
 
       {/* Create Category Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="bg-white sm:max-w-md">
+        <DialogContent className="bg-white sm:max-w-md max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleCreateSubmit}>
             <DialogHeader>
               <DialogTitle className="font-display text-xl text-stone-900">
@@ -586,6 +607,67 @@ export default function AdminCategoriesPage() {
                   Leave as &quot;None&quot; for a root category.
                 </p>
               </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-desc" className="text-stone-700 font-medium">
+                  Description
+                </Label>
+                <Textarea
+                  id="create-desc"
+                  placeholder="Overview of this collection for customers and search engines..."
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="bg-white border-stone-200 text-xs min-h-[60px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-image" className="text-stone-700 font-medium">
+                  Category Banner Image URL
+                </Label>
+                <Input
+                  id="create-image"
+                  placeholder="https://..."
+                  value={formImage}
+                  onChange={(e) => setFormImage(e.target.value)}
+                  className="bg-white border-stone-200 text-xs"
+                />
+              </div>
+
+              <div className="border-t border-stone-200 pt-3 space-y-3">
+                <h4 className="text-xs font-semibold text-stone-600 uppercase tracking-wider">SEO Metadata</h4>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="create-meta-title" className="text-stone-700 font-medium text-xs">
+                      Meta Title
+                    </Label>
+                    <span className="text-[10px] font-mono text-stone-400">{formMetaTitle.length}/60</span>
+                  </div>
+                  <Input
+                    id="create-meta-title"
+                    placeholder="e.g. Incense Sticks | Handcrafted Fragrances"
+                    value={formMetaTitle}
+                    onChange={(e) => setFormMetaTitle(e.target.value)}
+                    className="bg-white border-stone-200 text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="create-meta-desc" className="text-stone-700 font-medium text-xs">
+                      Meta Description
+                    </Label>
+                    <span className="text-[10px] font-mono text-stone-400">{formMetaDescription.length}/160</span>
+                  </div>
+                  <Textarea
+                    id="create-meta-desc"
+                    placeholder="Search result summary..."
+                    value={formMetaDescription}
+                    onChange={(e) => setFormMetaDescription(e.target.value)}
+                    className="bg-white border-stone-200 text-xs min-h-[50px]"
+                  />
+                </div>
+              </div>
             </div>
 
             <DialogFooter>
@@ -611,7 +693,7 @@ export default function AdminCategoriesPage() {
 
       {/* Edit Category Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="bg-white sm:max-w-md">
+        <DialogContent className="bg-white sm:max-w-md max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleEditSubmit}>
             <DialogHeader>
               <DialogTitle className="font-display text-xl text-stone-900">
@@ -674,6 +756,67 @@ export default function AdminCategoriesPage() {
                 <p className="text-xs text-stone-400">
                   Cannot set parent to itself or its own subcategories.
                 </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-desc" className="text-stone-700 font-medium">
+                  Description
+                </Label>
+                <Textarea
+                  id="edit-desc"
+                  placeholder="Overview of this collection for customers and search engines..."
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="bg-white border-stone-200 text-xs min-h-[60px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-image" className="text-stone-700 font-medium">
+                  Category Banner Image URL
+                </Label>
+                <Input
+                  id="edit-image"
+                  placeholder="https://..."
+                  value={formImage}
+                  onChange={(e) => setFormImage(e.target.value)}
+                  className="bg-white border-stone-200 text-xs"
+                />
+              </div>
+
+              <div className="border-t border-stone-200 pt-3 space-y-3">
+                <h4 className="text-xs font-semibold text-stone-600 uppercase tracking-wider">SEO Metadata</h4>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="edit-meta-title" className="text-stone-700 font-medium text-xs">
+                      Meta Title
+                    </Label>
+                    <span className="text-[10px] font-mono text-stone-400">{formMetaTitle.length}/60</span>
+                  </div>
+                  <Input
+                    id="edit-meta-title"
+                    placeholder="e.g. Incense Sticks | Handcrafted Fragrances"
+                    value={formMetaTitle}
+                    onChange={(e) => setFormMetaTitle(e.target.value)}
+                    className="bg-white border-stone-200 text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="edit-meta-desc" className="text-stone-700 font-medium text-xs">
+                      Meta Description
+                    </Label>
+                    <span className="text-[10px] font-mono text-stone-400">{formMetaDescription.length}/160</span>
+                  </div>
+                  <Textarea
+                    id="edit-meta-desc"
+                    placeholder="Search result summary..."
+                    value={formMetaDescription}
+                    onChange={(e) => setFormMetaDescription(e.target.value)}
+                    className="bg-white border-stone-200 text-xs min-h-[50px]"
+                  />
+                </div>
               </div>
             </div>
 

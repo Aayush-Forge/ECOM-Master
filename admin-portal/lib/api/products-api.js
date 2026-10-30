@@ -9,7 +9,15 @@ const BACKEND_URL =
 function getAuthToken() {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem('auth_session');
+    let raw = localStorage.getItem('auth_session');
+    if (!raw) {
+      const match = document.cookie.match(/(?:^|;\s*)sd_auth_session=([^;]+)/);
+      if (match) {
+        try {
+          raw = decodeURIComponent(match[1]);
+        } catch {}
+      }
+    }
     if (!raw) return null;
     const session = JSON.parse(raw);
     return session.access_token || session.token || null;
@@ -25,6 +33,42 @@ function getAuthHeaders() {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
+}
+
+async function refreshAuthToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    let raw = localStorage.getItem('auth_session');
+    if (!raw) {
+      const match = document.cookie.match(/(?:^|;\s*)sd_auth_session=([^;]+)/);
+      if (match) {
+        try {
+          raw = decodeURIComponent(match[1]);
+        } catch {}
+      }
+    }
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session?.refreshToken && !session?.refresh_token) return null;
+    const refreshToken = session.refreshToken || session.refresh_token;
+
+    const res = await fetch(`${BACKEND_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.access_token) return null;
+
+    session.access_token = data.access_token;
+    localStorage.setItem('auth_session', JSON.stringify(session));
+    window.dispatchEvent(new Event('auth-change'));
+    return data.access_token;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeProduct(p) {
@@ -200,6 +244,7 @@ export async function createProduct(data) {
         ? [data.imageUrl]
         : [],
     status: data.status || 'active',
+    shippingTemplateId: data.shippingTemplateId || null,
     productType: isVariable ? 'variable' : 'simple',
     customFields: data.customFields || {},
     metaTitle: data.metaTitle ? data.metaTitle.trim() : undefined,
@@ -274,6 +319,7 @@ export async function updateProduct(id, data) {
   if (data.categoryId !== undefined) payload.categoryId = data.categoryId;
   else if (data.category !== undefined) payload.categoryId = data.category;
   if (data.status !== undefined) payload.status = data.status;
+  if (data.shippingTemplateId !== undefined) payload.shippingTemplateId = data.shippingTemplateId || null;
   if (data.images !== undefined) {
     payload.images = Array.isArray(data.images)
       ? data.images.filter((url) => Boolean(url && url.trim()))
@@ -391,13 +437,21 @@ export async function deleteProductImage(url) {
 }
 
 export async function exportProductsCsv() {
-  const token = getAuthToken();
-  const headers = {};
+  let token = getAuthToken();
+  let headers = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BACKEND_URL}/admin/products/export-csv`, {
+  let res = await fetch(`${BACKEND_URL}/admin/products/export-csv`, {
     headers,
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      headers['Authorization'] = `Bearer ${newToken}`;
+      res = await fetch(`${BACKEND_URL}/admin/products/export-csv`, { headers });
+    }
+  }
 
   if (!res.ok) {
     throw new Error(`Failed to export products (${res.status})`);
@@ -415,19 +469,31 @@ export async function exportProductsCsv() {
 }
 
 export async function importProductsCsv(file, updateExisting = true) {
-  const token = getAuthToken();
+  let token = getAuthToken();
   const formData = new FormData();
   formData.append('file', file);
   formData.append('updateExisting', String(updateExisting));
 
-  const headers = {};
+  let headers = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BACKEND_URL}/admin/products/import-csv`, {
+  let res = await fetch(`${BACKEND_URL}/admin/products/import-csv`, {
     method: 'POST',
     headers,
     body: formData,
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      headers['Authorization'] = `Bearer ${newToken}`;
+      res = await fetch(`${BACKEND_URL}/admin/products/import-csv`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+    }
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

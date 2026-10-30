@@ -45,7 +45,6 @@ function normalizeAuditLog(log) {
     entityLabel: log.entityLabel || `${log.entityType}: ${log.entityId}`,
     beforeValue: log.beforeValue,
     afterValue: log.afterValue,
-    ipAddress: log.ipAddress || '—',
   };
 }
 
@@ -93,8 +92,7 @@ export async function getAuditLogs(filters = {}) {
         log.entityId?.toLowerCase().includes(q) ||
         log.entityLabel?.toLowerCase().includes(q) ||
         log.userName?.toLowerCase().includes(q) ||
-        log.userEmail?.toLowerCase().includes(q) ||
-        log.ipAddress?.includes(q)
+        log.userEmail?.toLowerCase().includes(q)
     );
   }
 

@@ -5,6 +5,10 @@ import { Toaster } from '@/components/ui/sonner'
 export const metadata = {
   title: 'Sridattam Admin Portal',
   description: 'Management & Operations Portal for Sridattam',
+  robots: {
+    index: false,
+    follow: false,
+  },
 }
 
 export default function RootLayout({ children }) {

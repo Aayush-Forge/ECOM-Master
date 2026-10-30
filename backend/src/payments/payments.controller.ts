@@ -67,8 +67,10 @@ export class PaymentsController {
     @Query('status') status?: string,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
+    @Query('sort_by') sortBy?: string,
+    @Query('sort_order') sortOrder?: string,
   ) {
-    return this.paymentsService.getAllPayments(status, page, perPage);
+    return this.paymentsService.getAllPayments(status, page, perPage, sortBy, sortOrder);
   }
 
   @Get('admin/payments/order/:orderId')

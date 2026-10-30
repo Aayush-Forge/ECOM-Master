@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditLogsModule } from './audit/audit-logs.module';
@@ -20,12 +21,16 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { PricingModule } from './pricing/pricing.module';
 import { CartModule } from './cart/cart.module';
 import { CustomersModule } from './customers/customers.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { ShippingModule } from './shipping/shipping.module';
+import { CompanyProfileModule } from './company-profile/company-profile.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -50,10 +55,14 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AnalyticsModule,
     PricingModule,
     CartModule,
+    ReviewsModule,
+    ShippingModule,
+    CompanyProfileModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
     // Global guards: ALL endpoints require JWT auth + role check by default.
     // Endpoints must explicitly opt out via @Public() decorator.
     { provide: APP_GUARD, useClass: ThrottlerGuard },

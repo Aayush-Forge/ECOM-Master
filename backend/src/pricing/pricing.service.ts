@@ -6,6 +6,7 @@ import {
 import { ProductStatus, ProductType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClubbingService } from '../clubbing/clubbing.service';
+import { ShippingCalculationItem, ShippingService } from '../shipping/shipping.service';
 
 export interface PricingItemInput {
   productId: string;
@@ -44,6 +45,10 @@ export interface PricingCalculationResult {
   grandTotal: number;
   appliedCouponCode?: string | null;
   appliedRuleId?: string | null;
+  shippingTemplateName?: string | null;
+  shippingCarrier?: string | null;
+  shippingSnapshot?: any;
+  weightError?: string | null;
 }
 
 export interface PricingCalculationOptions {
@@ -56,6 +61,7 @@ export class PricingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly clubbingService: ClubbingService,
+    private readonly shippingService: ShippingService,
   ) {}
 
   async calculatePricing(
@@ -92,6 +98,7 @@ export class PricingService {
     let subtotal = 0;
     const discountInputItems: { productId: string; quantity: number; price: number }[] = [];
     const computedItems: ComputedPricingItem[] = [];
+    const shippingInputItems: ShippingCalculationItem[] = [];
 
     for (const item of items) {
       const issues: PricingIssue[] = [];
@@ -266,6 +273,21 @@ export class PricingService {
         product,
         variant: matchedVariant,
       });
+
+      const effectiveWeight = matchedVariant?.weight !== undefined && matchedVariant?.weight !== null
+        ? Number(matchedVariant.weight)
+        : product.weight !== null && product.weight !== undefined
+          ? Number(product.weight)
+          : null;
+
+      shippingInputItems.push({
+        productId: item.productId,
+        variationId: item.variationId || null,
+        quantity: item.quantity,
+        price: unitPrice,
+        weight: effectiveWeight,
+        shippingTemplateId: product.shippingTemplateId || null,
+      });
     }
 
     let discountTotal = 0;
@@ -287,7 +309,13 @@ export class PricingService {
       discountTotal = 0;
     }
 
-    const shippingTotal = subtotal >= 499 || subtotal === 0 ? 0 : 49;
+    const shippingRes = await this.shippingService.calculateShipping(
+      shippingInputItems,
+      subtotal,
+      { throwOnError },
+    );
+
+    const shippingTotal = shippingRes.shippingTotal;
     const taxTotal = 0;
     const grandTotal = Math.max(0, subtotal - discountTotal + shippingTotal);
 
@@ -300,6 +328,10 @@ export class PricingService {
       grandTotal,
       appliedCouponCode,
       appliedRuleId,
+      shippingTemplateName: shippingRes.shippingTemplateName || null,
+      shippingCarrier: shippingRes.shippingCarrier || null,
+      shippingSnapshot: shippingRes.shippingSnapshot || null,
+      weightError: shippingRes.weightError || null,
     };
   }
 }

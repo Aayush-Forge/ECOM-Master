@@ -35,7 +35,13 @@ export class CustomersController {
     this.checkAdmin(req);
     const page = query.page || 1;
     const perPage = query.perPage || query.per_page || 20;
-    return this.customersService.getCustomers(query.search, page, perPage);
+    return this.customersService.getCustomers(
+      query.search,
+      page,
+      perPage,
+      query.sortBy,
+      query.sortOrder,
+    );
   }
 
   @Get(':phoneKey')

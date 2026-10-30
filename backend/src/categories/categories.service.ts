@@ -17,10 +17,25 @@ export class CategoriesService {
     @Optional() private readonly cacheService?: CacheService,
   ) {}
 
-  async invalidateCache(): Promise<void> {
+  async invalidateCache(slug?: string): Promise<void> {
     if (this.cacheService) {
       await this.cacheService.invalidatePattern('cache:categories:*');
       await this.cacheService.invalidatePattern('cache:products:*');
+    }
+
+    const storefrontUrl = process.env.STOREFRONT_INTERNAL_URL || process.env.STOREFRONT_URL || 'http://localhost:3000';
+    const secret = process.env.REVALIDATE_SECRET || 'sridattam-revalidate-secret-2026';
+    try {
+      await fetch(`${storefrontUrl}/api/revalidate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-revalidate-secret': secret,
+        },
+        body: JSON.stringify({ tag: 'categories', path: slug ? `/categories/${slug}` : undefined }),
+      });
+    } catch {
+      // Best-effort non-blocking storefront ISR notification
     }
   }
 
@@ -40,9 +55,13 @@ export class CategoriesService {
           name: createCategoryDto.name,
           slug: createCategoryDto.slug,
           parentId: createCategoryDto.parentId,
+          description: createCategoryDto.description,
+          image: createCategoryDto.image,
+          metaTitle: createCategoryDto.metaTitle,
+          metaDescription: createCategoryDto.metaDescription,
         },
       });
-      await this.invalidateCache();
+      await this.invalidateCache(created.slug);
       return created;
     } catch (error: any) {
       if (error?.code === 'P2002') {
@@ -66,11 +85,12 @@ export class CategoriesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(idOrSlug: string) {
     if (this.cacheService) {
-      return this.cacheService.getOrSet(`cache:categories:item:${id}`, 300, async () => {
-        const category = await this.prismaService.category.findUnique({
-          where: { id },
+      return this.cacheService.getOrSet(`cache:categories:item:${idOrSlug}`, 300, async () => {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrSlug);
+        const category = await this.prismaService.category.findFirst({
+          where: isUuid ? { OR: [{ id: idOrSlug }, { slug: idOrSlug }] } : { slug: idOrSlug },
         });
         if (!category) {
           throw new NotFoundException('Category not found');
@@ -79,8 +99,9 @@ export class CategoriesService {
       });
     }
 
-    const category = await this.prismaService.category.findUnique({
-      where: { id },
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrSlug);
+    const category = await this.prismaService.category.findFirst({
+      where: isUuid ? { OR: [{ id: idOrSlug }, { slug: idOrSlug }] } : { slug: idOrSlug },
     });
 
     if (!category) {
@@ -133,9 +154,13 @@ export class CategoriesService {
           name: updateCategoryDto.name,
           slug: updateCategoryDto.slug,
           parentId: updateCategoryDto.parentId,
+          ...(updateCategoryDto.description !== undefined && { description: updateCategoryDto.description }),
+          ...(updateCategoryDto.image !== undefined && { image: updateCategoryDto.image }),
+          ...(updateCategoryDto.metaTitle !== undefined && { metaTitle: updateCategoryDto.metaTitle }),
+          ...(updateCategoryDto.metaDescription !== undefined && { metaDescription: updateCategoryDto.metaDescription }),
         },
       });
-      await this.invalidateCache();
+      await this.invalidateCache(updated.slug);
       return updated;
     } catch (error: any) {
       if (error?.code === 'P2025') {
@@ -153,7 +178,7 @@ export class CategoriesService {
       const deleted = await this.prismaService.category.delete({
         where: { id },
       });
-      await this.invalidateCache();
+      await this.invalidateCache(deleted.slug);
       return deleted;
     } catch (error: any) {
       if (error?.code === 'P2025') {

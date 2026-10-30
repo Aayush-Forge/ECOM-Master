@@ -72,6 +72,8 @@ export async function getAdminCustomers(filter = {}) {
   if (filter.perPage || filter.per_page) {
     query.set('perPage', filter.perPage || filter.per_page);
   }
+  if (filter.sortBy) query.set('sortBy', filter.sortBy);
+  if (filter.sortOrder) query.set('sortOrder', filter.sortOrder);
 
   const url = `${BACKEND_URL}/admin/customers${query.toString() ? `?${query.toString()}` : ''}`;
   let headers = getAuthHeaders();

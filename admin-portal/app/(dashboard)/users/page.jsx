@@ -142,6 +142,7 @@ export default function AdminUsersPage() {
   }
 
   const filteredUsers = users.filter((u) => {
+    if (u.role?.toLowerCase() === "customer") return false;
     if (roleFilter === 'all') return true
     return u.role?.toLowerCase() === roleFilter.toLowerCase()
   })
@@ -150,7 +151,7 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Users</h2>
+          <h2 className="text-2xl font-bold tracking-tight font-display text-stone-900">Staff and Admin</h2>
         </div>
         <div className="flex items-center gap-3">
           <Select value={roleFilter} onValueChange={setRoleFilter}>
@@ -162,7 +163,7 @@ export default function AdminUsersPage() {
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="editor">Editor Employee</SelectItem>
               <SelectItem value="read_only">Viewer Employee</SelectItem>
-              <SelectItem value="customer">Customer</SelectItem>
+              
             </SelectContent>
           </Select>
           {isAdmin && (
@@ -170,7 +171,7 @@ export default function AdminUsersPage() {
               onClick={handleOpenCreate}
               className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs"
             >
-              <UserPlus className="h-4 w-4 mr-2" /> Create User
+              <UserPlus className="h-4 w-4 mr-2" /> Add Staff Account
             </Button>
           )}
         </div>
@@ -258,7 +259,7 @@ export default function AdminUsersPage() {
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
                         <SelectContent className="bg-white">
-                          <SelectItem value="customer">Customer</SelectItem>
+                          
                           <SelectItem value="read_only">Viewer Employee</SelectItem>
                           <SelectItem value="editor">Editor Employee</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
@@ -396,7 +397,7 @@ export default function AdminUsersPage() {
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="editor">Editor Employee</SelectItem>
                     <SelectItem value="read_only">Viewer Employee</SelectItem>
-                    <SelectItem value="customer">Customer</SelectItem>
+                    
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-stone-400">

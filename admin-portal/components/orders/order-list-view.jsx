@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FilterX, RefreshCw, Search } from 'lucide-react'
+import { FilterX, RefreshCw, Search, ArrowUpDown } from 'lucide-react'
 
 export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn = getAllOrders, linkQuery = '' }) {
   const [orders, setOrders] = useState(() => getAllOrdersSync())
@@ -19,16 +19,33 @@ export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn 
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [sortOption, setSortOption] = useState('recent')
 
   const fetchOrders = async () => {
     setLoading(true)
     setError(null)
     try {
+      let sortBy = 'createdAt'
+      let sortOrder = 'desc'
+
+      if (sortOption === 'oldest') {
+        sortBy = 'createdAt'
+        sortOrder = 'asc'
+      } else if (sortOption === 'amount_high') {
+        sortBy = 'grandTotal'
+        sortOrder = 'desc'
+      } else if (sortOption === 'amount_low') {
+        sortBy = 'grandTotal'
+        sortOrder = 'asc'
+      }
+
       const data = await fetchFn({
         status: statusFilter,
         search: searchTerm.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        sortBy,
+        sortOrder,
       })
       const list = Array.isArray(data) ? data : data?.data || []
       setOrders(list)
@@ -55,7 +72,7 @@ export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn 
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('auth-change', handleAuth)
     }
-  }, [statusFilter, dateFrom, dateTo])
+  }, [statusFilter, dateFrom, dateTo, sortOption])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
@@ -130,6 +147,20 @@ export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn 
             className="w-36 bg-white border-stone-200 text-xs h-9"
             title="Date to"
           />
+          <Select value={sortOption} onValueChange={setSortOption}>
+            <SelectTrigger className="w-[170px] bg-white border-stone-200 text-xs h-9">
+              <div className="flex items-center gap-1.5 truncate">
+                <ArrowUpDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <SelectValue placeholder="Sort orders" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              <SelectItem value="recent">Recent to Old</SelectItem>
+              <SelectItem value="oldest">Old to Recent</SelectItem>
+              <SelectItem value="amount_high">Amount: High to Low</SelectItem>
+              <SelectItem value="amount_low">Amount: Low to High</SelectItem>
+            </SelectContent>
+          </Select>
           <Button onClick={fetchOrders} variant="outline" size="sm" className="h-9 px-3 border-stone-200">
             <RefreshCw className="w-3.5 h-3.5" />
           </Button>

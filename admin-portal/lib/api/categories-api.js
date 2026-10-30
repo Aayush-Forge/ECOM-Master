@@ -107,6 +107,18 @@ export async function createCategory(data) {
   if (data.parentId) {
     payload.parentId = data.parentId;
   }
+  if (data.description !== undefined) {
+    payload.description = data.description ? data.description.trim() : undefined;
+  }
+  if (data.image !== undefined) {
+    payload.image = data.image ? data.image.trim() : undefined;
+  }
+  if (data.metaTitle !== undefined) {
+    payload.metaTitle = data.metaTitle ? data.metaTitle.trim() : undefined;
+  }
+  if (data.metaDescription !== undefined) {
+    payload.metaDescription = data.metaDescription ? data.metaDescription.trim() : undefined;
+  }
 
   let headers = getAuthHeaders();
   let res = await fetch(`${BACKEND_URL}/admin/create-categories`, {
@@ -149,6 +161,18 @@ export async function updateCategory(id, data) {
   if (data.slug !== undefined) payload.slug = data.slug.trim();
   if (data.parentId !== undefined) {
     payload.parentId = data.parentId || undefined;
+  }
+  if (data.description !== undefined) {
+    payload.description = data.description ? data.description.trim() : null;
+  }
+  if (data.image !== undefined) {
+    payload.image = data.image ? data.image.trim() : null;
+  }
+  if (data.metaTitle !== undefined) {
+    payload.metaTitle = data.metaTitle ? data.metaTitle.trim() : null;
+  }
+  if (data.metaDescription !== undefined) {
+    payload.metaDescription = data.metaDescription ? data.metaDescription.trim() : null;
   }
 
   let headers = getAuthHeaders();

@@ -26,4 +26,12 @@ export class GetCustomersQueryDto {
   @Min(1)
   @Max(100)
   per_page?: number;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortOrder?: string;
 }

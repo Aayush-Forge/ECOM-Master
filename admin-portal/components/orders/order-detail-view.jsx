@@ -560,6 +560,22 @@ export default function OrderDetailView() {
                   {order.shippingAddress.line2 && <p>{order.shippingAddress.line2}</p>}
                   <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pincode}</p>
                   <p className="pt-2">{order.shippingAddress.phone}</p>
+                  {(order.shippingCarrier || order.shippingTemplateName) && (
+                    <div className="pt-2 mt-2 border-t border-stone-100 space-y-1 text-xs text-stone-600">
+                      {order.shippingCarrier && (
+                        <div className="flex justify-between">
+                          <span className="font-medium text-stone-500">Carrier:</span>
+                          <span className="font-medium text-stone-900">{order.shippingCarrier}</span>
+                        </div>
+                      )}
+                      {order.shippingTemplateName && (
+                        <div className="flex justify-between">
+                          <span className="font-medium text-stone-500">Shipping Template:</span>
+                          <span className="text-stone-800">{order.shippingTemplateName}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="text-muted-foreground">No shipping address provided.</p>

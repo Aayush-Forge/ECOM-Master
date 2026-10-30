@@ -69,7 +69,7 @@ describe('PaymentsController', () => {
 
     const result = await controller.getAllPayments('CAPTURED', 1, 20);
 
-    expect(paymentsService.getAllPayments).toHaveBeenCalledWith('CAPTURED', 1, 20);
+    expect(paymentsService.getAllPayments).toHaveBeenCalledWith('CAPTURED', 1, 20, undefined, undefined);
     expect(result).toEqual(mockList);
   });
 

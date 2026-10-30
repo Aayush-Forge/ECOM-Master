@@ -175,7 +175,7 @@ export default function Header() {
                             {categories.map(cat => (
                               <Link 
                                 key={cat.id}
-                                href={`/products?category=${cat.slug}`}
+                                href={`/categories/${cat.slug}`}
                                 onClick={() => setOpen(false)}
                                 className="block text-sm font-body tracking-[0.12em] text-midnight/70 hover:text-saffron-600 transition-colors"
                               >

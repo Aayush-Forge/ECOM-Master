@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
 import { isValidPhoneNumber } from 'libphonenumber-js'
-import { createOrder } from '@/lib/api/orders'
+import { createOrder, calculateCheckoutPricing } from '@/lib/api/orders'
 import { createPaymentSession, verifyPaymentSession } from '@/lib/api/payments'
 import { calculateCartDiscount, getAllDiscounts } from '@/lib/api/discounts'
 
@@ -88,6 +88,9 @@ function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponDiscount, setCouponDiscount] = useState(0)
   const [couponError, setCouponError] = useState('')
+  const [shippingCharge, setShippingCharge] = useState(0)
+  const [shippingCarrier, setShippingCarrier] = useState('')
+  const [shippingError, setShippingError] = useState('')
 
   const handlePincodeChange = async (e) => {
     const code = e.target.value.replace(/\D/g, '').slice(0, 6)
@@ -129,6 +132,8 @@ function CheckoutPage() {
     if (!displayItems || displayItems.length === 0) {
       setAutoDiscount(0)
       setCouponDiscount(0)
+      setShippingCharge(0)
+      setShippingError('')
       return
     }
 
@@ -145,6 +150,27 @@ function CheckoutPage() {
         }
       })
       .catch(() => {})
+
+    calculateCheckoutPricing(displayItems, activeCode)
+      .then(res => {
+        if (!active || !res) return
+        if (typeof res.shippingTotal === 'number') {
+          setShippingCharge(res.shippingTotal)
+        }
+        if (res.shippingCarrier) {
+          setShippingCarrier(res.shippingCarrier)
+        }
+        if (res.weightError) {
+          setShippingError(res.weightError)
+        } else {
+          setShippingError('')
+        }
+      })
+      .catch((err) => {
+        if (active && err.message && err.message.includes('weight limit')) {
+          setShippingError(err.message)
+        }
+      })
 
     return () => { active = false }
   }, [displayItems, appliedCoupon])
@@ -186,7 +212,6 @@ function CheckoutPage() {
     } catch {}
   }
 
-  const shippingCharge = (displaySubtotal >= 499 || displaySubtotal === 0) ? 0 : 49
   const totalDiscount = Math.min(displaySubtotal, appliedCoupon ? couponDiscount : autoDiscount)
   const finalTotal = Math.max(0, displaySubtotal - totalDiscount + shippingCharge)
 
@@ -201,6 +226,10 @@ function CheckoutPage() {
   }, [])
 
   const validate = () => {
+    if (shippingError) {
+      toast.error(shippingError)
+      return false
+    }
     const required = ['first_name', 'last_name', 'email', 'phone', 'address_1', 'city', 'state', 'postcode']
     for (const f of required) {
       if (!form[f]?.trim()) {
@@ -627,9 +656,14 @@ function CheckoutPage() {
                           </div>
                         )}
                         <div className="flex justify-between">
-                          <span>Shipping</span>
+                          <span>Shipping {shippingCarrier ? <span className="text-xs text-stone-500 font-normal">({shippingCarrier})</span> : ''}</span>
                           <span className="text-stone-800">{shippingCharge === 0 ? 'Free delivery' : `₹${shippingCharge.toFixed(0)}`}</span>
                         </div>
+                        {shippingError && (
+                          <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded mt-1">
+                            {shippingError}
+                          </div>
+                        )}
                         <div className="flex justify-between text-xl font-display text-maroon-500 pt-2 border-t border-stone-200 mt-2 font-bold">
                           <span>Total</span>
                           <span className="text-saffron-600">₹{finalTotal.toFixed(0)}</span>

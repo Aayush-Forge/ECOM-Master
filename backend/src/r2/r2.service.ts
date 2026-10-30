@@ -23,17 +23,10 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
+  'application/pdf',
 ]);
 
-/**
- * Maximum upload size in bytes.
- *
- * ⚠️  PLACEHOLDER — 5 MB is a reasonable default but has NOT been confirmed
- * as a business requirement.  Confirm the real limit with the team before
- * treating this as final.  Changing it is a one-line edit here plus a
- * corresponding update to any client-side validation.
- */
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /**
  * R2Service — domain-agnostic file storage layer backed by Cloudflare R2

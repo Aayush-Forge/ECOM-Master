@@ -50,6 +50,9 @@ export class AdminUsersController {
   @Get()
   async getAllUsers() {
     return this.prisma.user.findMany({
+      where: {
+        role: { not: UserRole.customer },
+      },
       select: USER_SELECT_FIELDS,
       orderBy: { createdAt: 'desc' },
     });

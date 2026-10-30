@@ -60,6 +60,8 @@ describe('CustomersService', () => {
           latest_name: 'Customer One',
           latest_phone: '+919238859999',
           latest_email: 'c1@example.com',
+          total_orders: 3,
+          total_spent: 1250.5,
           total_count: 2,
         },
         {
@@ -67,6 +69,8 @@ describe('CustomersService', () => {
           latest_name: 'Customer Two',
           latest_phone: '9876543210',
           latest_email: null,
+          total_orders: 1,
+          total_spent: 450,
           total_count: 2,
         },
       ]);
@@ -74,8 +78,22 @@ describe('CustomersService', () => {
       const result = await service.getCustomers(undefined, 1, 10);
 
       expect(result.data).toEqual([
-        { phoneKey: '9238859999', name: 'Customer One', phone: '+919238859999' },
-        { phoneKey: '9876543210', name: 'Customer Two', phone: '9876543210' },
+        {
+          phoneKey: '9238859999',
+          name: 'Customer One',
+          phone: '+919238859999',
+          email: 'c1@example.com',
+          totalOrders: 3,
+          totalSpent: 1250.5,
+        },
+        {
+          phoneKey: '9876543210',
+          name: 'Customer Two',
+          phone: '9876543210',
+          email: null,
+          totalOrders: 1,
+          totalSpent: 450,
+        },
       ]);
       expect(result.meta).toEqual({
         total: 2,
@@ -112,6 +130,8 @@ describe('CustomersService', () => {
             latest_name: 'Latest Name',
             latest_phone: '+919876543210',
             latest_email: 'cust@example.com',
+            total_orders: 2,
+            total_spent: 890,
             total_count: 1,
           },
         ])
@@ -132,6 +152,8 @@ describe('CustomersService', () => {
         name: 'Latest Name',
         phone: '+919876543210',
         email: 'cust@example.com',
+        totalOrders: 2,
+        totalSpent: 890,
       });
       expect(result.data).toHaveLength(2);
       expect(result.meta.total).toBe(2);

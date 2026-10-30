@@ -67,6 +67,10 @@ export class CreateProductDto {
   @IsUUID()
   categoryId!: string;
 
+  @IsUUID()
+  @IsOptional()
+  shippingTemplateId?: string;
+
   @IsEnum(ProductStatus)
   @IsOptional()
   status?: ProductStatus;

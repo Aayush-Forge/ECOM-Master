@@ -22,7 +22,6 @@ import {
   FilterX,
   RefreshCw,
   Eye,
-  Globe,
   FileCode,
 } from 'lucide-react'
 import { getRoleLabel } from '@/lib/roles'
@@ -172,7 +171,7 @@ export default function AdminAuditLogsPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
             <Input
-              placeholder="Search entity, action, IP..."
+              placeholder="Search entity, action, user..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 bg-white border-stone-200 text-sm h-9"
@@ -284,7 +283,6 @@ export default function AdminAuditLogsPage() {
                 <TableHead className="font-semibold text-stone-700">Role at Action</TableHead>
                 <TableHead className="font-semibold text-stone-700">Action Type</TableHead>
                 <TableHead className="font-semibold text-stone-700">Entity</TableHead>
-                <TableHead className="font-semibold text-stone-700">IP Address</TableHead>
                 <TableHead className="text-right font-semibold text-stone-700">Details</TableHead>
               </TableRow>
             </TableHeader>
@@ -297,13 +295,12 @@ export default function AdminAuditLogsPage() {
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-36 rounded-md" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : logs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-16 text-center text-stone-500">
+                  <TableCell colSpan={6} className="py-16 text-center text-stone-500">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <FilterX className="w-10 h-10 text-stone-400" />
                       <p className="font-medium text-stone-700 text-base">No audit log entries found.</p>
@@ -331,12 +328,6 @@ export default function AdminAuditLogsPage() {
                       <div className="flex flex-col">
                         <span className="font-medium text-stone-900 text-xs">{log.entityLabel || log.entityId}</span>
                         <span className="text-[11px] text-stone-400 font-mono">ID: {log.entityId}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5 text-stone-600 font-mono text-xs">
-                        <Globe className="w-3.5 h-3.5 text-stone-400" />
-                        {log.ipAddress || 'Internal'}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -376,7 +367,7 @@ export default function AdminAuditLogsPage() {
           {selectedLog && (
             <div className="space-y-5 pt-2 font-inter text-sm">
               {/* Metadata Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-50 p-3.5 rounded-lg border border-stone-200 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-stone-50 p-3.5 rounded-lg border border-stone-200 text-xs">
                 <div>
                   <span className="text-stone-500 block">User</span>
                   <span className="font-semibold text-stone-900">{selectedLog.userName || selectedLog.userId}</span>
@@ -384,10 +375,6 @@ export default function AdminAuditLogsPage() {
                 <div>
                   <span className="text-stone-500 block">Role at Action</span>
                   <div className="mt-0.5">{getRoleBadge(selectedLog.userRole)}</div>
-                </div>
-                <div>
-                  <span className="text-stone-500 block">IP Address</span>
-                  <span className="font-mono text-stone-900">{selectedLog.ipAddress || 'Internal'}</span>
                 </div>
                 <div>
                   <span className="text-stone-500 block">Timestamp</span>

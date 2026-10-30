@@ -33,6 +33,8 @@ export class OrdersController {
       query.search,
       query.dateFrom,
       query.dateTo,
+      query.sortBy,
+      query.sortOrder,
     );
   }
 

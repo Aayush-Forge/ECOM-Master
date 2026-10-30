@@ -8,19 +8,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FilterX, RefreshCw } from 'lucide-react'
+import { FilterX, RefreshCw, ArrowUpDown } from 'lucide-react'
 
 export function PaymentsListView({ basePath = '/orders', title = 'Payment Records' }) {
   const [payments, setPayments] = useState(() => getAllPaymentsSync())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [sortOption, setSortOption] = useState('recent')
 
   const fetchPayments = async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await getAllPayments({ status: statusFilter })
+      let sortBy = 'createdAt'
+      let sortOrder = 'desc'
+
+      if (sortOption === 'oldest') {
+        sortBy = 'createdAt'
+        sortOrder = 'asc'
+      } else if (sortOption === 'amount_high') {
+        sortBy = 'amount'
+        sortOrder = 'desc'
+      } else if (sortOption === 'amount_low') {
+        sortBy = 'amount'
+        sortOrder = 'asc'
+      }
+
+      const data = await getAllPayments({
+        status: statusFilter,
+        sortBy,
+        sortOrder,
+      })
       setPayments(data || [])
     } catch (err) {
       console.error('Failed to fetch payments:', err)
@@ -45,7 +64,7 @@ export function PaymentsListView({ basePath = '/orders', title = 'Payment Record
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('auth-change', handleAuth)
     }
-  }, [statusFilter])
+  }, [statusFilter, sortOption])
 
   const getPaymentStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -81,6 +100,20 @@ export function PaymentsListView({ basePath = '/orders', title = 'Payment Record
               <SelectItem value="created">Created (Pending)</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="refunded">Refunded</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortOption} onValueChange={setSortOption}>
+            <SelectTrigger className="w-[170px] bg-white border-stone-200 text-xs h-9">
+              <div className="flex items-center gap-1.5 truncate">
+                <ArrowUpDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <SelectValue placeholder="Sort payments" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              <SelectItem value="recent">Recent to Old</SelectItem>
+              <SelectItem value="oldest">Old to Recent</SelectItem>
+              <SelectItem value="amount_high">Amount: High to Low</SelectItem>
+              <SelectItem value="amount_low">Amount: Low to High</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={fetchPayments} variant="outline" size="sm" className="h-9 px-3 border-stone-200">

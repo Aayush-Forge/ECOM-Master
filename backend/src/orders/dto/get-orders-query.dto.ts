@@ -25,4 +25,12 @@ export class GetOrdersQueryDto {
   @IsOptional()
   @IsDateString({}, { message: 'dateTo must be a valid ISO date string' })
   dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortOrder?: string;
 }

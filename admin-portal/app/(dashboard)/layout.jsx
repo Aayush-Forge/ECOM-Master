@@ -31,11 +31,14 @@ import {
   Package,
   FolderTree,
   Tags,
+  Star,
   Users,
   ScrollText,
   Mail,
+  Truck,
   LogOut,
   Shield,
+  Building2,
   Loader2,
 } from 'lucide-react'
 
@@ -46,9 +49,13 @@ const ICON_MAP = {
   Package,
   FolderTree,
   Tags,
+  Star,
   Users,
   ScrollText,
   Mail,
+  Truck,
+  Shield,
+  Building2,
 }
 
 export default function DashboardLayout({ children }) {

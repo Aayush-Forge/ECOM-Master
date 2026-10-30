@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
+import { getAllShippingTemplates } from '@/lib/api/shipping'
 import {
   createProduct,
   updateProduct,
@@ -115,10 +116,13 @@ const productSchema = z
       )
       .optional()
       .or(z.literal('')),
+    metaTitle: z.string().trim().max(100, 'Meta title cannot exceed 100 characters.').optional().or(z.literal('')),
+    metaDescription: z.string().trim().max(250, 'Meta description cannot exceed 250 characters.').optional().or(z.literal('')),
     weight: optionalNumber('Weight', null),
     length: optionalNumber('Length', null),
     width: optionalNumber('Width', null),
     height: optionalNumber('Height', null),
+    shippingTemplateId: z.string().optional().nullable(),
     images: z
       .array(
         z.string().trim().refine(
@@ -153,6 +157,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
   const { user } = useAuth()
   const canEdit = hasRole(user, ROLES.EDITOR)
   const [categories, setCategories] = useState([])
+  const [shippingTemplates, setShippingTemplates] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(isEdit)
 
@@ -191,6 +196,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       stockQuantity: 50,
       status: 'active',
       category: '',
+      shippingTemplateId: 'default',
       shortDescription: '',
       description: '',
       weight: '',
@@ -198,13 +204,19 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       width: '',
       height: '',
       images: [],
+      metaTitle: '',
+      metaDescription: '',
     },
   })
 
   const loadData = async () => {
     try {
-      const cats = await getProductCategories()
+      const [cats, templates] = await Promise.all([
+        getProductCategories(),
+        getAllShippingTemplates().catch(() => []),
+      ])
       setCategories(cats || [])
+      setShippingTemplates(templates || [])
 
       if (isEdit && productId) {
         const product = await getAdminProductById(productId)
@@ -252,18 +264,22 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                   const img = typeof v.image === 'string' ? v.image : (v.image?.src || '')
                   const active = v.isActive !== false
 
-                  return {
-                    id: v.id,
-                    sku: v.sku || '',
-                    combination: combo,
-                    attributes: attrs.map((a) => ({ name: a.name, option: a.option || a.value })),
-                    price: regP !== null && regP !== undefined ? String(regP) : '',
-                    salePrice: saleP !== null && saleP !== undefined ? String(saleP) : '',
-                    stockQuantity: stock,
-                    image: img,
-                    isActive: active,
-                    isExisting: true,
-                  }
+                    return {
+                      id: v.id,
+                      sku: v.sku || '',
+                      combination: combo,
+                      attributes: attrs.map((a) => ({ name: a.name, option: a.option || a.value })),
+                      price: regP !== null && regP !== undefined ? String(regP) : '',
+                      salePrice: saleP !== null && saleP !== undefined ? String(saleP) : '',
+                      stockQuantity: stock,
+                      weight: v.weight !== null && v.weight !== undefined ? String(v.weight) : '',
+                      length: v.length !== null && v.length !== undefined ? String(v.length) : '',
+                      width: v.width !== null && v.width !== undefined ? String(v.width) : '',
+                      height: v.height !== null && v.height !== undefined ? String(v.height) : '',
+                      image: img,
+                      isActive: active,
+                      isExisting: true,
+                    }
                 })
               )
             }
@@ -291,6 +307,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                 : product.imageUrl
                   ? [product.imageUrl]
                   : [],
+            metaTitle: product.metaTitle || '',
+            metaDescription: product.metaDescription || '',
           })
         }
       } else if (!isEdit) {
@@ -383,6 +401,10 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
           price: basePrice,
           salePrice: '',
           stockQuantity: baseStock,
+          weight: form.getValues('weight') ? String(form.getValues('weight')) : '',
+          length: form.getValues('length') ? String(form.getValues('length')) : '',
+          width: form.getValues('width') ? String(form.getValues('width')) : '',
+          height: form.getValues('height') ? String(form.getValues('height')) : '',
           image: primaryImg,
           isActive: true,
           isExisting: false,
@@ -458,6 +480,24 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
     toast.success(`Applied ${s} stock units to all variations`)
   }
 
+  const handleBulkDimensions = () => {
+    const w = form.getValues('weight') ? String(form.getValues('weight')) : ''
+    const l = form.getValues('length') ? String(form.getValues('length')) : ''
+    const wi = form.getValues('width') ? String(form.getValues('width')) : ''
+    const h = form.getValues('height') ? String(form.getValues('height')) : ''
+
+    setVariations((prev) =>
+      prev.map((v) => ({
+        ...v,
+        weight: w || v.weight,
+        length: l || v.length,
+        width: wi || v.width,
+        height: h || v.height,
+      }))
+    )
+    toast.success('Applied parent weight and dimensions to all variations')
+  }
+
   const onInvalid = (errors) => {
     const firstKey = Object.keys(errors)[0]
     if (firstKey) {
@@ -496,6 +536,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       let payload = {
         ...values,
         slug: values.slug?.trim() || undefined,
+        shippingTemplateId: values.shippingTemplateId && values.shippingTemplateId !== 'default' ? values.shippingTemplateId : null,
         images: cleanImages,
         customFields,
         productType,
@@ -568,7 +609,10 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
             regularPrice: Number(v.price ?? values.price ?? 0),
             salePrice: v.salePrice !== undefined && v.salePrice !== null && v.salePrice !== '' ? Number(v.salePrice) : undefined,
             stockQuantity: Number(v.stockQuantity ?? 0),
-            weight: values.weight ? Number(values.weight) : undefined,
+            weight: v.weight !== undefined && v.weight !== '' ? Number(v.weight) : (values.weight ? Number(values.weight) : undefined),
+            length: v.length !== undefined && v.length !== '' ? Number(v.length) : (values.length ? Number(values.length) : undefined),
+            width: v.width !== undefined && v.width !== '' ? Number(v.width) : (values.width ? Number(values.width) : undefined),
+            height: v.height !== undefined && v.height !== '' ? Number(v.height) : (values.height ? Number(values.height) : undefined),
             image: v.image ? v.image : (cleanImages[0] ? cleanImages[0] : undefined),
             attributes: (v.attributes || []).map((a) => ({
               name: a.name.trim(),
@@ -875,6 +919,37 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
 
                   <FormField
                     control={form.control}
+                    name="shippingTemplateId"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <FormLabel className="text-xs font-semibold text-stone-700">Shipping Template</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value || 'default'} value={field.value || 'default'}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white h-9 text-xs">
+                              <SelectValue placeholder="Default shipping template" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="default" className="text-xs">
+                              Default template (System fallback)
+                            </SelectItem>
+                            {shippingTemplates.map((tmpl) => (
+                              <SelectItem key={tmpl.id} value={tmpl.id} className="text-xs">
+                                {tmpl.name} {tmpl.isDefault ? '• Default' : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[11px] text-stone-500">
+                          Empty/Default automatically uses the default shipping template.
+                        </p>
+                        <FormMessage className="text-[11px] text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="salePrice"
                     render={({ field }) => (
                       <FormItem className="space-y-1">
@@ -1108,6 +1183,61 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                 </CardContent>
               </Card>
 
+              {/* Search Engine Optimization (SEO) */}
+              <Card className="border-stone-200 shadow-xs">
+                <CardContent className="p-4 space-y-3">
+                  <div className="border-b border-stone-100 pb-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 font-inter">Search Engine Optimization (SEO)</h3>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="metaTitle"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-xs font-semibold text-stone-700">Meta Title</FormLabel>
+                          <span className={`text-[10px] font-mono ${(field.value || '').length > 60 ? 'text-amber-600 font-semibold' : 'text-stone-400'}`}>
+                            {(field.value || '').length}/60 chars
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g. Pure Chandan Agarbatti | Premium Handcrafted Incense"
+                            className="h-9 text-xs"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-[11px] text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="metaDescription"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-xs font-semibold text-stone-700">Meta Description</FormLabel>
+                          <span className={`text-[10px] font-mono ${(field.value || '').length > 160 ? 'text-amber-600 font-semibold' : 'text-stone-400'}`}>
+                            {(field.value || '').length}/160 chars
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Brief search summary displayed in Google search results..."
+                            className="text-xs min-h-[70px] resize-y"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-[11px] text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
               {/* Shipping & Dimensions Card */}
               <Card className="border-stone-200 shadow-xs">
                 <CardContent className="p-4 space-y-3">
@@ -1121,9 +1251,9 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                       name="weight"
                       render={({ field }) => (
                         <FormItem className="space-y-1">
-                          <FormLabel className="text-[11px] font-medium text-stone-600">Weight (kg)</FormLabel>
+                          <FormLabel className="text-[11px] font-medium text-stone-600">Weight (g)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.5" className="h-8 text-xs font-mono px-2" {...field} />
+                            <Input type="number" step="1" placeholder="250" className="h-8 text-xs font-mono px-2" {...field} />
                           </FormControl>
                           <FormMessage className="text-[10px] text-red-600" />
                         </FormItem>
@@ -1422,6 +1552,14 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                             >
                               Apply base stock to all
                             </button>
+                            <span className="text-stone-300">•</span>
+                            <button
+                              type="button"
+                              onClick={handleBulkDimensions}
+                              className="text-[#FF6B00] hover:underline font-medium cursor-pointer"
+                            >
+                              Apply parent specs (g / L×W×H) to all
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1432,12 +1570,14 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                             <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold text-[11px]">
                               <tr>
                                 <th className="py-2.5 px-3 min-w-[130px]">Variant</th>
-                                <th className="py-2.5 px-3 min-w-[140px]">SKU</th>
-                                <th className="py-2.5 px-3 w-28">Price (₹)</th>
-                                <th className="py-2.5 px-3 w-28">Sale Price (₹)</th>
-                                <th className="py-2.5 px-3 w-24">Stock</th>
-                                <th className="py-2.5 px-3 w-40">Image</th>
-                                <th className="py-2.5 px-3 w-24 text-center">Status</th>
+                                <th className="py-2.5 px-3 min-w-[130px]">SKU</th>
+                                <th className="py-2.5 px-3 w-24">Price (₹)</th>
+                                <th className="py-2.5 px-3 w-24">Sale Price (₹)</th>
+                                <th className="py-2.5 px-3 w-20">Stock</th>
+                                <th className="py-2.5 px-3 w-20">Weight (g)</th>
+                                <th className="py-2.5 px-3 min-w-[170px]">Dimensions (L × W × H cm)</th>
+                                <th className="py-2.5 px-3 w-36">Image</th>
+                                <th className="py-2.5 px-3 w-20 text-center">Status</th>
                                 <th className="py-2.5 px-2 w-10 text-right"></th>
                               </tr>
                             </thead>
@@ -1502,6 +1642,53 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                                         className="h-8 text-xs font-mono"
                                         placeholder="Stock"
                                       />
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={v.weight ?? ''}
+                                        onChange={(e) => handleVariationChange(vIdx, 'weight', e.target.value)}
+                                        className="h-8 text-xs font-mono"
+                                        placeholder="g"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <div className="flex items-center gap-1">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.1"
+                                          value={v.length ?? ''}
+                                          onChange={(e) => handleVariationChange(vIdx, 'length', e.target.value)}
+                                          className="h-8 text-xs font-mono w-14 px-1 text-center"
+                                          placeholder="L"
+                                          title="Length (cm)"
+                                        />
+                                        <span className="text-stone-400 text-[10px]">×</span>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.1"
+                                          value={v.width ?? ''}
+                                          onChange={(e) => handleVariationChange(vIdx, 'width', e.target.value)}
+                                          className="h-8 text-xs font-mono w-14 px-1 text-center"
+                                          placeholder="W"
+                                          title="Width (cm)"
+                                        />
+                                        <span className="text-stone-400 text-[10px]">×</span>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.1"
+                                          value={v.height ?? ''}
+                                          onChange={(e) => handleVariationChange(vIdx, 'height', e.target.value)}
+                                          className="h-8 text-xs font-mono w-14 px-1 text-center"
+                                          placeholder="H"
+                                          title="Height (cm)"
+                                        />
+                                      </div>
                                     </td>
                                     <td className="py-2 px-3">
                                       <Select

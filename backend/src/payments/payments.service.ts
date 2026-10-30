@@ -755,7 +755,13 @@ export class PaymentsService implements OnModuleInit {
     }
   }
 
-  async getAllPayments(status?: string, page = 1, perPage = 20) {
+  async getAllPayments(
+    status?: string,
+    page = 1,
+    perPage = 20,
+    sortBy?: string,
+    sortOrder?: string,
+  ) {
     const skip = (page - 1) * perPage;
     const where: any = {};
 
@@ -764,6 +770,14 @@ export class PaymentsService implements OnModuleInit {
       if (Object.values(PaymentStatus).includes(normalizedStatus as PaymentStatus)) {
         where.status = normalizedStatus as PaymentStatus;
       }
+    }
+
+    const direction: 'asc' | 'desc' = sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+    let orderBy: any = { createdAt: direction };
+    if (sortBy === 'amount') {
+      orderBy = { amount: direction };
+    } else if (sortBy === 'createdAt' || sortBy === 'date') {
+      orderBy = { createdAt: direction };
     }
 
     const [data, total] = await Promise.all([
@@ -785,7 +799,7 @@ export class PaymentsService implements OnModuleInit {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: perPage,
       }),

@@ -67,6 +67,10 @@ export class UpdateProductDto {
   @IsOptional()
   categoryId?: string;
 
+  @IsUUID()
+  @IsOptional()
+  shippingTemplateId?: string | null;
+
   @IsEnum(ProductStatus)
   @IsOptional()
   status?: ProductStatus;

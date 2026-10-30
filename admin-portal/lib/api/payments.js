@@ -103,6 +103,12 @@ export async function getAllPayments(filter = {}) {
   if (filter.perPage || filter.per_page) {
     query.set('per_page', filter.perPage || filter.per_page);
   }
+  if (filter.sortBy || filter.sort_by) {
+    query.set('sort_by', filter.sortBy || filter.sort_by);
+  }
+  if (filter.sortOrder || filter.sort_order) {
+    query.set('sort_order', filter.sortOrder || filter.sort_order);
+  }
 
   const url = `${BACKEND_URL}/admin/payments${query.toString() ? `?${query.toString()}` : ''}`;
   let headers = getAuthHeaders();

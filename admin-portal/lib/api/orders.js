@@ -341,6 +341,8 @@ export async function getAllOrders(filter = {}) {
   if (filter.search) query.set('search', filter.search);
   if (filter.dateFrom) query.set('dateFrom', filter.dateFrom);
   if (filter.dateTo) query.set('dateTo', filter.dateTo);
+  if (filter.sortBy) query.set('sortBy', filter.sortBy);
+  if (filter.sortOrder) query.set('sortOrder', filter.sortOrder);
 
   const url = `${BACKEND_URL}/admin/orders${query.toString() ? `?${query.toString()}` : ''}`;
   let headers = getAuthHeaders();
