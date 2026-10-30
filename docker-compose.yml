@@ -50,6 +50,7 @@ services:
     environment:
       PORT: 5000
       NODE_ENV: development
+      DB_POOL_MAX: ${DB_POOL_MAX:-25}
       DATABASE_URL: postgresql://${POSTGRES_USER:-sridattam_admin}:${POSTGRES_PASSWORD:-sridattam_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-sridattam_dev_db}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379

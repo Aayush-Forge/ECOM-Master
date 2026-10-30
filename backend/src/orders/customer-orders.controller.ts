@@ -38,12 +38,14 @@ export class CustomerOrdersController {
 
   @Post('track')
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   trackOrder(@Body() dto: TrackOrderDto) {
     return this.ordersService.trackOrder(dto.orderNumber, dto.phone, dto.email);
   }
 
   @Get('track')
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   trackOrderGet(
     @Query('orderNumber') orderNumber?: string,
     @Query('phone') phone?: string,

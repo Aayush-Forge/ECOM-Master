@@ -9,7 +9,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     const connectionString =
       process.env.DATABASE_URL ||
       'postgresql://postgres:postgres@localhost:5432/ecom_db?schema=public';
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({
+      connectionString,
+      max: parseInt(process.env.DB_POOL_MAX || '25', 10),
+      idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT_MS || '30000', 10),
+      connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECT_TIMEOUT_MS || '5000', 10),
+    });
     const adapter = new PrismaPg(pool);
     super({ adapter });
   }
