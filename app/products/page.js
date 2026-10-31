@@ -49,12 +49,14 @@ function ProductsContent() {
 
       if (!Array.isArray(data) || data.length === 0) {
         try {
-          const bRes = await fetch(`http://localhost:5000/products?${qs.toString()}`)
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+          const bRes = await fetch(`${backendUrl}/products?${qs.toString()}`)
           if (bRes.ok) {
-            data = await bRes.json()
+            const raw = await bRes.json()
+            data = Array.isArray(raw) ? raw : (raw?.data || [])
           }
         } catch (err) {
-          console.warn('Backend :5000 products fetch error:', err)
+          console.warn('Backend products fetch error:', err)
         }
       }
 

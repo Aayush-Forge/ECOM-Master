@@ -21,8 +21,9 @@ async function getFallbackProducts(q = {}) {
     const res = await fetch('http://localhost:5000/products', { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        list = data
+      const items = Array.isArray(data) ? data : (data?.data || [])
+      if (items.length > 0) {
+        list = items
       }
     }
   } catch (e) {
