@@ -86,7 +86,7 @@ function CartPage() {
                   </div>
                 )}
                 {items.map(item => {
-                  const key = cartKey(item.product_id || item.productId, item.variation_id || item.variationId)
+                  const key = item.id || cartKey(item.product_id || item.productId, item.variation_id || item.variationId)
                   return (
                     <div key={key} className="bg-white border border-stone-200 rounded-xl p-4 flex gap-4 animate-fade-in">
                       <Link href={`/products/${item.slug}`} className="w-24 h-24 md:w-28 md:h-28 rounded-lg overflow-hidden bg-stone-50 flex-shrink-0 border border-stone-150">

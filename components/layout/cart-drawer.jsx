@@ -46,7 +46,7 @@ export default function CartDrawer() {
           <>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
               {items.map(item => {
-                const key = cartKey(item.product_id, item.variation_id)
+                const key = item.id || cartKey(item.product_id || item.productId, item.variation_id || item.variationId)
                 const hasDiscount = item.regular_price > item.price
                 return (
                   <div key={key} className="flex gap-3 pb-4 border-b border-stone-100 animate-fade-in">

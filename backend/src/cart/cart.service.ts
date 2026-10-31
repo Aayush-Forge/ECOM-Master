@@ -275,7 +275,9 @@ export class CartService {
       return {
         id: ci.id,
         productId: ci.productId,
+        product_id: ci.productId,
         variationId: ci.variationId || null,
+        variation_id: ci.variationId || null,
         quantity: ci.quantity,
         title: comp?.titleSnapshot || 'Product',
         name: comp?.titleSnapshot || 'Product',
