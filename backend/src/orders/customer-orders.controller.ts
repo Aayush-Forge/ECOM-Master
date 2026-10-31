@@ -24,13 +24,13 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 export class CustomerOrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  @Roles(ROLES.READ_ONLY)
+  @Public()
   @Get(':id/invoice')
   getOrderInvoice(@Param('id') id: string, @Query('format') format?: string) {
     return this.ordersService.getOrderInvoice(id, format);
   }
 
-  @Roles(ROLES.READ_ONLY)
+  @Public()
   @Get(':id/shipping-label')
   getOrderShippingLabel(@Param('id') id: string, @Query('format') format?: string) {
     return this.ordersService.getOrderShippingLabel(id, format);
