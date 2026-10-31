@@ -1,0 +1,74 @@
+[
+  {
+    "id": "BL-01",
+    "domain": "Cart",
+    "title": "Cart Add Item Zero Quantity Validation",
+    "expected": "HTTP 400 rejection",
+    "actual": "HTTP 400",
+    "status": "PASS",
+    "evidence": "{\"message\":[\"quantity must not be less than 1\"],\"error\":\"Bad Request\",\"statusCode\":400}"
+  },
+  {
+    "id": "BL-02",
+    "domain": "Cart",
+    "title": "Cart Add Item Negative Quantity Validation",
+    "expected": "HTTP 400 rejection",
+    "actual": "HTTP 400",
+    "status": "PASS",
+    "evidence": "{\"message\":[\"quantity must not be less than 1\"],\"error\":\"Bad Request\",\"statusCode\":400}"
+  },
+  {
+    "id": "BL-03",
+    "domain": "Cart",
+    "title": "Cart Add Item Exceeding Stock Quantity",
+    "expected": "HTTP 400 rejection or capped at stock",
+    "actual": "HTTP 400",
+    "status": "PASS",
+    "evidence": "{\"message\":[\"quantity must not be greater than 99\"],\"error\":\"Bad Request\",\"statusCode\":400}"
+  },
+  {
+    "id": "BL-04",
+    "domain": "Checkout",
+    "title": "Server-Authoritative Pricing vs Client Total Tampering",
+    "expected": "Server calculates price from DB catalog (ignores client-supplied grandTotal=1)",
+    "actual": "Server grandTotal: 158",
+    "status": "PASS",
+    "evidence": "Client sent grandTotal=1, Server stored grandTotal=158"
+  },
+  {
+    "id": "BL-05",
+    "domain": "State Machine",
+    "title": "Illegal Reverse Transition (paid -> payment_pending)",
+    "expected": "HTTP 400 Bad Request (Transition rejected)",
+    "actual": "HTTP 400: {\"message\":[\"toStatus should not be empty\",\"toStatus must be one of the following values: cart, payment_pending, paid, processing, shipped, delivered, cancelled, refunded\"],\"error\":\"Bad Request\",\"statusCode\":400}",
+    "status": "PASS",
+    "evidence": "{\"message\":[\"toStatus should not be empty\",\"toStatus must be one of the following values: cart, payment_pending, paid, processing, shipped, delivered, cancelled, refunded\"],\"error\":\"Bad Request\",\"statusCode\":400}"
+  },
+  {
+    "id": "BL-06",
+    "domain": "State Machine",
+    "title": "Customer Forbidden from Mutating Order Status",
+    "expected": "HTTP 403 Forbidden",
+    "actual": "HTTP 403",
+    "status": "PASS",
+    "evidence": "{\"message\":\"You do not have permission to access this resource.\",\"error\":\"Forbidden\",\"statusCode\":403}"
+  },
+  {
+    "id": "BL-07",
+    "domain": "Payments Webhook",
+    "title": "Duplicate Webhook Event Idempotency & Replay Protection",
+    "expected": "Second webhook returns 200 with idempotent acknowledgment without duplicate processing",
+    "actual": "First: 201, Second: 201",
+    "status": "PASS",
+    "evidence": "First: {\"received\":true,\"status\":\"processed\",\"eventId\":\"evt_test_replay_1793466505631\",\"eventType\":\"payment.captured\"}, Second: {\"received\":true,\"status\":\"already_processed\",\"eventId\":\"evt_test_replay_1793466505631\"}"
+  },
+  {
+    "id": "BL-08",
+    "domain": "Audit Logs",
+    "title": "Audit Logs Immutability (No DELETE endpoint)",
+    "expected": "HTTP 404 or 405 (Logs cannot be deleted via API)",
+    "actual": "HTTP 404",
+    "status": "PASS",
+    "evidence": "Status: 404"
+  }
+]

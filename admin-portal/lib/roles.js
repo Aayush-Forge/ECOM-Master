@@ -54,7 +54,6 @@ export const ROLE_NAV_ITEMS = {
     { label: 'Dashboard', href: '/overview', icon: 'LayoutDashboard', group: 'Overview' },
     { label: 'Orders', href: '/orders', icon: 'ClipboardList', group: 'Operations' },
     { label: 'Payments', href: '/payments', icon: 'CreditCard', group: 'Operations' },
-    { label: 'Shipping', href: '/shipping', icon: 'Truck', group: 'Operations' },
     { label: 'Clubbing Module', href: '/clubbings', icon: 'Sparkles', group: 'Catalog' },
     { label: 'Products', href: '/products', icon: 'Package', group: 'Catalog' },
     { label: 'Categories', href: '/categories', icon: 'FolderTree', group: 'Catalog' },

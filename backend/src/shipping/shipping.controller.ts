@@ -20,7 +20,7 @@ import { Public } from '../auth/decorators/public.decorator';
 export class ShippingController {
   constructor(private readonly shippingService: ShippingService) {}
 
-  @Roles(ROLES.READ_ONLY)
+  @Roles(ROLES.ADMIN)
   @Get()
   findAll(@Query('includeDisabled') includeDisabled?: string) {
     const shouldInclude = includeDisabled === undefined || includeDisabled === 'true';
@@ -39,19 +39,19 @@ export class ShippingController {
     return this.shippingService.getDefaultTemplate();
   }
 
-  @Roles(ROLES.READ_ONLY)
+  @Roles(ROLES.ADMIN)
   @Get(':id')
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.shippingService.findOne(id);
   }
 
-  @Roles(ROLES.EDITOR)
+  @Roles(ROLES.ADMIN)
   @Post()
   create(@Body() dto: CreateShippingTemplateDto) {
     return this.shippingService.create(dto);
   }
 
-  @Roles(ROLES.EDITOR)
+  @Roles(ROLES.ADMIN)
   @Patch(':id')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -60,13 +60,13 @@ export class ShippingController {
     return this.shippingService.update(id, dto);
   }
 
-  @Roles(ROLES.EDITOR)
+  @Roles(ROLES.ADMIN)
   @Patch(':id/set-default')
   setDefault(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.shippingService.setDefault(id);
   }
 
-  @Roles(ROLES.EDITOR)
+  @Roles(ROLES.ADMIN)
   @Delete(':id')
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.shippingService.remove(id);

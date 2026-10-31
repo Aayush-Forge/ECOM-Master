@@ -10,6 +10,14 @@ import { PaymentsService } from './payments.service.js';
 import { RazorpayService } from './razorpay.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RAZORPAY_CONFIG } from './razorpay.config.js';
+import { createHmac } from 'crypto';
+
+const getValidSignature = (razorpayOrderId: string, razorpayPaymentId: string) => {
+  if (!RAZORPAY_CONFIG.keySecret) return 'sig_test';
+  return createHmac('sha256', RAZORPAY_CONFIG.keySecret)
+    .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+    .digest('hex');
+};
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -58,6 +66,7 @@ describe('PaymentsService', () => {
     }).compile();
 
     service = module.get<PaymentsService>(PaymentsService);
+    jest.spyOn(service as any, 'verifyWebhookSignature').mockReturnValue(true);
     razorpayService = module.get<RazorpayService>(RazorpayService);
   });
 
@@ -175,7 +184,7 @@ describe('PaymentsService', () => {
           orderId: 'non-existent-order',
           razorpayOrderId: 'rzp_order_1',
           razorpayPaymentId: 'rzp_pay_1',
-          razorpaySignature: 'sig_1',
+          razorpaySignature: getValidSignature('rzp_order_1', 'rzp_pay_1'),
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -192,7 +201,7 @@ describe('PaymentsService', () => {
           orderId: 'order-1',
           razorpayOrderId: 'rzp_order_1',
           razorpayPaymentId: 'rzp_pay_1',
-          razorpaySignature: 'sig_1',
+          razorpaySignature: getValidSignature('rzp_order_1', 'rzp_pay_1'),
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -213,7 +222,7 @@ describe('PaymentsService', () => {
         orderId: 'order-1',
         razorpayOrderId: 'rzp_order_1',
         razorpayPaymentId: 'rzp_pay_1',
-        razorpaySignature: 'sig_1',
+        razorpaySignature: getValidSignature('rzp_order_1', 'rzp_pay_1'),
       });
 
       expect(result).toEqual({
@@ -225,7 +234,7 @@ describe('PaymentsService', () => {
         where: { id: 'payment-1' },
         data: {
           razorpayPaymentId: 'rzp_pay_1',
-          razorpaySignature: 'sig_1',
+          razorpaySignature: getValidSignature('rzp_order_1', 'rzp_pay_1'),
           status: PaymentStatus.CAPTURED,
         },
       });
@@ -453,7 +462,7 @@ describe('PaymentsService', () => {
         orderId: 'order_1',
         razorpayOrderId: 'order_rzp_1',
         razorpayPaymentId: 'pay_rzp_1',
-        razorpaySignature: 'sig_test',
+        razorpaySignature: getValidSignature('order_rzp_1', 'pay_rzp_1'),
       });
       expect(verifyRes.success).toBe(true);
       expect(prismaService.orderStatusHistory.create).toHaveBeenCalledTimes(1);
@@ -679,7 +688,7 @@ describe('PaymentsService', () => {
         orderId: 'order_race_1',
         razorpayOrderId: 'order_rzp_race',
         razorpayPaymentId: 'pay_rzp_race',
-        razorpaySignature: 'sig_test',
+        razorpaySignature: getValidSignature('order_rzp_race', 'pay_rzp_race'),
       });
 
       expect(verifyRes.success).toBe(true);

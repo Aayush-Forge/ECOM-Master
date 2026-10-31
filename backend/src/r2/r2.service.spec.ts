@@ -21,7 +21,7 @@ function bufferOfSize(sizeBytes: number): Buffer {
 const MB = 1024 * 1024;
 const VALID_KEY = 'products/SKU-123/hero.webp';
 const VALID_CONTENT_TYPE = 'image/webp';
-const VALID_BUFFER = bufferOfSize(1 * MB); // 1 MB — well within the 5 MB limit
+const VALID_BUFFER = bufferOfSize(1 * MB); // 1 MB — well within the 10 MB limit
 
 // ── Test suite ────────────────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ describe('R2Service', () => {
 
     it('throws BadRequestException for a completely invalid MIME type (application/pdf)', async () => {
       await expect(
-        service.uploadFile(VALID_KEY, VALID_BUFFER, 'application/pdf'),
+        service.uploadFile(VALID_KEY, VALID_BUFFER, 'text/html'),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -134,15 +134,15 @@ describe('R2Service', () => {
 
     // ── Validation: file size ──────────────────────────────────────────────
 
-    it('throws BadRequestException when the file exceeds 5 MB', async () => {
-      const oversized = bufferOfSize(5 * MB + 1);
+    it('throws BadRequestException when the file exceeds 10 MB', async () => {
+      const oversized = bufferOfSize(10 * MB + 1);
       await expect(
         service.uploadFile(VALID_KEY, oversized, VALID_CONTENT_TYPE),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('does NOT call S3 send when the file is oversized', async () => {
-      const oversized = bufferOfSize(5 * MB + 1);
+      const oversized = bufferOfSize(10 * MB + 1);
       await expect(
         service.uploadFile(VALID_KEY, oversized, VALID_CONTENT_TYPE),
       ).rejects.toThrow(BadRequestException);
@@ -150,7 +150,7 @@ describe('R2Service', () => {
       expect(mockS3.send).not.toHaveBeenCalled();
     });
 
-    it('accepts a file that is exactly 5 MB (boundary — should succeed)', async () => {
+    it('accepts a file that is exactly 10 MB (boundary — should succeed)', async () => {
       mockS3.send.mockResolvedValue({});
       const exactlyMax = bufferOfSize(5 * MB);
       await expect(

@@ -1,0 +1,42 @@
+[
+  {
+    "path": "/health",
+    "totalRequests": 50,
+    "successful": 59,
+    "errors": 0,
+    "avgMs": "8.0",
+    "p50Ms": 5,
+    "p95Ms": 35,
+    "p99Ms": 36
+  },
+  {
+    "path": "/products",
+    "totalRequests": 50,
+    "successful": 59,
+    "errors": 0,
+    "avgMs": "7.6",
+    "p50Ms": 7,
+    "p95Ms": 11,
+    "p99Ms": 11
+  },
+  {
+    "path": "/categories",
+    "totalRequests": 50,
+    "successful": 59,
+    "errors": 0,
+    "avgMs": "5.1",
+    "p50Ms": 5,
+    "p95Ms": 10,
+    "p99Ms": 11
+  },
+  {
+    "path": "/company-profile/public",
+    "totalRequests": 50,
+    "successful": 59,
+    "errors": 0,
+    "avgMs": "4.6",
+    "p50Ms": 5,
+    "p95Ms": 6,
+    "p99Ms": 7
+  }
+]

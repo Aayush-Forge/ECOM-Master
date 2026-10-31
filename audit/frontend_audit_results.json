@@ -1,0 +1,849 @@
+{
+  "storefront": [
+    {
+      "name": "Homepage",
+      "path": "/",
+      "status": "CRASH",
+      "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n"
+    },
+    {
+      "name": "Product Catalog",
+      "path": "/products",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/products",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Product_Catalog.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Product_Catalog.png"
+    },
+    {
+      "name": "Cart",
+      "path": "/cart",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/cart",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Cart.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Cart.png"
+    },
+    {
+      "name": "Checkout",
+      "path": "/checkout",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/cart",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Checkout.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Checkout.png"
+    },
+    {
+      "name": "Festive / Clubbing Deals",
+      "path": "/clubbing",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/clubbing",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Festive___Clubbing_Deals.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Festive___Clubbing_Deals.png"
+    },
+    {
+      "name": "About Us",
+      "path": "/about",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/about",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_About_Us.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_About_Us.png"
+    },
+    {
+      "name": "Contact",
+      "path": "/contact",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/contact",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Contact.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Contact.png"
+    },
+    {
+      "name": "Track Order",
+      "path": "/track-order",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/track-order",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Track_Order.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Track_Order.png"
+    },
+    {
+      "name": "Login Page",
+      "path": "/login",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Login_Page.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Login_Page.png"
+    },
+    {
+      "name": "Register Page",
+      "path": "/register",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/register",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Register_Page.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Register_Page.png"
+    },
+    {
+      "name": "Terms & Conditions",
+      "path": "/terms-conditions",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/terms-conditions",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Terms___Conditions.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Terms___Conditions.png"
+    },
+    {
+      "name": "Privacy Policy",
+      "path": "/privacy-policy",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/privacy-policy",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Privacy_Policy.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Privacy_Policy.png"
+    },
+    {
+      "name": "Refund Policy",
+      "path": "/refund-policy",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/refund-policy",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Refund_Policy.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Refund_Policy.png"
+    },
+    {
+      "name": "Shipping Policy",
+      "path": "/shipping-policy",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/shipping-policy",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Shipping_Policy.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Shipping_Policy.png"
+    },
+    {
+      "name": "Storefront /admin (Middleware redirect check)",
+      "path": "/admin",
+      "status": 200,
+      "finalUrl": "http://localhost:3001/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__admin__Middleware_redirect_check_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__admin__Middleware_redirect_check_.png"
+    },
+    {
+      "name": "Storefront /admin/accounting (Leaked Admin Page)",
+      "path": "/admin/accounting",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__admin_accounting__Leaked_Admin_Page_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__admin_accounting__Leaked_Admin_Page_.png"
+    },
+    {
+      "name": "Storefront /admin/clubbings (Leaked Admin Page)",
+      "path": "/admin/clubbings",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__admin_clubbings__Leaked_Admin_Page_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__admin_clubbings__Leaked_Admin_Page_.png"
+    },
+    {
+      "name": "Storefront /staff/clubbings (Leaked Admin Page)",
+      "path": "/staff/clubbings",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__staff_clubbings__Leaked_Admin_Page_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__staff_clubbings__Leaked_Admin_Page_.png"
+    },
+    {
+      "name": "Storefront /account (Unauth redirect check)",
+      "path": "/account",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__account__Unauth_redirect_check_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__account__Unauth_redirect_check_.png"
+    },
+    {
+      "name": "Storefront /account/orders (Unauth redirect check)",
+      "path": "/account/orders",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__account_orders__Unauth_redirect_check_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__account_orders__Unauth_redirect_check_.png"
+    },
+    {
+      "name": "Storefront /account/profile (Unauth redirect check)",
+      "path": "/account/profile",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__account_profile__Unauth_redirect_check_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__account_profile__Unauth_redirect_check_.png"
+    },
+    {
+      "name": "Storefront /account/addresses (Unauth redirect check)",
+      "path": "/account/addresses",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "errorsCount": 0,
+      "errors": [],
+      "screenshot": "audit/screenshots/sf_Storefront__account_addresses__Unauth_redirect_check_.png",
+      "mobileScreenshot": "audit/screenshots/sf_mobile_Storefront__account_addresses__Unauth_redirect_check_.png"
+    }
+  ],
+  "adminPortal": [
+    {
+      "route": "/overview",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/orders",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/payments",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/shipping",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/clubbings",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/products",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/products/new",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/categories",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/discounts",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/reviews",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/customers",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/accounting",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/users",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/company-profile",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/email",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    },
+    {
+      "route": "/audit-logs",
+      "role": "Unauthenticated",
+      "finalUrl": "http://localhost:3001/login",
+      "protected": true,
+      "status": "PASS (Redirected to /login)"
+    }
+  ],
+  "roleRouting": [
+    {
+      "role": "customer",
+      "route": "/overview",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/orders",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/payments",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/shipping",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/clubbings",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/products",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/products/new",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/categories",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/discounts",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/reviews",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/customers",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/accounting",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/users",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/company-profile",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/email",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "customer",
+      "route": "/audit-logs",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/login?error=unauthorized",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/overview",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/orders",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/payments",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/payments",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/shipping",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/clubbings",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/products",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/products/new",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/categories",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/discounts",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/reviews",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/customers",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/accounting",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/users",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/company-profile",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/email",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "read_only",
+      "route": "/audit-logs",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/overview",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/orders",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/payments",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/payments",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/shipping",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/clubbings",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/clubbings",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/products",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/products",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/products/new",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/products/new",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/categories",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/categories",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/discounts",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/discounts",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/reviews",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/reviews",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/customers",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/accounting",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/users",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/company-profile",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/email",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "editor",
+      "route": "/audit-logs",
+      "expectedAccess": false,
+      "actuallyAllowed": false,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/overview",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/overview",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/orders",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/orders",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/payments",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/payments",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/shipping",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/shipping",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/clubbings",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/clubbings",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/products",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/products",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/products/new",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/products/new",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/categories",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/categories",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/discounts",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/discounts",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/reviews",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/reviews",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/customers",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/customers",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/accounting",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/accounting",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/users",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/users",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/company-profile",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/company-profile",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/email",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/email",
+      "verdict": "PASS"
+    },
+    {
+      "role": "admin",
+      "route": "/audit-logs",
+      "expectedAccess": true,
+      "actuallyAllowed": true,
+      "finalUrl": "/audit-logs",
+      "verdict": "PASS"
+    }
+  ],
+  "consoleErrors": []
+}

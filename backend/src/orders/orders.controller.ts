@@ -66,13 +66,13 @@ export class OrdersController {
     );
   }
 
-  @Public()
+  @Roles(ROLES.READ_ONLY)
   @Get(':id/invoice')
   getOrderInvoice(@Param('id') id: string, @Query('format') format?: string) {
     return this.ordersService.getOrderInvoice(id, format);
   }
 
-  @Public()
+  @Roles(ROLES.READ_ONLY)
   @Get(':id/shipping-label')
   getOrderShippingLabel(@Param('id') id: string, @Query('format') format?: string) {
     return this.ordersService.getOrderShippingLabel(id, format);

@@ -1,0 +1,317 @@
+{
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "blocked": 0
+  },
+  "authMatrix": [
+    {
+      "endpoint": "GET /health",
+      "minRole": "public",
+      "scenarios": {
+        "Unauthenticated": 200,
+        "Expired JWT": 200,
+        "Tampered JWT": 200,
+        "Wrong Secret JWT": 200,
+        "Refresh Token as Access Token": 200,
+        "Customer Role": 200,
+        "Read-Only Role": 200,
+        "Editor Role": 200,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /products",
+      "minRole": "public",
+      "scenarios": {
+        "Unauthenticated": 200,
+        "Expired JWT": 200,
+        "Tampered JWT": 200,
+        "Wrong Secret JWT": 200,
+        "Refresh Token as Access Token": 200,
+        "Customer Role": 200,
+        "Read-Only Role": 200,
+        "Editor Role": 200,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /categories",
+      "minRole": "public",
+      "scenarios": {
+        "Unauthenticated": 200,
+        "Expired JWT": 200,
+        "Tampered JWT": 200,
+        "Wrong Secret JWT": 200,
+        "Refresh Token as Access Token": 200,
+        "Customer Role": 200,
+        "Read-Only Role": 200,
+        "Editor Role": 200,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /orders",
+      "minRole": "public",
+      "scenarios": {
+        "Unauthenticated": 404,
+        "Expired JWT": 404,
+        "Tampered JWT": 404,
+        "Wrong Secret JWT": 404,
+        "Refresh Token as Access Token": 404,
+        "Customer Role": 404,
+        "Read-Only Role": 404,
+        "Editor Role": 404,
+        "Admin Role": 404
+      }
+    },
+    {
+      "endpoint": "GET /admin/orders",
+      "minRole": "read_only",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 200,
+        "Editor Role": 200,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /admin/payments",
+      "minRole": "read_only",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 200,
+        "Editor Role": 200,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /admin/users",
+      "minRole": "admin",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "POST /admin/users",
+      "minRole": "admin",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 400
+      }
+    },
+    {
+      "endpoint": "GET /audit-logs",
+      "minRole": "admin",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /admin/company-profile",
+      "minRole": "admin",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /admin/accounting/summary",
+      "minRole": "read_only",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /shipping-templates",
+      "minRole": "read_only",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "POST /shipping-templates",
+      "minRole": "editor",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 400
+      }
+    },
+    {
+      "endpoint": "GET /admin/customers",
+      "minRole": "admin",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 403,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /reviews/products-summary",
+      "minRole": "editor",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 403,
+        "Read-Only Role": 403,
+        "Editor Role": 200,
+        "Admin Role": 200
+      }
+    },
+    {
+      "endpoint": "GET /orders/me",
+      "minRole": "customer",
+      "scenarios": {
+        "Unauthenticated": 401,
+        "Expired JWT": 401,
+        "Tampered JWT": 401,
+        "Wrong Secret JWT": 401,
+        "Refresh Token as Access Token": 401,
+        "Customer Role": 200,
+        "Read-Only Role": 200,
+        "Editor Role": 200,
+        "Admin Role": 200
+      }
+    }
+  ],
+  "securityChecks": [
+    {
+      "id": "SEC-01",
+      "title": "Payment Signature Leaked in Admin Payments API",
+      "status": "PASS",
+      "evidence": "HTTP 200, Contains razorpaySignature: false",
+      "recommendation": "Exclude razorpaySignature from response DTO/Prisma select."
+    },
+    {
+      "id": "SEC-02",
+      "title": "Draft/Archived Catalog Leaked to Unauthenticated Visitors via ?admin=true",
+      "status": "PASS",
+      "evidence": "Public count: 0, ?admin=true count: 0",
+      "recommendation": "Check req.user role before honoring admin=true query parameter."
+    },
+    {
+      "id": "SEC-03",
+      "title": "Unauthenticated Public Access to /admin/all-categories",
+      "status": "PASS",
+      "evidence": "HTTP 401",
+      "recommendation": "Apply @Roles(ROLES.READ_ONLY) and remove @Public() from admin/all-categories"
+    },
+    {
+      "id": "SEC-04",
+      "title": "Staff Email Leaked in Order Status History",
+      "status": "PASS",
+      "evidence": "No email in history",
+      "recommendation": "Omit email from changedByUser select."
+    },
+    {
+      "id": "SEC-05",
+      "title": "CORS Restricts Untrusted Origins",
+      "status": "PASS",
+      "evidence": "Origin: http://malicious-attacker.com -> Access-Control-Allow-Origin: none",
+      "recommendation": "Maintain strict origin allowlist."
+    },
+    {
+      "id": "SEC-06",
+      "title": "Security Headers Present & X-Powered-By Stripped",
+      "status": "PASS",
+      "evidence": "X-Frame-Options: SAMEORIGIN, X-Content-Type-Options: nosniff, X-Powered-By: hidden",
+      "recommendation": "Ensure helmet is properly enabled."
+    },
+    {
+      "id": "SEC-07",
+      "title": "Webhook Signature Enforcement",
+      "status": "PASS",
+      "evidence": "Missing sig status: 400, Invalid sig status: 400",
+      "recommendation": "Reject unsigned or invalid webhook payloads with 400."
+    },
+    {
+      "id": "SEC-08",
+      "title": "SQL Injection & Malformed Input Handling",
+      "status": "PASS",
+      "evidence": "Search with SQL injection: HTTP 200, Login with XSS email: HTTP 400",
+      "recommendation": "Validate all inputs with class-validator."
+    },
+    {
+      "id": "SEC-09",
+      "title": "IDOR Prevention on Customer Resources",
+      "status": "PASS",
+      "evidence": "No secondary customer address available to mutate.",
+      "recommendation": "Enforce user ownership checks on all customer entity mutations."
+    }
+  ],
+  "businessLogic": [],
+  "findings": []
+}

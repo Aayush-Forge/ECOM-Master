@@ -25,16 +25,8 @@ describe('CartController', () => {
   });
 
   it('passes headers and body through to CartService.addItem', () => {
-    void controller.addItem(
-      { productId: 'prod-1', quantity: 1 },
-      'Bearer token',
-      'session-token',
-    );
+    void controller.addItem('cart-id', { productId: 'prod-1', quantity: 1 }, 'session-token', { user: { userId: 'u1' } });
 
-    expect(cartService.addItem).toHaveBeenCalledWith(
-      'Bearer token',
-      'session-token',
-      { productId: 'prod-1', quantity: 1 },
-    );
+    expect(cartService.addItem).toHaveBeenCalledWith('cart-id', { productId: 'prod-1', quantity: 1 }, 'session-token', { userId: 'u1' });
   });
 });

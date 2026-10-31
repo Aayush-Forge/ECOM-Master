@@ -15,29 +15,25 @@ import { Public } from '../auth/decorators/public.decorator';
 export class AccountingController {
   constructor(private readonly accountingService: AccountingService) {}
 
-  @Public()
-  @Roles(ROLES.READ_ONLY)
+  @Roles(ROLES.ADMIN)
   @Get('summary')
   getSummary(@Query() query: AccountingQueryDto) {
     return this.accountingService.getFinancialSummary(query);
   }
 
-  @Public()
-  @Roles(ROLES.READ_ONLY)
+  @Roles(ROLES.ADMIN)
   @Get('daily-breakdown')
   getDailyBreakdown(@Query() query: AccountingQueryDto) {
     return this.accountingService.getDailyBreakdown(query);
   }
 
-  @Public()
-  @Roles(ROLES.READ_ONLY)
+  @Roles(ROLES.ADMIN)
   @Get('orders')
   getLedgerOrders(@Query() query: AccountingQueryDto) {
     return this.accountingService.getLedgerOrders(query);
   }
 
-  @Public()
-  @Roles(ROLES.READ_ONLY)
+  @Roles(ROLES.ADMIN)
   @Get('export-csv')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="sridattam-financial-ledger.csv"')

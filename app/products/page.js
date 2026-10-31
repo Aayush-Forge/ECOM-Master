@@ -39,25 +39,14 @@ function ProductsContent() {
       let data = null
 
       try {
-        const r = await fetch(`/api/products?${qs.toString()}`)
-        if (r.ok) {
-          data = await r.json()
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        const bRes = await fetch(`${backendUrl}/products?${qs.toString()}`)
+        if (bRes.ok) {
+          const raw = await bRes.json()
+          data = Array.isArray(raw) ? raw : (raw?.data || [])
         }
       } catch (err) {
-        console.warn('Storefront /api/products fetch error:', err)
-      }
-
-      if (!Array.isArray(data) || data.length === 0) {
-        try {
-          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-          const bRes = await fetch(`${backendUrl}/products?${qs.toString()}`)
-          if (bRes.ok) {
-            const raw = await bRes.json()
-            data = Array.isArray(raw) ? raw : (raw?.data || [])
-          }
-        } catch (err) {
-          console.warn('Backend products fetch error:', err)
-        }
+        console.warn('Backend products fetch error:', err)
       }
 
       if (!Array.isArray(data) || data.length === 0) {

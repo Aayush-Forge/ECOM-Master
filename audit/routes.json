@@ -1,0 +1,1282 @@
+[
+  {
+    "file": "backend/src/accounting/accounting.controller.ts",
+    "controller": "accounting.controller.ts",
+    "methodName": "getSummary",
+    "httpMethod": "GET",
+    "path": "/admin/accounting/summary",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/accounting/accounting.controller.ts",
+    "controller": "accounting.controller.ts",
+    "methodName": "getDailyBreakdown",
+    "httpMethod": "GET",
+    "path": "/admin/accounting/daily-breakdown",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/accounting/accounting.controller.ts",
+    "controller": "accounting.controller.ts",
+    "methodName": "getLedgerOrders",
+    "httpMethod": "GET",
+    "path": "/admin/accounting/orders",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/accounting/accounting.controller.ts",
+    "controller": "accounting.controller.ts",
+    "methodName": "Header",
+    "httpMethod": "GET",
+    "path": "/admin/accounting/export-csv",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/addresses/addresses.controller.ts",
+    "controller": "addresses.controller.ts",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/addresses/me",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/addresses/addresses.controller.ts",
+    "controller": "addresses.controller.ts",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/addresses/me",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/addresses/addresses.controller.ts",
+    "controller": "addresses.controller.ts",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/addresses/me/:id",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/addresses/addresses.controller.ts",
+    "controller": "addresses.controller.ts",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/addresses/me/:id",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/addresses/addresses.controller.ts",
+    "controller": "addresses.controller.ts",
+    "methodName": "setDefault",
+    "httpMethod": "PATCH",
+    "path": "/addresses/me/:id/default",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/analytics/analytics.controller.ts",
+    "controller": "analytics.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/analytics/overview",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/analytics/analytics.controller.ts",
+    "controller": "analytics.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/analytics/top-products",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/analytics/analytics.controller.ts",
+    "controller": "analytics.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/analytics/top-categories",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/analytics/analytics.controller.ts",
+    "controller": "analytics.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/analytics/coupons",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/analytics/analytics.controller.ts",
+    "controller": "analytics.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/analytics/operational",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/app.controller.ts",
+    "controller": "app.controller.ts",
+    "methodName": "getHello",
+    "httpMethod": "GET",
+    "path": "/",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/app.controller.ts",
+    "controller": "app.controller.ts",
+    "methodName": "getHealth",
+    "httpMethod": "GET",
+    "path": "/health",
+    "isPublic": false,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/audit-logs.controller.ts",
+    "controller": "audit-logs.controller.ts",
+    "methodName": "getAuditLogs",
+    "httpMethod": "GET",
+    "path": "/audit-logs",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/test-mutations/products",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PUT",
+    "path": "/test-mutations/products/:id/price",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/test-mutations/products/:id",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/test-mutations/orders/:id/status",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/test-mutations/orders/:id/refund",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/test-mutations/discounts",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PUT",
+    "path": "/test-mutations/discounts/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/test-mutations/discounts/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/test-mutations/users/:id/role",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/audit/fixtures/sample-mutations.controller.ts",
+    "controller": "sample-mutations.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/test-mutations/inventory/:productId",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/auth/auth.controller.ts",
+    "controller": "auth.controller.ts",
+    "methodName": "register",
+    "httpMethod": "POST",
+    "path": "/auth/register",
+    "isPublic": false,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/auth/auth.controller.ts",
+    "controller": "auth.controller.ts",
+    "methodName": "login",
+    "httpMethod": "POST",
+    "path": "/auth/login",
+    "isPublic": false,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/auth/auth.controller.ts",
+    "controller": "auth.controller.ts",
+    "methodName": "refreshToken",
+    "httpMethod": "POST",
+    "path": "/auth/refresh",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/auth/auth.controller.ts",
+    "controller": "auth.controller.ts",
+    "methodName": "changePassword",
+    "httpMethod": "PATCH",
+    "path": "/auth/change-password",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/auth/auth.controller.ts",
+    "controller": "auth.controller.ts",
+    "methodName": "adminPanelAuth",
+    "httpMethod": "GET",
+    "path": "/auth/adminPanel",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/cart/cart.controller.ts",
+    "controller": "cart.controller.ts",
+    "methodName": "createCart",
+    "httpMethod": "POST",
+    "path": "/cart",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/cart/cart.controller.ts",
+    "controller": "cart.controller.ts",
+    "methodName": "getCart",
+    "httpMethod": "GET",
+    "path": "/cart/:id",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/cart/cart.controller.ts",
+    "controller": "cart.controller.ts",
+    "methodName": "addItem",
+    "httpMethod": "POST",
+    "path": "/cart/:id/items",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/cart/cart.controller.ts",
+    "controller": "cart.controller.ts",
+    "methodName": "updateItem",
+    "httpMethod": "PATCH",
+    "path": "/cart/:id/items/:itemId",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/cart/cart.controller.ts",
+    "controller": "cart.controller.ts",
+    "methodName": "removeItem",
+    "httpMethod": "DELETE",
+    "path": "/cart/:id/items/:itemId",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/categories/categories.controller.ts",
+    "controller": "categories.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/create-categories",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/categories/categories.controller.ts",
+    "controller": "categories.controller.ts",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/categories",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/categories/categories.controller.ts",
+    "controller": "categories.controller.ts",
+    "methodName": "findAllAdmin",
+    "httpMethod": "GET",
+    "path": "/admin/all-categories",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/categories/categories.controller.ts",
+    "controller": "categories.controller.ts",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/categories/:id",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/categories/categories.controller.ts",
+    "controller": "categories.controller.ts",
+    "methodName": "findOneAdmin",
+    "httpMethod": "GET",
+    "path": "/admin/categories/:id",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/categories/categories.controller.ts",
+    "controller": "categories.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/admin/update-categories/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/categories/categories.controller.ts",
+    "controller": "categories.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/admin/delete-categories/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/[clubbing-rules, clubbing]/upload-banner",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/[clubbing-rules, clubbing]",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "GET",
+    "path": "/[clubbing-rules, clubbing]",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "GET",
+    "path": "/[clubbing-rules, clubbing]/active",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "GET",
+    "path": "/[clubbing-rules, clubbing]/:id",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/[clubbing-rules, clubbing]/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/[clubbing-rules, clubbing]/:id/toggle",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/[clubbing-rules, clubbing]/:id/toggle",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/[clubbing-rules, clubbing]/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/[clubbing-rules, clubbing]/bulk-delete",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/[clubbing-rules, clubbing]/bulk-status",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/clubbing/clubbing.controller.ts",
+    "controller": "clubbing.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "POST",
+    "path": "/[clubbing-rules, clubbing]/calculate",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/company-profile/company-profile.controller.ts",
+    "controller": "company-profile.controller.ts",
+    "methodName": "getPublicProfile",
+    "httpMethod": "GET",
+    "path": "/company-profile/public",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/company-profile/company-profile.controller.ts",
+    "controller": "company-profile.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/company-profile",
+    "isPublic": false,
+    "roles": "'admin'",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/company-profile/company-profile.controller.ts",
+    "controller": "company-profile.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/admin/company-profile",
+    "isPublic": false,
+    "roles": "'admin'",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/company-profile/company-profile.controller.ts",
+    "controller": "company-profile.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/company-profile/documents",
+    "isPublic": false,
+    "roles": "'admin'",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/company-profile/company-profile.controller.ts",
+    "controller": "company-profile.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/company-profile/documents/upload",
+    "isPublic": false,
+    "roles": "'admin'",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/company-profile/company-profile.controller.ts",
+    "controller": "company-profile.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/admin/company-profile/documents/:id",
+    "isPublic": false,
+    "roles": "'admin'",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/customers/customers.controller.ts",
+    "controller": "customers.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/customers",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/customers/customers.controller.ts",
+    "controller": "customers.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/customers/:phoneKey",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/notifications/admin-email-logs.controller.ts",
+    "controller": "admin-email-logs.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/email/logs",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/notifications/admin-email-logs.controller.ts",
+    "controller": "admin-email-logs.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/email/stats",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/notifications/admin-email-logs.controller.ts",
+    "controller": "admin-email-logs.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/email/logs/:id/retry",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/notifications/admin-email-templates.controller.ts",
+    "controller": "admin-email-templates.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/email/templates",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/notifications/admin-email-templates.controller.ts",
+    "controller": "admin-email-templates.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/admin/email/templates/:key",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/notifications/admin-email-templates.controller.ts",
+    "controller": "admin-email-templates.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/email/templates/:key/preview",
+    "isPublic": false,
+    "roles": "ROLES.ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "getAllOrders",
+    "httpMethod": "GET",
+    "path": "/orders",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "getOrderInvoice",
+    "httpMethod": "GET",
+    "path": "/orders/:id/invoice",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "getOrderShippingLabel",
+    "httpMethod": "GET",
+    "path": "/orders/:id/shipping-label",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "POST",
+    "path": "/orders",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "POST",
+    "path": "/orders/track",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "GET",
+    "path": "/orders/track",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/orders/me",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/orders/me/by-number/:orderNumber",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/orders/me/:id",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/customer-orders.controller.ts",
+    "controller": "customer-orders.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "GET",
+    "path": "/orders/:id",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/orders.controller.ts",
+    "controller": "orders.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/orders",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/orders.controller.ts",
+    "controller": "orders.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/orders/:id",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/orders.controller.ts",
+    "controller": "orders.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/admin/orders/:id/status",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/orders.controller.ts",
+    "controller": "orders.controller.ts",
+    "methodName": "getOrderInvoice",
+    "httpMethod": "GET",
+    "path": "/admin/orders/:id/invoice",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/orders.controller.ts",
+    "controller": "orders.controller.ts",
+    "methodName": "getOrderShippingLabel",
+    "httpMethod": "GET",
+    "path": "/admin/orders/:id/shipping-label",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/orders/orders.controller.ts",
+    "controller": "orders.controller.ts",
+    "methodName": "HttpCode",
+    "httpMethod": "POST",
+    "path": "/admin/orders/webhook/refund",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/payments/payments.controller.ts",
+    "controller": "payments.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "POST",
+    "path": "/payments/create-session",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/payments/payments.controller.ts",
+    "controller": "payments.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "POST",
+    "path": "/payments/verify",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/payments/payments.controller.ts",
+    "controller": "payments.controller.ts",
+    "methodName": "Public",
+    "httpMethod": "POST",
+    "path": "/payments/webhook",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/payments/payments.controller.ts",
+    "controller": "payments.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/payments",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/payments/payments.controller.ts",
+    "controller": "payments.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/payments/order/:orderId",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/pricing/pricing.controller.ts",
+    "controller": "pricing.controller.ts",
+    "methodName": "calculate",
+    "httpMethod": "POST",
+    "path": "/pricing/calculate",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/products/upload-image",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/admin/products/delete-image",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/products/export-csv",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/products/import-csv",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/products/next-sku",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/create-products",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/admin/products",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "POST",
+    "path": "/products",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/all-products",
+    "isPublic": false,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/products",
+    "isPublic": false,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/products/:id",
+    "isPublic": false,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "GET",
+    "path": "/admin/products/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/admin/update-products/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "PATCH",
+    "path": "/products/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/admin/delete-products/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/products/products.controller.ts",
+    "controller": "products.controller.ts",
+    "methodName": "Roles",
+    "httpMethod": "DELETE",
+    "path": "/products/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/reviews/reviews.controller.ts",
+    "controller": "reviews.controller.ts",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/reviews",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/reviews/reviews.controller.ts",
+    "controller": "reviews.controller.ts",
+    "methodName": "getTopReviews",
+    "httpMethod": "GET",
+    "path": "/reviews/top",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/reviews/reviews.controller.ts",
+    "controller": "reviews.controller.ts",
+    "methodName": "getProductReviewSummaries",
+    "httpMethod": "GET",
+    "path": "/reviews/products-summary",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/reviews/reviews.controller.ts",
+    "controller": "reviews.controller.ts",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/reviews",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/reviews/reviews.controller.ts",
+    "controller": "reviews.controller.ts",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/reviews/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/shipping-templates",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "findAllPublic",
+    "httpMethod": "GET",
+    "path": "/shipping-templates/public",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "getDefault",
+    "httpMethod": "GET",
+    "path": "/shipping-templates/default",
+    "isPublic": true,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/shipping-templates/:id",
+    "isPublic": false,
+    "roles": "ROLES.READ_ONLY",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/shipping-templates",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/shipping-templates/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "setDefault",
+    "httpMethod": "PATCH",
+    "path": "/shipping-templates/:id/set-default",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/shipping/shipping.controller.ts",
+    "controller": "shipping.controller.ts",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/shipping-templates/:id",
+    "isPublic": false,
+    "roles": "ROLES.EDITOR",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/user/user.controller.ts",
+    "controller": "user.controller.ts",
+    "methodName": "getUserProfileById",
+    "httpMethod": "GET",
+    "path": "/user/profile",
+    "isPublic": false,
+    "roles": "DEFAULT (Authenticated)",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/users/admin-users.controller.ts",
+    "controller": "admin-users.controller.ts",
+    "methodName": "getAllUsers",
+    "httpMethod": "GET",
+    "path": "/admin/users",
+    "isPublic": false,
+    "roles": "ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/users/admin-users.controller.ts",
+    "controller": "admin-users.controller.ts",
+    "methodName": "AuditLog",
+    "httpMethod": "POST",
+    "path": "/admin/users",
+    "isPublic": false,
+    "roles": "ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/users/admin-users.controller.ts",
+    "controller": "admin-users.controller.ts",
+    "methodName": "AuditLog",
+    "httpMethod": "PATCH",
+    "path": "/admin/users/:id/role",
+    "isPublic": false,
+    "roles": "ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/users/admin-users.controller.ts",
+    "controller": "admin-users.controller.ts",
+    "methodName": "AuditLog",
+    "httpMethod": "PATCH",
+    "path": "/admin/users/:id/password",
+    "isPublic": false,
+    "roles": "ADMIN",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/users/users.controller.ts",
+    "controller": "users.controller.ts",
+    "methodName": "getProfile",
+    "httpMethod": "GET",
+    "path": "/users/me",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  },
+  {
+    "file": "backend/src/users/users.controller.ts",
+    "controller": "users.controller.ts",
+    "methodName": "updateProfile",
+    "httpMethod": "PATCH",
+    "path": "/users/me",
+    "isPublic": false,
+    "roles": "ROLES.CUSTOMER",
+    "dtos": "None"
+  }
+]

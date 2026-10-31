@@ -22,8 +22,7 @@ test.describe('Phase 2A: Storefront Browsing & Product Catalog', () => {
 
     // Verify product card links exist
     const productCards = page.locator('a[href^="/products/"]');
-    const count = await productCards.count();
-    expect(count).toBeGreaterThan(0);
+    await expect(productCards.first()).toBeVisible({ timeout: 15000 });
 
     // Navigate directly to the first product PDP
     const firstCard = productCards.first();
