@@ -32,6 +32,7 @@ import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SEED_PRODUCTS, SEED_CATEGORIES } from '@/lib/products-seed'
+import { getActiveClubbings } from '@/lib/api/clubbings'
 
 function HomeProductCard({ product, wishlist = [], toggleWishlist, handleAddToCart }) {
   const [activeImgIdx, setActiveImgIdx] = useState(0)
@@ -255,6 +256,31 @@ export default function Home() {
   const [testimonialIndex, setTestimonialIndex] = useState(0)
   const [dynamicTestimonials, setDynamicTestimonials] = useState([])
 
+  // Active Clubbings for Hero Slider
+  const [activeClubbings, setActiveClubbings] = useState([])
+
+  useEffect(() => {
+    let active = true
+    const loadClubbings = async () => {
+      try {
+        const data = await getActiveClubbings()
+        if (active && Array.isArray(data)) {
+          setActiveClubbings(data.filter(c => c && c.isActive !== false))
+        }
+      } catch (err) {
+        console.warn('Failed to load active clubbings for hero slider:', err)
+      }
+    }
+    loadClubbings()
+
+    const onUpdate = () => loadClubbings()
+    window.addEventListener('sd:clubbings-updated', onUpdate)
+    return () => {
+      active = false
+      window.removeEventListener('sd:clubbings-updated', onUpdate)
+    }
+  }, [])
+
   useEffect(() => {
     let active = true
 
@@ -379,14 +405,14 @@ export default function Home() {
     openDrawer()
   }
 
-  // Hero Slider Data
-  const slides = [
+  // Base Hero Slider Data - all standard banners link straight to /products
+  const baseSlides = [
     {
       id: 1,
       headline: 'SRIDATTAM Agarbatti',
       subheadline: 'Premium botanical incense sticks crafted for daily rituals, peace, and reflection.',
       cta: 'Explore Collection',
-      link: '/products?category=incense-sticks',
+      link: '/products',
       desktopImage: '/HD1.png',
       mobileImage: '/HM1.png',
       image: '/HD1.png',
@@ -397,7 +423,7 @@ export default function Home() {
       headline: 'Devotional Fragrances',
       subheadline: 'Hand-rolled sticks prepared with sun-dried petals and pure botanical oils.',
       cta: 'Explore Collection',
-      link: '/products?category=incense-sticks',
+      link: '/products',
       desktopImage: '/HD2.png',
       mobileImage: '/HM2.png',
       image: '/HD2.png',
@@ -408,7 +434,7 @@ export default function Home() {
       headline: 'Natural Dhoop Sticks',
       subheadline: 'Charcoal-free bamboo-free dhoop sticks for a clean and pure atmosphere.',
       cta: 'Explore Collection',
-      link: '/products?category=bamboo-free-dhoop-sticks',
+      link: '/products',
       desktopImage: '/HD3.png',
       mobileImage: '/HM3.png',
       image: '/HD3.png',
@@ -419,7 +445,7 @@ export default function Home() {
       headline: 'Sambrani Kits',
       subheadline: 'Complete traditional sambrani cups and accessories for positive energy.',
       cta: 'Explore Collection',
-      link: '/products?category=sambrani-kits-2',
+      link: '/products',
       desktopImage: '/HD4.png',
       mobileImage: '/HM4.png',
       image: '/HD4.png',
@@ -427,8 +453,36 @@ export default function Home() {
     }
   ]
 
+  // Map active clubbing modules (e.g. Diwali) into hero slides with their custom banners & direct clubbing link
+  const clubbingSlides = activeClubbings.map(c => {
+    const eventParam = (c.eventName?.toLowerCase() || c.id || 'diwali')
+    const desktopImg = c.bannerImageDesktop || c.bannerImage || '/HD1.png'
+    const mobileImg = c.bannerImageMobile || desktopImg
+    return {
+      id: `clubbing_${c.id}`,
+      headline: c.name || 'Diwali Festive Clubbing',
+      subheadline: c.description || c.tagline || 'Special festive clubbing deals on pure sacred essentials.',
+      cta: 'Shop Festive Deals',
+      link: `/products?clubbing=${eventParam}`,
+      desktopImage: desktopImg,
+      mobileImage: mobileImg,
+      image: desktopImg,
+      isClubbing: true,
+      tagline: c.tagline || 'Diwali Sale',
+      layoutType: 'right'
+    }
+  })
+
+  // Put active clubbing banner directly into the hero slider carousel!
+  const slides = clubbingSlides.length > 0
+    ? [clubbingSlides[0], ...baseSlides, ...clubbingSlides.slice(1)]
+    : baseSlides
+
+  const activeSlideIndex = slides.length > 0 ? (currentSlide % slides.length) : 0
+
   // Auto transition hero slides
   useEffect(() => {
+    if (slides.length <= 1) return
     const timer = setInterval(() => {
       setCurrentSlide(prev => (prev + 1) % slides.length)
     }, 5000)
@@ -547,7 +601,7 @@ export default function Home() {
           <div
             key={slide.id}
             className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
-              currentSlide === idx ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+              activeSlideIndex === idx ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
             }`}
           >
             {/* Clickable Image Slide Link */}
@@ -599,7 +653,7 @@ export default function Home() {
                 key={idx}
                 onClick={() => setCurrentSlide(idx)}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  currentSlide === idx ? 'bg-[#D7A65B] w-8' : 'bg-[#F7E9D1]/30 hover:bg-[#D7A65B]/60'
+                  activeSlideIndex === idx ? 'bg-[#D7A65B] w-8' : 'bg-[#F7E9D1]/30 hover:bg-[#D7A65B]/60'
                 }`}
                 aria-label={`Go to slide ${idx + 1}`}
               />
@@ -608,8 +662,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* DYNAMIC FESTIVE CLUBBING BANNER */}
-      <ClubbingFestiveBanner />
+      {/* Standalone banner removed: now unified directly into the hero slider above! */}
 
       {/* SECTION 2 — TRUST & QUALITY HIGHLIGHTS */}
       <section className="bg-transparent border-b border-stone-100 py-10 md:py-12 relative z-10">

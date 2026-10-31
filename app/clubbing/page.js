@@ -193,29 +193,10 @@ function ClubbingScrollRow({ campaign, onAddToCart, onBuyNow, addingId }) {
 
 export default function ClubbingStorefrontPage() {
   const router = useRouter()
-  const { addItem, openDrawer } = useCart()
-  const [activeClubbings, setActiveClubbings] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [addingId, setAddingId] = useState(null)
-
-  const loadCampaigns = async () => {
-    try {
-      const active = await getActiveClubbings()
-      setActiveClubbings(active || [])
-    } catch (err) {
-      console.error('Failed to load active clubbings:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   useEffect(() => {
-    loadCampaigns()
-
-    const handleUpdate = () => loadCampaigns()
-    window.addEventListener('sd:clubbings-updated', handleUpdate)
-    return () => window.removeEventListener('sd:clubbings-updated', handleUpdate)
-  }, [])
+    router.replace('/products?clubbing=diwali')
+  }, [router])
 
   // Add Item to Cart at exact Clubbing Price
   const handleAddToCart = (item, campaign) => {

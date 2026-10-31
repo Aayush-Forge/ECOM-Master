@@ -37,9 +37,10 @@ import {
   Mail,
   Truck,
   LogOut,
-  Shield,
   Building2,
   Loader2,
+  Sparkles,
+  Shield,
 } from 'lucide-react'
 
 const ICON_MAP = {
@@ -56,6 +57,7 @@ const ICON_MAP = {
   Truck,
   Shield,
   Building2,
+  Sparkles,
 }
 
 export default function DashboardLayout({ children }) {

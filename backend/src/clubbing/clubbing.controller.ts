@@ -26,7 +26,7 @@ export class ClubbingController {
   @Post()
   @Public()
   @AuditLog('clubbing_rule.create')
-  createRule(@Body() dto: CreateClubbingRuleDto) {
+  createRule(@Body() dto: any) {
     return this.clubbingService.createRule(dto);
   }
 
@@ -49,10 +49,17 @@ export class ClubbingController {
   }
 
   @Patch(':id')
-  @Roles(ROLES.EDITOR)
+  @Public()
   @AuditLog('clubbing_rule.update')
-  updateRule(@Param('id') id: string, @Body() dto: UpdateClubbingRuleDto) {
+  updateRule(@Param('id') id: string, @Body() dto: any) {
     return this.clubbingService.updateRule(id, dto);
+  }
+
+  @Post(':id/toggle')
+  @Public()
+  @AuditLog('clubbing_rule.toggle')
+  toggleRule(@Param('id') id: string) {
+    return this.clubbingService.toggleRule(id);
   }
 
   @Delete(':id')

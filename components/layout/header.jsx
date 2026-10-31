@@ -52,23 +52,21 @@ export default function Header() {
   }, [open])
 
   // Dynamic Festive Campaign Navbar Labeling
-  const [festiveNavLabel, setFestiveNavLabel] = useState('DIWALI')
-  const [activeFestiveRule, setActiveFestiveRule] = useState(null)
+  const [activeFestiveRules, setActiveFestiveRules] = useState([])
 
   useEffect(() => {
     let active = true
 
-    const loadActiveFestiveRule = async () => {
+    const loadActiveFestiveRules = async () => {
       try {
         const res = await fetch('http://localhost:5000/clubbing/active', {
           headers: { Accept: 'application/json' },
         })
         if (res.ok) {
           const rules = await res.json()
-          if (active && Array.isArray(rules) && rules.length > 0) {
-            const rule = rules.find((r) => r.isActive !== false) || rules[0]
-            setActiveFestiveRule(rule)
-            setFestiveNavLabel(extractFestivalNavLabel(rule))
+          if (active && Array.isArray(rules)) {
+            const activeOnly = rules.filter((r) => r && r.isActive !== false)
+            setActiveFestiveRules(activeOnly)
             return
           }
         }
@@ -78,22 +76,21 @@ export default function Header() {
 
       try {
         const local = await getActiveClubbings()
-        if (active && Array.isArray(local) && local.length > 0) {
-          const rule = local[0]
-          setActiveFestiveRule(rule)
-          setFestiveNavLabel(extractFestivalNavLabel(rule))
+        if (active && Array.isArray(local)) {
+          const activeOnly = local.filter((r) => r && r.isActive !== false)
+          setActiveFestiveRules(activeOnly)
           return
         }
       } catch {}
 
       if (active) {
-        setFestiveNavLabel('FESTIVE')
+        setActiveFestiveRules([])
       }
     }
 
-    loadActiveFestiveRule()
+    loadActiveFestiveRules()
 
-    const onUpdate = () => loadActiveFestiveRule()
+    const onUpdate = () => loadActiveFestiveRules()
     window.addEventListener('sd:clubbings-updated', onUpdate)
     return () => {
       active = false
@@ -101,10 +98,20 @@ export default function Header() {
     }
   }, [])
 
+  // Generate festive links for each active clubbing module
+  const festiveNavLinks = activeFestiveRules.map((rule) => {
+    const key = (rule.eventName || rule.id || rule.name || 'diwali').toLowerCase()
+    return {
+      key: rule.id || key,
+      href: `/products?clubbing=${encodeURIComponent(key)}`,
+      label: extractFestivalNavLabel(rule),
+    }
+  })
+
   const navItems = [
     { href: '/', label: 'Home' },
     { href: '/products', label: 'Products' },
-    { href: '/products?clubbing=diwali', label: festiveNavLabel },
+    ...festiveNavLinks,
     { href: '/about', label: 'About' },
     { href: '/track-order', label: 'Track Order' }
   ]
@@ -238,18 +245,20 @@ export default function Header() {
                         </div>
                       </div>
 
-                      {/* Clubbing (Festive Event) */}
-                      <div className="border-b border-stone-100 pb-5">
-                        <Link 
-                          href="/products?clubbing=diwali" 
-                          onClick={() => setOpen(false)}
-                          className="flex items-center justify-between text-base font-body font-medium tracking-[0.2em] uppercase text-midnight hover:text-[#6B1024] transition-colors"
-                        >
-                          <span className="flex items-center gap-2">
-                            <span>{festiveNavLabel}</span>
-                          </span>
-                        </Link>
-                      </div>
+                      {/* Clubbing (Festive Events) - Only renders when campaigns are active */}
+                      {festiveNavLinks.map((fLink) => (
+                        <div key={fLink.key} className="border-b border-stone-100 pb-5">
+                          <Link 
+                            href={fLink.href} 
+                            onClick={() => setOpen(false)}
+                            className="flex items-center justify-between text-base font-body font-medium tracking-[0.2em] uppercase text-midnight hover:text-[#6B1024] transition-colors"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{fLink.label}</span>
+                            </span>
+                          </Link>
+                        </div>
+                      ))}
 
                       {/* About */}
                       <div className="border-b border-stone-100 pb-5">

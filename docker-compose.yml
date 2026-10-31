@@ -11,6 +11,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-sridattam_dev_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/data/database_dump.sql:/docker-entrypoint-initdb.d/01_database_dump.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sridattam_admin} -d ${POSTGRES_DB:-sridattam_dev_db}"]
       interval: 5s
@@ -81,6 +82,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/src
+      - ./backend/data:/app/data
     networks:
       - sridattam_network
 

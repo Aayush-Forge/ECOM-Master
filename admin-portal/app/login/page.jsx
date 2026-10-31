@@ -53,7 +53,7 @@ function LoginForm() {
   }
 
   return (
-    <Card className="bg-white border-stone-200 text-stone-900 shadow-xl rounded-xl">
+    <Card className="bg-white border-stone-200 text-stone-900 shadow-xl rounded-xl" suppressHydrationWarning>
       <CardHeader className="space-y-1 pb-4">
         <CardTitle className="text-xl font-bold text-stone-900">Sign In</CardTitle>
         <CardDescription className="text-stone-500 text-xs">
@@ -127,8 +127,8 @@ function LoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4" suppressHydrationWarning>
+      <div className="w-full max-w-md" suppressHydrationWarning>
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/20 mb-3 shadow-sm">
             <Shield size={24} />
