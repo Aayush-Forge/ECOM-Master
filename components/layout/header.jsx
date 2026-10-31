@@ -98,12 +98,11 @@ export default function Header() {
     }
   }, [])
 
-  // Generate festive links for each active clubbing module
+  // Generate festive links for each active clubbing module - pointing directly to dedicated /clubbing storefront
   const festiveNavLinks = activeFestiveRules.map((rule) => {
-    const key = (rule.eventName || rule.id || rule.name || 'diwali').toLowerCase()
     return {
-      key: rule.id || key,
-      href: `/products?clubbing=${encodeURIComponent(key)}`,
+      key: rule.id || 'clubbing',
+      href: '/clubbing',
       label: extractFestivalNavLabel(rule),
     }
   })

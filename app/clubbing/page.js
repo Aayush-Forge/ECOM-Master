@@ -14,14 +14,14 @@ import { toast } from 'sonner'
 import {
   Sparkles,
   ShoppingBag,
-  CreditCard,
   Plus,
   Minus,
+  Check,
+  ArrowRight,
+  ShieldCheck,
   Flame,
   Gift,
   Truck,
-  ShieldCheck,
-  Package,
 } from 'lucide-react'
 
 export default function ClubbingStorefrontPage() {
@@ -31,6 +31,7 @@ export default function ClubbingStorefrontPage() {
   const [loading, setLoading] = useState(true)
   const [quantities, setQuantities] = useState({})
   const [addingId, setAddingId] = useState(null)
+  const [addingAll, setAddingAll] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -57,7 +58,7 @@ export default function ClubbingStorefrontPage() {
     })
   }
 
-  const handleAddToCart = (product, campaign) => {
+  const handleAddToCart = async (product, campaign) => {
     const pId = product.productId || product.id
     const qty = quantities[pId] || 1
     setAddingId(pId)
@@ -66,7 +67,7 @@ export default function ClubbingStorefrontPage() {
       const clubPrice = Number(product.clubbingPrice || product.price || 0)
       const origPrice = Number(product.originalPrice || clubPrice)
 
-      addItem(
+      await addItem(
         {
           product_id: pId,
           id: pId,
@@ -81,36 +82,52 @@ export default function ClubbingStorefrontPage() {
         qty,
       )
 
-      toast.success(`✨ Added ×${qty} "${product.name || product.title}" at clubbing price ₹${clubPrice}!`)
+      toast.success(`Added ×${qty} "${product.name || product.title}" to cart at celebratory price ₹${clubPrice}`)
       openDrawer()
+    } catch (err) {
+      console.error('Failed to add item:', err)
+      toast.error('Failed to add item to cart')
     } finally {
-      setTimeout(() => setAddingId(null), 300)
+      setAddingId(null)
     }
   }
 
-  const handleBuyNow = (product, campaign) => {
-    const pId = product.productId || product.id
-    const qty = quantities[pId] || 1
-    const clubPrice = Number(product.clubbingPrice || product.price || 0)
-    const origPrice = Number(product.originalPrice || clubPrice)
+  // One-Click Buy All Products in Bundle Together
+  const handleBuyAllTogether = async (campaignProducts, campaignName) => {
+    if (!campaignProducts || campaignProducts.length === 0) return
+    setAddingAll(true)
 
-    addItem(
-      {
-        product_id: pId,
-        id: pId,
-        title: product.name || product.title,
-        name: product.name || product.title,
-        slug: product.slug || pId,
-        price: clubPrice,
-        regular_price: origPrice,
-        image: product.image || null,
-        weight: 0.25,
-      },
-      qty,
-    )
+    try {
+      for (const item of campaignProducts) {
+        const pId = item.productId || item.id
+        const qty = quantities[pId] || 1
+        const clubPrice = Number(item.clubbingPrice || item.price || 0)
+        const origPrice = Number(item.originalPrice || clubPrice)
 
-    toast.success(`Proceeding to checkout with ${product.name || product.title}...`)
-    router.push('/checkout')
+        await addItem(
+          {
+            product_id: pId,
+            id: pId,
+            title: item.name || item.title,
+            name: item.name || item.title,
+            slug: item.slug || pId,
+            price: clubPrice,
+            regular_price: origPrice,
+            image: item.image || null,
+            weight: 0.25,
+          },
+          qty,
+        )
+      }
+
+      toast.success(`Added entire ${campaignName} bundle to your cart!`)
+      openDrawer()
+    } catch (err) {
+      console.error('Failed to add bundle:', err)
+      toast.error('Failed to add complete bundle to cart')
+    } finally {
+      setAddingAll(false)
+    }
   }
 
   return (
@@ -125,11 +142,11 @@ export default function ClubbingStorefrontPage() {
         <div className="container max-w-5xl mx-auto px-4 relative z-10 text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-none bg-[#D7A65B]/15 text-[#D7A65B] border border-[#D7A65B]/30 text-[10px] font-semibold uppercase tracking-[0.25em]">
             <Sparkles className="w-3 h-3 text-[#D7A65B]" />
-            <span>SACRED FESTIVE CLUBBINGS • EXCLUSIVE SAVINGS</span>
+            <span>SACRED FESTIVE CLUBBINGS • CURATED BUNDLES</span>
           </div>
 
           <h1 className="font-cormorant text-3xl sm:text-4xl md:text-5xl font-light text-white tracking-widest uppercase leading-tight">
-            Sacred Festive Collections
+            Sacred Festive Clubbing
           </h1>
 
           <p className="text-xs sm:text-sm text-stone-300 font-light max-w-xl mx-auto leading-relaxed">
@@ -165,8 +182,8 @@ export default function ClubbingStorefrontPage() {
           {loading ? (
             <div className="space-y-12">
               <Skeleton className="h-64 w-full bg-stone-200 rounded-none animate-pulse" />
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
                   <Skeleton key={i} className="aspect-square bg-stone-200 rounded-none animate-pulse" />
                 ))}
               </div>
@@ -187,15 +204,19 @@ export default function ClubbingStorefrontPage() {
           ) : (
             activeClubbings.map((campaign) => {
               const desktopBanner = campaign.bannerImageDesktop || campaign.bannerImage || '/HD1.png'
-              const mobileBanner = campaign.bannerImageMobile || desktopBanner
               const products = Array.isArray(campaign.clubbingProducts) && campaign.clubbingProducts.length > 0
                 ? campaign.clubbingProducts
                 : Array.isArray(campaign.products)
                   ? campaign.products
                   : []
 
+              const bundleOriginalTotal = products.reduce((sum, item) => sum + (Number(item.originalPrice || item.price) || 0), 0)
+              const bundleClubbingTotal = products.reduce((sum, item) => sum + (Number(item.clubbingPrice || item.price) || 0), 0)
+              const bundleSavings = bundleOriginalTotal - bundleClubbingTotal
+              const bundleDiscountPercent = bundleOriginalTotal > 0 ? Math.round((bundleSavings / bundleOriginalTotal) * 100) : 0
+
               return (
-                <section key={campaign.id} className="space-y-8">
+                <section key={campaign.id} className="space-y-10">
                   {/* Festival Hero Banner */}
                   <div className="relative w-full aspect-[16/6] md:aspect-[21/7] overflow-hidden border border-[#D7A65B]/30 bg-[#130306] shadow-sm">
                     <Image
@@ -222,23 +243,69 @@ export default function ClubbingStorefrontPage() {
                     </div>
                   </div>
 
+                  {/* Curated Festive Bundle Header Banner with One-Click Buy All */}
+                  <div className="bg-[#FFF9EE] border-2 border-[#D7A65B] p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 shadow-sm">
+                    <div className="space-y-2 max-w-xl">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#6B1024] text-white text-[10px] font-bold uppercase tracking-wider">
+                        <Sparkles className="w-3 h-3 text-[#D7A65B]" />
+                        <span>Curated Festive Ritual Set ({products.length} Sacred Items)</span>
+                      </div>
+                      <h3 className="font-cormorant text-2xl sm:text-3xl font-bold text-[#6B1024]">
+                        Buy The Complete {campaign.eventName || campaign.name} Set
+                      </h3>
+                      <p className="text-xs text-stone-600 font-light leading-relaxed">
+                        Specially curated harmonious sacred fragrances for your festive celebrations. Experience all {products.length} consecrated offerings together at our exclusive festival clubbing price.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6 bg-white p-4 border border-stone-200 shrink-0">
+                      <div>
+                        <div className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold">Total Bundle Value</div>
+                        <div className="flex items-baseline gap-2 mt-0.5">
+                          <span className="font-cormorant text-3xl font-bold text-[#6B1024]">
+                            ₹{bundleClubbingTotal}
+                          </span>
+                          {bundleOriginalTotal > bundleClubbingTotal && (
+                            <span className="text-sm text-stone-400 line-through">
+                              ₹{bundleOriginalTotal}
+                            </span>
+                          )}
+                        </div>
+                        {bundleSavings > 0 && (
+                          <div className="text-[11px] font-bold text-emerald-700">
+                            Save ₹{bundleSavings} ({bundleDiscountPercent}% OFF)
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={() => handleBuyAllTogether(products, campaign.name)}
+                        disabled={addingAll}
+                        className="bg-[#6B1024] hover:bg-[#4D0013] text-white border border-[#6B1024] rounded-none px-6 py-5 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2 h-auto shadow-sm"
+                      >
+                        <ShoppingBag className="w-4 h-4 text-[#D7A65B]" />
+                        <span>{addingAll ? 'Adding Bundle...' : `Buy All ${products.length} Together`}</span>
+                      </Button>
+                    </div>
+                  </div>
+
                   {/* Section Title */}
                   <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 border-b border-stone-200 pb-3">
                     <div>
                       <h3 className="font-cormorant text-2xl sm:text-3xl font-light uppercase tracking-widest text-[#6B1024]">
-                        Featured Products
+                        Included In This Festive Collection
                       </h3>
                       <p className="text-xs text-stone-500 font-light mt-0.5">
-                        Available at exclusive festive clubbing prices for a limited time.
+                        You can purchase the full set above, or select individual sacred items below at their special celebratory prices.
                       </p>
                     </div>
                     <span className="text-xs text-[#D7A65B] font-semibold tracking-wider uppercase">
-                      {products.length} Festive Items
+                      {products.length} Products
                     </span>
                   </div>
 
-                  {/* Products Grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
+                  {/* Products Grid - Exact Same Sridattam Card Presentation As Homepage */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                     {products.map((item) => {
                       const pId = item.productId || item.id
                       const title = item.title || item.name || 'Sacred Incense'
@@ -252,103 +319,104 @@ export default function ClubbingStorefrontPage() {
                       return (
                         <div
                           key={pId}
-                          className="group relative flex flex-col justify-between bg-white border border-stone-200/90 rounded-none p-3 sm:p-4 hover:shadow-xl hover:border-[#6B1024]/40 transition-all duration-300"
+                          className="group bg-white border border-stone-200 p-4 sm:p-5 flex flex-col justify-between shadow-sm relative transition-all duration-500 hover:border-[#D7A65B]/40 hover:shadow-md hover:bg-stone-50/20 rounded-sm overflow-hidden"
                         >
-                          <div className="space-y-3">
-                            {/* Badges */}
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#6B1024] bg-[#6B1024]/5 px-2 py-0.5 border border-[#6B1024]/15">
-                                <Sparkles size={10} className="text-[#D7A65B]" />
-                                {item.category || 'Incense'}
-                              </span>
+                          <div className="space-y-4">
+                            {/* Product Image Frame matching HomeProductCard */}
+                            <div className="aspect-square w-full relative overflow-hidden bg-stone-50 border border-stone-150 rounded-sm group/img">
+                              <Link href={`/products/${item.slug || pId}`}>
+                                <Image
+                                  src={image}
+                                  alt={title}
+                                  fill
+                                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 350px"
+                                  className="object-cover opacity-95 transition-transform duration-700 ease-out group-hover:scale-105"
+                                  unoptimized={image.startsWith('http')}
+                                />
+                              </Link>
+
+                              {/* Badges */}
+                              <div className="absolute top-2 left-2 flex flex-col gap-1 z-20">
+                                <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#6B1024] bg-white/95 backdrop-blur-sm px-2 py-0.5 border border-stone-200 shadow-xs">
+                                  <Sparkles size={10} className="text-[#D7A65B]" />
+                                  {item.category || 'Sacred Offering'}
+                                </span>
+                              </div>
+
                               {hasDiscount && (
-                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 border border-emerald-200">
-                                  SAVE ₹{orig - deal} ({discountPercent}% OFF)
+                                <span className="absolute top-2 right-2 text-[9px] font-bold text-white bg-[#6B1024] px-2 py-0.5 uppercase tracking-wider shadow-xs z-20">
+                                  {discountPercent}% OFF
                                 </span>
                               )}
                             </div>
 
-                            {/* Product Image */}
-                            <Link
-                              href={`/products/${item.slug || pId}`}
-                              className="relative aspect-square w-full block overflow-hidden bg-stone-50"
-                            >
-                              <Image
-                                src={image}
-                                alt={title}
-                                fill
-                                sizes="(max-width: 768px) 50vw, 25vw"
-                                className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                unoptimized={image.startsWith('http')}
-                              />
-                            </Link>
-
-                            {/* Title and details */}
+                            {/* Info Details matching HomeProductCard */}
                             <div className="space-y-1 text-left">
-                              <Link
-                                href={`/products/${item.slug || pId}`}
-                                className="block font-cormorant text-base sm:text-lg font-bold text-[#6B1024] hover:underline line-clamp-1"
-                              >
-                                {title}
-                              </Link>
-                              <p className="text-[10px] text-stone-500 line-clamp-2 h-7 font-light">
-                                Pure temple agarbatti crafted for daily prayers and peace.
+                              <h4 className="font-cormorant text-lg sm:text-xl text-[#6B1024] font-bold leading-snug tracking-wide line-clamp-1">
+                                <Link href={`/products/${item.slug || pId}`} className="hover:underline">
+                                  {title}
+                                </Link>
+                              </h4>
+                              <p className="text-[11px] text-[#6B1024]/75 line-clamp-2 h-8 font-light leading-relaxed">
+                                Pure consecrated temple incense prepared with authentic botanicals for sacred rituals.
                               </p>
 
-                              <div className="flex items-center gap-2 pt-1">
-                                <span className="font-cormorant font-bold text-[#6B1024] text-base sm:text-lg">
+                              {/* Pricing row */}
+                              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                                <span className="text-xl font-cormorant font-bold text-[#6B1024]">
                                   ₹{deal}
                                 </span>
                                 {hasDiscount && (
-                                  <span className="text-xs text-stone-400 line-through">
-                                    ₹{orig}
-                                  </span>
+                                  <>
+                                    <span className="text-xs text-[#6B1024]/50 line-through">
+                                      ₹{orig}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-sm border border-emerald-100">
+                                      Save ₹{orig - deal}
+                                    </span>
+                                  </>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          {/* Add to Cart Actions */}
-                          <div className="pt-3 mt-3 border-t border-stone-100 space-y-2">
-                            <div className="flex items-center justify-center border border-stone-200 bg-stone-50/70 h-8 gap-2 w-full">
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(pId, -1)}
-                                className="p-1 hover:bg-stone-200 text-stone-600 transition"
-                                aria-label="Decrease quantity"
+                          {/* Action panel matching HomeProductCard */}
+                          <div className="pt-4 mt-4 border-t border-stone-100 z-20 relative">
+                            <div className="flex flex-col gap-2">
+                              {/* Quantity Selector Row */}
+                              <div className="flex items-center justify-center border border-stone-200 rounded-sm bg-stone-50/55 py-1.5 px-3 h-10 gap-2 w-full">
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateQuantity(pId, -1)}
+                                    className="p-1 hover:bg-stone-200 rounded-full text-stone-600 transition"
+                                    aria-label="Decrease quantity"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <span className="font-bold min-w-[20px] text-center text-stone-900 text-xs sm:text-sm">
+                                    {cardQty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateQuantity(pId, 1)}
+                                    className="p-1 hover:bg-stone-200 rounded-full text-stone-600 transition"
+                                    aria-label="Increase quantity"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <Button
+                                onClick={() => handleAddToCart(item, campaign)}
+                                disabled={addingId === pId}
+                                className="w-full bg-[#6B1024] hover:bg-[#4D0013] text-white border border-[#6B1024] px-2 py-3.5 sm:py-4 rounded-none font-bold uppercase tracking-wider text-[9px] flex items-center justify-center gap-1.5 h-10 transition-colors"
                               >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <span className="font-bold text-xs text-stone-800 min-w-[20px] text-center">
-                                {cardQty}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(pId, 1)}
-                                className="p-1 hover:bg-stone-200 text-stone-600 transition"
-                                aria-label="Increase quantity"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
+                                <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" />
+                                <span>{addingId === pId ? 'Adding...' : 'Add Individual Item'}</span>
+                              </Button>
                             </div>
-
-                            <Button
-                              onClick={() => handleAddToCart(item, campaign)}
-                              disabled={addingId === pId}
-                              className="w-full bg-[#6B1024] hover:bg-[#4D0013] text-white border border-[#6B1024] rounded-none font-bold uppercase tracking-wider text-[9px] flex items-center justify-center gap-1.5 h-10 transition-colors"
-                            >
-                              <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" />
-                              <span>{addingId === pId ? 'Adding...' : 'Add at Clubbing Price'}</span>
-                            </Button>
-
-                            <Button
-                              onClick={() => handleBuyNow(item, campaign)}
-                              variant="outline"
-                              className="w-full border-stone-300 hover:border-[#6B1024] hover:bg-[#FFF9EE] text-[#6B1024] font-bold text-[9px] uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 h-8 transition-colors"
-                            >
-                              <CreditCard className="w-3.5 h-3.5 stroke-[1.5]" />
-                              <span>Buy Now</span>
-                            </Button>
                           </div>
                         </div>
                       )
