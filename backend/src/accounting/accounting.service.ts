@@ -64,17 +64,27 @@ export class AccountingService {
     const { fromDate, toDate } = this.parseDateRange(query);
     const companyState = await this.getCompanyState();
 
-    const dateFilter: any = {};
+    const where: any = {};
     if (fromDate || toDate) {
-      dateFilter.createdAt = {};
-      if (fromDate) dateFilter.createdAt.gte = fromDate;
-      if (toDate) dateFilter.createdAt.lte = toDate;
+      where.createdAt = {};
+      if (fromDate) where.createdAt.gte = fromDate;
+      if (toDate) where.createdAt.lte = toDate;
+    }
+
+    if (query.status && query.status !== 'all') {
+      where.status = query.status as OrderStatus;
+    }
+
+    if (query.state && query.state !== 'all') {
+      where.addresses = {
+        some: {
+          state: { contains: query.state.trim(), mode: 'insensitive' },
+        },
+      };
     }
 
     const orders = await this.prisma.order.findMany({
-      where: {
-        ...dateFilter,
-      },
+      where,
       include: {
         addresses: true,
         payments: true,
@@ -222,6 +232,14 @@ export class AccountingService {
       ];
     }
 
+    if (query.state && query.state !== 'all') {
+      where.addresses = {
+        some: {
+          state: { contains: query.state.trim(), mode: 'insensitive' },
+        },
+      };
+    }
+
     const orders = await this.prisma.order.findMany({
       where,
       include: {
@@ -240,7 +258,12 @@ export class AccountingService {
 
     return orders.map((o) => {
       const shippingAddr = o.addresses.find((a) => a.type === 'shipping') || o.addresses[0];
-      const customerName = shippingAddr?.fullName || o.customer?.firstName ? `${o.customer?.firstName || ''} ${o.customer?.lastName || ''}`.trim() : o.email?.split('@')[0] || 'Customer';
+      const customerName =
+        (shippingAddr?.fullName && shippingAddr.fullName.trim()) ||
+        (o.customer?.firstName
+          ? `${o.customer.firstName || ''} ${o.customer.lastName || ''}`.trim()
+          : '') ||
+        (o.email ? o.email.split('@')[0] : 'Customer');
       const state = shippingAddr?.state || 'Karnataka';
       const orderState = state.toLowerCase();
       const isIntraState = !orderState || orderState.includes(companyState) || companyState.includes(orderState);

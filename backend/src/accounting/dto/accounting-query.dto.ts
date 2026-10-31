@@ -20,4 +20,8 @@ export class AccountingQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
 }

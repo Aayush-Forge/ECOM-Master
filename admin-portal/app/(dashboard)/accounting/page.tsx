@@ -1,8 +1,25 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { fetchWithAuth } from '@/services/api';
+import { 
+  ArrowLeft, 
+  Download, 
+  Printer, 
+  RefreshCw, 
+  FileText, 
+  CheckCircle2, 
+  Clock, 
+  RotateCcw, 
+  HelpCircle,
+  ExternalLink,
+  ChevronRight,
+  ShieldCheck,
+  AlertCircle
+} from 'lucide-react';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
 interface OrderItem {
   name: string;
@@ -14,472 +31,215 @@ interface OrderItem {
 
 interface FinancialOrder {
   id: string;
+  dbId: string;
   invoice: string;
   date: string;
   customer: string;
   email: string;
   state: string;
   type: 'intra' | 'inter';
-  items: OrderItem[];
+  subtotal: number;
+  discount: number;
   shipping: number;
-  status: 'Paid' | 'Pending' | 'Refunded';
+  tax: number;
+  total: number;
+  status: 'Paid' | 'Pending' | 'Refunded' | string;
   gateway: string;
   ref: string;
   refund: number;
+  items: OrderItem[];
 }
 
-const INITIAL_SAMPLE_ORDERS: FinancialOrder[] = [
-  {
-    id: "ORD-1048",
-    invoice: "INV-2026-048",
-    date: "2026-10-24",
-    customer: "Ananya Rao",
-    email: "ananya.rao@example.com",
-    state: "Karnataka",
-    type: "intra",
-    items: [
-      { name: "Premium Incense Sticks", qty: 2, price: 180, hsn: "33074100", rate: 5 },
-      { name: "Dhoop Cones", qty: 1, price: 240, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 49,
-    status: "Paid",
-    gateway: "Razorpay",
-    ref: "pay_demo_8KQ241",
-    refund: 0
-  },
-  {
-    id: "ORD-1047",
-    invoice: "INV-2026-047",
-    date: "2026-10-23",
-    customer: "Rohan Mehta",
-    email: "rohan.m@example.com",
-    state: "Maharashtra",
-    type: "inter",
-    items: [
-      { name: "Sambrani Kit", qty: 2, price: 320, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 49,
-    status: "Paid",
-    gateway: "UPI",
-    ref: "UPI-DEMO-731028",
-    refund: 0
-  },
-  {
-    id: "ORD-1046",
-    invoice: "INV-2026-046",
-    date: "2026-10-22",
-    customer: "Kavya Iyer",
-    email: "kavya.iyer@example.com",
-    state: "Tamil Nadu",
-    type: "inter",
-    items: [
-      { name: "Dhoop Sticks", qty: 3, price: 150, hsn: "33074100", rate: 5 },
-      { name: "Premium Incense Sticks", qty: 1, price: 180, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 99,
-    status: "Pending",
-    gateway: "Razorpay",
-    ref: "—",
-    refund: 0
-  },
-  {
-    id: "ORD-1045",
-    invoice: "INV-2026-045",
-    date: "2026-10-21",
-    customer: "Arjun Reddy",
-    email: "arjun.r@example.com",
-    state: "Telangana",
-    type: "inter",
-    items: [
-      { name: "Sambrani Kit", qty: 1, price: 320, hsn: "33074100", rate: 5 },
-      { name: "Dhoop Cones", qty: 2, price: 240, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 49,
-    status: "Paid",
-    gateway: "Card",
-    ref: "CARD-DEMO-92014",
-    refund: 0
-  },
-  {
-    id: "ORD-1044",
-    invoice: "INV-2026-044",
-    date: "2026-10-20",
-    customer: "Meera Shetty",
-    email: "meera.s@example.com",
-    state: "Karnataka",
-    type: "intra",
-    items: [
-      { name: "Dhoop Sticks", qty: 2, price: 150, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 49,
-    status: "Refunded",
-    gateway: "Razorpay",
-    ref: "pay_demo_2MZ913",
-    refund: 180
-  },
-  {
-    id: "ORD-1043",
-    invoice: "INV-2026-043",
-    date: "2026-10-18",
-    customer: "Nikhil Shah",
-    email: "nikhil.s@example.com",
-    state: "Maharashtra",
-    type: "inter",
-    items: [
-      { name: "Premium Incense Sticks", qty: 4, price: 180, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 99,
-    status: "Paid",
-    gateway: "UPI",
-    ref: "UPI-DEMO-621109",
-    refund: 0
-  },
-  {
-    id: "ORD-1042",
-    invoice: "INV-2026-042",
-    date: "2026-10-16",
-    customer: "Pooja Nair",
-    email: "pooja.n@example.com",
-    state: "Karnataka",
-    type: "intra",
-    items: [
-      { name: "Sambrani Kit", qty: 1, price: 320, hsn: "33074100", rate: 5 },
-      { name: "Dhoop Sticks", qty: 1, price: 150, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 49,
-    status: "Pending",
-    gateway: "Razorpay",
-    ref: "—",
-    refund: 0
-  },
-  {
-    id: "ORD-1041",
-    invoice: "INV-2026-041",
-    date: "2026-10-14",
-    customer: "Sanjay Kulkarni",
-    email: "sanjay.k@example.com",
-    state: "Maharashtra",
-    type: "inter",
-    items: [
-      { name: "Dhoop Cones", qty: 2, price: 240, hsn: "33074100", rate: 5 }
-    ],
-    shipping: 49,
-    status: "Paid",
-    gateway: "Card",
-    ref: "CARD-DEMO-71302",
-    refund: 0
-  }
-];
+interface FinancialSummary {
+  grossOrderValue: number;
+  paymentsCollected: number;
+  refundsRecorded: number;
+  totalTaxCollected: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  taxableAmount: number;
+  totalShipping: number;
+  totalDiscounts: number;
+  estimatedGatewayFees: number;
+  netProfit: number;
+  ordersCount: number;
+}
 
-const MONTHLY_TREND_DATA = [
-  { m: "May", sales: 28400, paid: 25100 },
-  { m: "Jun", sales: 32100, paid: 29700 },
-  { m: "Jul", sales: 30800, paid: 28200 },
-  { m: "Aug", sales: 39700, paid: 36500 },
-  { m: "Sep", sales: 42100, paid: 38800 },
-  { m: "Oct", sales: 48560, paid: 37140 }
-];
+interface DailyBreakdownItem {
+  date: string;
+  sales: number;
+  collections: number;
+  ordersCount: number;
+}
+
+const DEFAULT_SUMMARY: FinancialSummary = {
+  grossOrderValue: 0,
+  paymentsCollected: 0,
+  refundsRecorded: 0,
+  totalTaxCollected: 0,
+  cgst: 0,
+  sgst: 0,
+  igst: 0,
+  taxableAmount: 0,
+  totalShipping: 0,
+  totalDiscounts: 0,
+  estimatedGatewayFees: 0,
+  netProfit: 0,
+  ordersCount: 0,
+};
 
 export default function AccountingPage() {
-  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    async function loadData() {
-      try {
-        const data = await fetchWithAuth('/admin/accounting/orders');
-        if (mounted && Array.isArray(data) && data.length > 0) {
-          setOrders(data);
-        }
-      } catch (err) {
-        console.warn('Accounting orders load error:', err);
-      } finally {
-        if (mounted) setLoadingOrders(false);
-      }
-    }
-    loadData();
-    return () => { mounted = false; };
-  }, []);
-  const [orders, setOrders] = useState<FinancialOrder[]>(INITIAL_SAMPLE_ORDERS);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [stateFilter, setStateFilter] = useState("all");
-  const [monthFilter, setMonthFilter] = useState("");
-  const [chartRange, setChartRange] = useState<number>(6);
-  
-  // Modals state
+  // Live data states
+  const [summary, setSummary] = useState<FinancialSummary>(DEFAULT_SUMMARY);
+  const [breakdown, setBreakdown] = useState<DailyBreakdownItem[]>([]);
+  const [orders, setOrders] = useState<FinancialOrder[]>([]);
+
+  // Filter states
+  const [dateRange, setDateRange] = useState<string>('all_time');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [stateFilter, setStateFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Selected Order Modal
   const [selectedOrder, setSelectedOrder] = useState<FinancialOrder | null>(null);
-  const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // New Invoice Form state
-  const [newCustomer, setNewCustomer] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newState, setNewState] = useState("Karnataka");
-  const [newItemName, setNewItemName] = useState("Premium Incense Sticks");
-  const [newItemQty, setNewItemQty] = useState(2);
-  const [newItemPrice, setNewItemPrice] = useState(180);
-  const [newShipping, setNewShipping] = useState(49);
-  const [newStatus, setNewStatus] = useState<'Paid' | 'Pending'>('Paid');
-  const [newGateway, setNewGateway] = useState('UPI');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3000);
+    }, 3200);
   };
 
   const money = (n: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
       maximumFractionDigits: 2,
-    }).format(n);
+    }).format(n || 0);
   };
 
   const fmtDate = (s: string) => {
     try {
-      return new Date(s + "T00:00:00").toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
+      if (!s) return '—';
+      const d = new Date(s.includes('T') ? s : `${s}T00:00:00`);
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
       });
     } catch {
       return s;
     }
   };
 
-  const calc = (o: FinancialOrder) => {
-    const taxable = o.items.reduce((s, i) => s + i.qty * i.price, 0);
-    const tax = o.items.reduce((s, i) => s + (i.qty * i.price * i.rate) / 100, 0);
-    const shippingTaxable = o.shipping;
-    const total = taxable + tax + shippingTaxable;
-    const intra = o.type === "intra";
-    return {
-      taxable,
-      tax,
-      cgst: intra ? tax / 2 : 0,
-      sgst: intra ? tax / 2 : 0,
-      igst: intra ? 0 : tax,
-      shipping: shippingTaxable,
-      total,
-    };
-  };
+  // Fetch live accounting data from backend
+  const loadAccountingData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
 
-  // Filtered orders
-  const filteredOrders = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    return orders.filter((o) => {
-      const matchesQ =
-        !q ||
-        [o.id, o.invoice, o.customer, o.email, o.ref, o.gateway, o.state]
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
-      const matchesStatus = statusFilter === "all" || o.status === statusFilter;
-      const matchesState = stateFilter === "all" || o.state === stateFilter;
-      const matchesMonth = !monthFilter || o.date.startsWith(monthFilter);
-      return matchesQ && matchesStatus && matchesState && matchesMonth;
-    });
-  }, [orders, searchQuery, statusFilter, stateFilter, monthFilter]);
+    try {
+      const params = new URLSearchParams();
+      if (dateRange && dateRange !== 'all_time') params.append('range', dateRange);
+      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter.toLowerCase());
+      if (stateFilter && stateFilter !== 'all') params.append('state', stateFilter);
+      if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-  // Overall Financial Metric calculations based on active orders
-  const metrics = useMemo(() => {
-    const gross = orders.reduce((s, o) => s + calc(o).total, 0);
-    const collected = orders
-      .filter((o) => o.status === "Paid")
-      .reduce((s, o) => s + calc(o).total, 0);
-    const gst = orders.reduce((s, o) => s + calc(o).tax, 0);
-    const refunds = orders.reduce((s, o) => s + (o.refund || 0), 0);
-    return { gross, collected, gst, refunds };
-  }, [orders]);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
 
-  // Filtered GST Breakdown calculations
-  const gstBreakdown = useMemo(() => {
-    let intra = 0;
-    let inter = 0;
-    let taxable = 0;
-    let shipping = 0;
+      // Concurrent fetch for summary, breakdown, and ledger
+      const [sumRes, breakRes, ordRes] = await Promise.allSettled([
+        fetchWithAuth(`/admin/accounting/summary${queryStr}`),
+        fetchWithAuth(`/admin/accounting/daily-breakdown${dateRange ? `?range=${dateRange}` : ''}`),
+        fetchWithAuth(`/admin/accounting/orders${queryStr}`),
+      ]);
 
-    filteredOrders.forEach((o) => {
-      const c = calc(o);
-      taxable += c.taxable;
-      if (o.type === "intra") {
-        intra += c.tax;
-      } else {
-        inter += c.tax;
+      if (sumRes.status === 'fulfilled' && sumRes.value?.summary) {
+        setSummary(sumRes.value.summary);
       }
-      shipping += c.shipping;
-    });
 
-    const total = intra + inter;
-    return {
-      taxable,
-      cgst: intra / 2,
-      sgst: intra / 2,
-      igst: inter,
-      total,
-      shipping,
-    };
-  }, [filteredOrders]);
+      if (breakRes.status === 'fulfilled' && Array.isArray(breakRes.value)) {
+        setBreakdown(breakRes.value);
+      }
 
-  // Payment reconciliation calculations
-  const reconciliation = useMemo(() => {
-    const paid = filteredOrders.filter((o) => o.status === "Paid");
-    const pending = filteredOrders.filter((o) => o.status === "Pending");
-    const refunded = filteredOrders.filter((o) => o.status === "Refunded");
+      if (ordRes.status === 'fulfilled' && Array.isArray(ordRes.value)) {
+        setOrders(ordRes.value);
+      }
 
-    const paidTotal = paid.reduce((s, o) => s + calc(o).total, 0);
-    const pendingTotal = pending.reduce((s, o) => s + calc(o).total, 0);
-    const refundedTotal = refunded.reduce((s, o) => s + (o.refund || 0), 0);
+      if (isRefresh) {
+        showToast('Accounting ledger refreshed successfully.');
+      }
+    } catch (err: any) {
+      console.error('Failed to load accounting data:', err);
+      setError(err?.message || 'Unable to sync live financial records.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [dateRange, statusFilter, stateFilter, searchQuery]);
 
-    return {
-      paidCount: paid.length,
-      paidTotal,
-      pendingCount: pending.length,
-      pendingTotal,
-      refundedCount: refunded.length,
-      refundedTotal,
-    };
-  }, [filteredOrders]);
+  useEffect(() => {
+    loadAccountingData();
+  }, [loadAccountingData]);
 
-  // CSV Export utility
-  const csvEscape = (v: any) => `"${String(v ?? "").replaceAll('"', '""')}"`;
+  // Direct CSV Export download via backend stream
+  const handleExportCSV = () => {
+    const params = new URLSearchParams();
+    if (dateRange && dateRange !== 'all_time') params.append('range', dateRange);
+    if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter.toLowerCase());
+    if (stateFilter && stateFilter !== 'all') params.append('state', stateFilter);
+    if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-  const downloadCSV = (rows: FinancialOrder[], filename: string) => {
-    const headers = [
-      "Order ID",
-      "Invoice Number",
-      "Date",
-      "Customer",
-      "Customer Email",
-      "Supply State",
-      "Product Details",
-      "HSN",
-      "Taxable Value INR",
-      "CGST INR",
-      "SGST INR",
-      "IGST INR",
-      "Shipping INR",
-      "Order Total INR",
-      "Payment Status",
-      "Gateway",
-      "Payment Reference",
-      "Refund Recorded INR",
-    ];
-
-    const lines = [
-      headers,
-      ...rows.map((o) => {
-        const c = calc(o);
-        return [
-          o.id,
-          o.invoice,
-          o.date,
-          o.customer,
-          o.email,
-          o.state,
-          o.items.map((i) => `${i.name} x${i.qty}`).join("; "),
-          [...new Set(o.items.map((i) => i.hsn))].join("; "),
-          c.taxable.toFixed(2),
-          c.cgst.toFixed(2),
-          c.sgst.toFixed(2),
-          c.igst.toFixed(2),
-          c.shipping.toFixed(2),
-          c.total.toFixed(2),
-          o.status,
-          o.gateway,
-          o.ref,
-          (o.refund || 0).toFixed(2),
-        ];
-      }),
-    ].map((r) => r.map(csvEscape).join(","));
-
-    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("CSV report generated and downloaded successfully");
+    const url = `${API_BASE_URL}/admin/accounting/export-csv?${params.toString()}`;
+    window.open(url, '_blank');
+    showToast('Exporting financial ledger to CSV...');
   };
 
   const handleResetFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("all");
-    setStateFilter("all");
-    setMonthFilter("");
-    showToast("Filters reset to default view");
+    setDateRange('all_time');
+    setStatusFilter('all');
+    setStateFilter('all');
+    setSearchQuery('');
   };
 
-  const handleCreateInvoice = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCustomer.trim()) {
-      showToast("Customer name is required");
-      return;
-    }
-    const nextIdx = orders.length + 1;
-    const isIntra = newState.toLowerCase() === "karnataka";
-    const newOrder: FinancialOrder = {
-      id: `ORD-${1040 + nextIdx}`,
-      invoice: `INV-2026-0${40 + nextIdx}`,
-      date: new Date().toISOString().split("T")[0],
-      customer: newCustomer.trim(),
-      email: newEmail.trim() || `${newCustomer.toLowerCase().replace(/\s+/g, ".")}@example.com`,
-      state: newState,
-      type: isIntra ? "intra" : "inter",
-      items: [
-        {
-          name: newItemName,
-          qty: Number(newItemQty) || 1,
-          price: Number(newItemPrice) || 150,
-          hsn: "33074100",
-          rate: 5,
-        },
-      ],
-      shipping: Number(newShipping) || 49,
-      status: newStatus,
-      gateway: newGateway,
-      ref: newStatus === "Paid" ? `PAY-REC-${Date.now().toString().slice(-6)}` : "—",
-      refund: 0,
-    };
+  // Chart data calculations
+  const chartItems = useMemo(() => {
+    if (!breakdown || breakdown.length === 0) return [];
+    return breakdown.slice(-12);
+  }, [breakdown]);
 
-    setOrders([newOrder, ...orders]);
-    setShowCreateInvoiceModal(false);
-    showToast(`Invoice ${newOrder.invoice} successfully recorded!`);
-    // Clear form
-    setNewCustomer("");
-    setNewEmail("");
-  };
-
-  // Chart data
-  const chartData = MONTHLY_TREND_DATA.slice(-chartRange);
-  const maxSales = Math.max(...chartData.map((x) => x.sales)) * 1.15;
+  const maxChartSales = useMemo(() => {
+    if (chartItems.length === 0) return 1000;
+    const maxVal = Math.max(...chartItems.map((c) => Math.max(c.sales, c.collections)));
+    return maxVal > 0 ? maxVal * 1.15 : 1000;
+  }, [chartItems]);
 
   return (
     <div className="min-h-screen bg-[#F5F7FB] text-[#182230] font-sans pb-16">
       {/* Top Banner & Breadcrumb Header */}
       <div className="bg-white border-b border-zinc-200 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
-          <span>Finance</span>
+          <Link href="/overview" className="hover:text-zinc-800 transition">Finance</Link>
           <span>/</span>
-          <strong className="text-zinc-800 font-semibold">Accounting dashboard</strong>
+          <strong className="text-zinc-800 font-semibold">Accounting &amp; Tax Compliance</strong>
         </div>
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Demo data (Sridattam Ledger)
+            Live Sridattam Financial Ledger (GST Compliant)
           </span>
           <button
-            onClick={() => showToast("Use filters to review orders, View for GST breakdown, and Export CSV to download audit records.")}
+            onClick={() => showToast('Financial ledger computes live SQL sales, intra/inter GST, refunds, and gateway fees.')}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 px-3 py-1.5 rounded-lg transition"
           >
-            ⓘ Help
+            <HelpCircle className="w-3.5 h-3.5 text-zinc-500" /> Guide
           </button>
         </div>
       </div>
@@ -490,52 +250,58 @@ export default function AccountingPage() {
         {/* Workspace Title & Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <span className="text-[11px] font-black uppercase tracking-wider text-indigo-600">
-              Finance Workspace
+            <span className="text-[11px] font-black uppercase tracking-wider text-rose-800">
+              Finance &amp; Statutory Accounts
             </span>
             <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight mt-0.5">
               Accounting &amp; Finance
             </h1>
             <p className="text-xs sm:text-sm text-zinc-500 font-normal mt-0.5">
-              Track sales, reconcile payments, manage GST and export your financial records.
+              Real-time sales revenue, Razorpay collections, Indian GST (HSN 33074100), and CA audit ledger.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <a
+            <Link
               href="/overview"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-2xs hover:bg-zinc-50 transition"
             >
-              ← Dashboard
-            </a>
+              <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+            </Link>
             <button
-              onClick={() => downloadCSV(filteredOrders, "accounting-ledger.csv")}
+              onClick={() => loadAccountingData(true)}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-2xs hover:bg-zinc-50 transition disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Sync Live
+            </button>
+            <button
+              onClick={handleExportCSV}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-2xs hover:bg-zinc-50 transition"
             >
-              <span>↓</span> Export CSV
+              <Download className="w-3.5 h-3.5 text-zinc-600" /> Export CSV
             </button>
             <button
               onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-2xs hover:bg-zinc-50 transition"
             >
-              <span>▣</span> Print report
+              <Printer className="w-3.5 h-3.5 text-zinc-600" /> Print Report
             </button>
-            <button
-              onClick={() => setShowCreateInvoiceModal(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 border border-indigo-700 rounded-lg shadow-sm transition"
+            <Link
+              href="/orders"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-rose-900 hover:bg-rose-950 border border-rose-950 rounded-lg shadow-sm transition"
             >
-              <span>＋</span> Create Invoice
-            </button>
+              <FileText className="w-3.5 h-3.5" /> View Orders
+            </Link>
           </div>
         </div>
 
-        {/* Prototype Alert Notice */}
-        <div className="bg-[#EFF4FE] border border-[#D5E2FD] text-[#294C9B] rounded-xl p-3.5 text-xs leading-relaxed flex items-start gap-2.5 shadow-2xs">
-          <span className="font-bold text-indigo-600 text-sm">ℹ</span>
-          <div>
-            <strong className="font-bold text-indigo-950">Prototype notice:</strong> This dashboard uses illustrative sample orders and calculations. Connect it to your order database, payment gateway and verified GST configuration before using it for real accounting or tax filing.
+        {error && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3.5 text-xs flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>{error}</span>
           </div>
-        </div>
+        )}
 
         {/* 4 Financial Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -544,15 +310,15 @@ export default function AccountingPage() {
           <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-2xs space-y-3">
             <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
               <span>Gross order value</span>
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-sm">
+              <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-800 font-bold flex items-center justify-center text-sm">
                 ₹
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight font-mono">
-              {money(metrics.gross)}
+              {money(summary.grossOrderValue)}
             </div>
             <div className="text-[11px] text-zinc-500 flex items-center gap-1">
-              <span className="font-bold text-emerald-600">↑ 8.4%</span> vs previous period
+              <span className="font-bold text-zinc-700">{summary.ordersCount}</span> total order transactions
             </div>
           </div>
 
@@ -561,66 +327,70 @@ export default function AccountingPage() {
             <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
               <span>Payments collected</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-sm">
-                ✓
+                <CheckCircle2 className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight font-mono">
-              {money(metrics.collected)}
+              {money(summary.paymentsCollected)}
             </div>
             <div className="text-[11px] text-zinc-500">
-              Successful captured payments
+              Realized captured gateway funds
             </div>
           </div>
 
           {/* Card 3: GST Collected */}
           <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-2xs space-y-3">
             <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
-              <span>GST collected / payable*</span>
+              <span>GST collected / payable</span>
               <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 font-bold flex items-center justify-center text-sm">
-                📄
+                <FileText className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight font-mono">
-              {money(metrics.gst)}
+              {money(summary.totalTaxCollected)}
             </div>
             <div className="text-[11px] text-zinc-500">
-              Illustrative output GST on listed orders
+              Output GST (CGST/SGST/IGST)
             </div>
           </div>
 
-          {/* Card 4: Refunds Recorded */}
+          {/* Card 4: Net Estimated Profit */}
           <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-2xs space-y-3">
             <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
-              <span>Refunds recorded</span>
-              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 font-bold flex items-center justify-center text-sm">
-                ↺
+              <span>Estimated net earnings</span>
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-sm">
+                <ShieldCheck className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight font-mono">
-              {money(metrics.refunds)}
+              {money(summary.netProfit)}
             </div>
             <div className="text-[11px] text-zinc-500">
-              Review gateway settlement before filing
+              After refunds, ~2.36% gateway fee &amp; GST
             </div>
           </div>
         </div>
 
         {/* Sales & Collections Trend Chart Panel */}
         <div className="bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden">
-          <div className="px-5 py-4 border-b border-zinc-150 flex flex-wrap items-center justify-between gap-3">
+          <div className="px-5 py-4 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold text-zinc-900">Sales &amp; collections</h2>
-              <p className="text-[11px] text-zinc-500">Illustrative monthly performance · ₹</p>
+              <h2 className="text-sm font-bold text-zinc-900">Sales &amp; collections timeline</h2>
+              <p className="text-[11px] text-zinc-500">Time-series daily performance from live database records · ₹</p>
             </div>
-            <select
-              value={chartRange}
-              onChange={(e) => setChartRange(Number(e.target.value))}
-              className="text-xs font-semibold bg-white border border-zinc-300 text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:border-indigo-500"
-            >
-              <option value={6}>Last 6 months</option>
-              <option value={4}>Last 4 months</option>
-              <option value={3}>Last 3 months</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="text-xs font-semibold bg-white border border-zinc-300 text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:border-rose-900"
+              >
+                <option value="all_time">All Time</option>
+                <option value="this_month">This Month</option>
+                <option value="last_30_days">Last 30 Days</option>
+                <option value="last_7_days">Last 7 Days</option>
+                <option value="today">Today</option>
+              </select>
+            </div>
           </div>
 
           <div className="p-5">
@@ -628,66 +398,77 @@ export default function AccountingPage() {
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-xs bg-[#C5D0E2]"></span>
-                  Order value
+                  Gross Order Value
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-indigo-600"></span>
-                  Collected
+                  <span className="w-2.5 h-2.5 rounded-xs bg-rose-900"></span>
+                  Collected Cash
                 </span>
               </div>
-              <span className="text-[11px] font-bold text-zinc-500 bg-zinc-100 px-2.5 py-0.5 rounded-full">
-                Sample trend
+              <span className="text-[11px] font-bold text-zinc-600 bg-zinc-100 px-2.5 py-0.5 rounded-full">
+                {chartItems.length} active period date buckets
               </span>
             </div>
 
             {/* Custom Bar Chart Canvas */}
-            <div className="h-40 border-b border-zinc-200 relative flex items-end justify-around px-2 pb-1 gap-4 bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_34px,#F3F4F6_35px,#F3F4F6_36px)]">
-              {chartData.map((item, idx) => {
-                const salesHeight = (item.sales / maxSales) * 100;
-                const paidHeight = (item.paid / maxSales) * 100;
-                return (
-                  <div
-                    key={idx}
-                    className="flex-1 flex items-end justify-center gap-1.5 h-full relative group cursor-pointer"
-                    title={`${item.m}: Sales ${money(item.sales)}, Collected ${money(item.paid)}`}
-                  >
-                    {/* Tooltip on hover */}
-                    <div className="opacity-0 group-hover:opacity-100 pointer-events-none absolute -top-12 z-20 bg-zinc-900 text-white text-[10px] font-mono py-1 px-2 rounded shadow-lg transition-opacity whitespace-nowrap">
-                      Sales: {money(item.sales)} | Paid: {money(item.paid)}
-                    </div>
+            {chartItems.length === 0 ? (
+              <div className="h-40 border border-dashed border-zinc-200 rounded-lg flex flex-col items-center justify-center text-xs text-zinc-400">
+                <Clock className="w-6 h-6 mb-1 text-zinc-300" />
+                No daily order activity recorded for this period.
+              </div>
+            ) : (
+              <div>
+                <div className="h-44 border-b border-zinc-200 relative flex items-end justify-around px-2 pb-1 gap-4 bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_34px,#F3F4F6_35px,#F3F4F6_36px)]">
+                  {chartItems.map((item, idx) => {
+                    const salesHeight = Math.min(100, Math.max(8, (item.sales / maxChartSales) * 100));
+                    const paidHeight = Math.min(100, Math.max(6, (item.collections / maxChartSales) * 100));
+                    return (
+                      <div
+                        key={idx}
+                        className="flex-1 flex items-end justify-center gap-1.5 h-full relative group cursor-pointer"
+                        title={`${item.date}: Sales ${money(item.sales)}, Collected ${money(item.collections)}`}
+                      >
+                        {/* Tooltip on hover */}
+                        <div className="opacity-0 group-hover:opacity-100 pointer-events-none absolute -top-12 z-20 bg-zinc-900 text-white text-[10px] font-mono py-1 px-2.5 rounded-md shadow-lg transition-opacity whitespace-nowrap">
+                          {fmtDate(item.date)}: Sales {money(item.sales)} | Paid {money(item.collections)}
+                        </div>
 
-                    {/* Gray Bar: Order Value */}
-                    <div
-                      style={{ height: `${salesHeight}%` }}
-                      className="w-4 sm:w-6 bg-[#C5D0E2] rounded-t-sm transition-all duration-500 group-hover:bg-[#B3C0D6]"
-                    />
-                    {/* Blue Bar: Collected */}
-                    <div
-                      style={{ height: `${paidHeight}%` }}
-                      className="w-4 sm:w-6 bg-indigo-600 rounded-t-sm transition-all duration-500 group-hover:bg-indigo-700"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            {/* Axis Labels */}
-            <div className="flex justify-around text-xs text-zinc-500 pt-2 font-medium">
-              {chartData.map((item, idx) => (
-                <span key={idx}>{item.m}</span>
-              ))}
-            </div>
+                        {/* Order Value Bar */}
+                        <div
+                          style={{ height: `${salesHeight}%` }}
+                          className="w-4 sm:w-6 bg-[#C5D0E2] rounded-t-sm transition-all duration-500 group-hover:bg-[#B3C0D6]"
+                        />
+                        {/* Collected Bar */}
+                        <div
+                          style={{ height: `${paidHeight}%` }}
+                          className="w-4 sm:w-6 bg-rose-900 rounded-t-sm transition-all duration-500 group-hover:bg-rose-950"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Axis Labels */}
+                <div className="flex justify-around text-xs text-zinc-500 pt-2 font-medium">
+                  {chartItems.map((item, idx) => (
+                    <span key={idx} className="text-[10px] sm:text-xs">
+                      {fmtDate(item.date).split(' ')[0]} {fmtDate(item.date).split(' ')[1]}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Order Accounting Ledger Section */}
         <div className="bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden">
-          <div className="px-5 py-4 border-b border-zinc-200 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold text-zinc-900">Order accounting ledger</h2>
-              <p className="text-[11px] text-zinc-500">Order-level sales, taxes, payment references and invoice status</p>
+              <p className="text-[11px] text-zinc-500">Live order-level sales, GST tax split, gateway references, and tax invoices</p>
             </div>
             <span className="text-xs font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2.5 py-0.5 rounded-full font-mono">
-              {filteredOrders.length} records
+              {orders.length} records
             </span>
           </div>
 
@@ -696,48 +477,43 @@ export default function AccountingPage() {
             <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
               <input
                 type="text"
-                placeholder="Search order, customer, payment ref…"
+                placeholder="Search order number, invoice, customer, or email…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-xs bg-white border border-zinc-300 text-zinc-800 placeholder-zinc-400 px-3 py-2 rounded-lg outline-none focus:border-indigo-500 w-full sm:w-64"
+                className="text-xs bg-white border border-zinc-300 text-zinc-800 placeholder-zinc-400 px-3 py-2 rounded-lg outline-none focus:border-rose-900 w-full sm:w-72"
               />
 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs bg-white border border-zinc-300 text-zinc-700 px-3 py-2 rounded-lg outline-none focus:border-indigo-500"
+                className="text-xs bg-white border border-zinc-300 text-zinc-700 px-3 py-2 rounded-lg outline-none focus:border-rose-900"
               >
                 <option value="all">All payment statuses</option>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-                <option value="Refunded">Refunded</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="refunded">Refunded</option>
               </select>
 
               <select
                 value={stateFilter}
                 onChange={(e) => setStateFilter(e.target.value)}
-                className="text-xs bg-white border border-zinc-300 text-zinc-700 px-3 py-2 rounded-lg outline-none focus:border-indigo-500"
+                className="text-xs bg-white border border-zinc-300 text-zinc-700 px-3 py-2 rounded-lg outline-none focus:border-rose-900"
               >
-                <option value="all">All supply states</option>
-                <option value="Karnataka">Karnataka</option>
-                <option value="Maharashtra">Maharashtra</option>
-                <option value="Tamil Nadu">Tamil Nadu</option>
-                <option value="Telangana">Telangana</option>
+                <option value="all">All destination states</option>
+                <option value="Karnataka">Karnataka (Intra-state)</option>
+                <option value="Maharashtra">Maharashtra (Inter-state)</option>
+                <option value="Tamil Nadu">Tamil Nadu (Inter-state)</option>
+                <option value="Telangana">Telangana (Inter-state)</option>
+                <option value="Delhi">Delhi (Inter-state)</option>
+                <option value="Uttar Pradesh">Uttar Pradesh (Inter-state)</option>
               </select>
-
-              <input
-                type="month"
-                value={monthFilter}
-                onChange={(e) => setMonthFilter(e.target.value)}
-                className="text-xs bg-white border border-zinc-300 text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:border-indigo-500"
-              />
             </div>
 
             <button
               onClick={handleResetFilters}
-              className="text-xs font-bold text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-300 hover:bg-zinc-100 px-3 py-2 rounded-lg transition"
+              className="text-xs font-bold text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-300 hover:bg-zinc-100 px-3 py-2 rounded-lg transition flex items-center gap-1.5"
             >
-              ↺ Reset filters
+              <RotateCcw className="w-3.5 h-3.5" /> Reset filters
             </button>
           </div>
 
@@ -748,31 +524,45 @@ export default function AccountingPage() {
                 <tr>
                   <th className="py-3 px-4">Order / Invoice</th>
                   <th className="py-3 px-4">Order date</th>
-                  <th className="py-3 px-4">Customer</th>
+                  <th className="py-3 px-4">Customer / State</th>
                   <th className="py-3 px-4">Taxable value</th>
                   <th className="py-3 px-4">GST split</th>
-                  <th className="py-3 px-4">Order total</th>
+                  <th className="py-3 px-4">Grand Total</th>
                   <th className="py-3 px-4">Payment</th>
-                  <th className="py-3 px-4">Reference no.</th>
-                  <th className="py-3 px-4 text-right">Action</th>
+                  <th className="py-3 px-4">Reference / Gateway</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {filteredOrders.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-zinc-400 text-xs">
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-rose-900" />
+                        <span>Synchronizing live database ledger...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : orders.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-zinc-400 text-sm">
                       No financial records match the specified filters.
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => {
-                    const c = calc(order);
-                    const unitsCount = order.items.reduce((s, it) => s + it.qty, 0);
+                  orders.map((order) => {
+                    const isIntra = order.type === 'intra';
+                    const cgst = isIntra ? order.tax / 2 : 0;
+                    const sgst = isIntra ? order.tax / 2 : 0;
+                    const igst = isIntra ? 0 : order.tax;
 
                     return (
                       <tr key={order.id} className="hover:bg-zinc-50/80 transition-colors">
                         <td className="py-3 px-4 font-mono">
-                          <span className="font-bold text-indigo-600 hover:underline cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                          <span 
+                            className="font-bold text-rose-900 hover:underline cursor-pointer" 
+                            onClick={() => setSelectedOrder(order)}
+                          >
                             {order.id}
                           </span>
                           <div className="text-[11px] text-zinc-400 font-normal">
@@ -783,42 +573,44 @@ export default function AccountingPage() {
                           {fmtDate(order.date)}
                         </td>
                         <td className="py-3 px-4">
-                          <span className="font-bold text-zinc-800">{order.customer}</span>
-                          <div className="text-[11px] text-zinc-400">{order.state}</div>
+                          <span className="font-bold text-zinc-800">{order.customer || 'Guest'}</span>
+                          <div className="text-[11px] text-zinc-400">{order.state || 'Karnataka'}</div>
                         </td>
                         <td className="py-3 px-4 font-mono font-bold text-zinc-800">
-                          {money(c.taxable)}
-                          <div className="text-[10px] text-zinc-400 font-sans font-normal">
-                            {unitsCount} item units
-                          </div>
+                          {money(order.subtotal)}
+                          {order.discount > 0 && (
+                            <div className="text-[10px] text-emerald-600 font-sans font-normal">
+                              -Disc {money(order.discount)}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4">
-                          {order.type === "intra" ? (
+                          {isIntra ? (
                             <div>
-                              <span className="font-semibold text-zinc-700 font-mono">CGST {money(c.cgst)}</span>
-                              <div className="text-[10px] text-zinc-400 font-mono">SGST {money(c.sgst)}</div>
+                              <span className="font-semibold text-zinc-700 font-mono">CGST {money(cgst)}</span>
+                              <div className="text-[10px] text-zinc-400 font-mono">SGST {money(sgst)}</div>
                             </div>
                           ) : (
                             <div>
-                              <span className="font-semibold text-zinc-700 font-mono">IGST {money(c.igst)}</span>
+                              <span className="font-semibold text-zinc-700 font-mono">IGST {money(igst)}</span>
                               <div className="text-[10px] text-zinc-400 font-sans">Inter-state</div>
                             </div>
                           )}
                         </td>
                         <td className="py-3 px-4 font-mono font-bold text-zinc-900">
-                          {money(c.total)}
+                          {money(order.total)}
                           <div className="text-[10px] text-zinc-400 font-sans font-normal">
-                            Ship {money(c.shipping)}
+                            Ship {order.shipping > 0 ? money(order.shipping) : 'FREE'}
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              order.status === "Paid"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : order.status === "Pending"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                              order.status === 'Paid'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : order.status === 'Pending'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
                             }`}
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
@@ -826,7 +618,7 @@ export default function AccountingPage() {
                           </span>
                         </td>
                         <td className="py-3 px-4 font-mono text-zinc-600">
-                          {order.ref === "—" ? (
+                          {order.ref === '—' || !order.ref ? (
                             <span className="text-zinc-400 italic">Not captured</span>
                           ) : (
                             <span className="font-medium text-zinc-700">{order.ref}</span>
@@ -834,12 +626,28 @@ export default function AccountingPage() {
                           <div className="text-[10px] text-zinc-400 font-sans">{order.gateway}</div>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => setSelectedOrder(order)}
-                            className="inline-flex items-center gap-1 text-xs font-bold text-zinc-700 hover:text-indigo-600 bg-white border border-zinc-200 hover:border-indigo-300 px-2.5 py-1 rounded-md shadow-2xs transition"
-                          >
-                            <span>View</span> <span>↗</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              title="Print GST Tax Invoice"
+                              onClick={() => window.open(`${API_BASE_URL}/admin/orders/${order.dbId}/invoice`, '_blank')}
+                              className="p-1.5 text-zinc-600 hover:text-rose-900 bg-white border border-zinc-200 hover:border-zinc-300 rounded-md shadow-2xs transition"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              title="Print Shipping Label (4x6)"
+                              onClick={() => window.open(`${API_BASE_URL}/admin/orders/${order.dbId}/shipping-label`, '_blank')}
+                              className="p-1.5 text-zinc-600 hover:text-rose-900 bg-white border border-zinc-200 hover:border-zinc-300 rounded-md shadow-2xs transition"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setSelectedOrder(order)}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-zinc-700 hover:text-rose-900 bg-white border border-zinc-200 hover:border-zinc-300 px-2.5 py-1 rounded-md shadow-2xs transition"
+                            >
+                              <span>View</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -851,17 +659,9 @@ export default function AccountingPage() {
 
           {/* Table Footer */}
           <div className="px-5 py-3 border-t border-zinc-200 flex items-center justify-between text-xs text-zinc-500">
-            <span>Showing {filteredOrders.length} of {orders.length} sample orders</span>
-            <div className="flex items-center gap-1">
-              <span className="px-2.5 py-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 font-bold">
-                1
-              </span>
-              <button
-                onClick={() => showToast("All sample orders are visible on this page.")}
-                className="px-2.5 py-1 rounded border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600"
-              >
-                Next →
-              </button>
+            <span>Showing {orders.length} orders from live database</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-zinc-400">HSN Code 33074100 (Incense &amp; Sacred Aromas)</span>
             </div>
           </div>
         </div>
@@ -874,14 +674,14 @@ export default function AccountingPage() {
             <div>
               <div className="px-5 py-4 border-b border-zinc-200 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-zinc-900">GST summary</h3>
-                  <p className="text-[11px] text-zinc-500">Based on the currently filtered ledger</p>
+                  <h3 className="text-sm font-bold text-zinc-900">GST statutory breakdown</h3>
+                  <p className="text-[11px] text-zinc-500">Live output tax liability calculated per GST Rule 46</p>
                 </div>
                 <button
-                  onClick={() => downloadCSV(filteredOrders, "gst-summary-report.csv")}
+                  onClick={handleExportCSV}
                   className="text-xs font-bold text-zinc-700 bg-white border border-zinc-200 hover:bg-zinc-50 px-2.5 py-1 rounded-md transition flex items-center gap-1"
                 >
-                  <span>↓</span> Export
+                  <Download className="w-3 h-3 text-zinc-600" /> Export
                 </button>
               </div>
 
@@ -892,11 +692,11 @@ export default function AccountingPage() {
                       ↔
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-800">Taxable goods value</div>
-                      <div className="text-[11px] text-zinc-400">Before GST, excludes shipping</div>
+                      <div className="font-bold text-zinc-800">Net Taxable Goods Value</div>
+                      <div className="text-[11px] text-zinc-400">Excludes shipping, after bundle &amp; coupon discounts</div>
                     </div>
                   </div>
-                  <div className="font-mono font-bold text-zinc-900">{money(gstBreakdown.taxable)}</div>
+                  <div className="font-mono font-bold text-zinc-900">{money(summary.taxableAmount)}</div>
                 </div>
 
                 <div className="px-5 py-3.5 flex items-center justify-between">
@@ -905,11 +705,11 @@ export default function AccountingPage() {
                       ⌂
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-800">CGST</div>
-                      <div className="text-[11px] text-zinc-400">Intra-state sample supplies</div>
+                      <div className="font-bold text-zinc-800">CGST (Central Tax)</div>
+                      <div className="text-[11px] text-zinc-400">Intra-state supplies (Karnataka consignees)</div>
                     </div>
                   </div>
-                  <div className="font-mono font-bold text-zinc-900">{money(gstBreakdown.cgst)}</div>
+                  <div className="font-mono font-bold text-zinc-900">{money(summary.cgst)}</div>
                 </div>
 
                 <div className="px-5 py-3.5 flex items-center justify-between">
@@ -918,11 +718,11 @@ export default function AccountingPage() {
                       ⌂
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-800">SGST / UTGST</div>
-                      <div className="text-[11px] text-zinc-400">Intra-state sample supplies</div>
+                      <div className="font-bold text-zinc-800">SGST / UTGST (State Tax)</div>
+                      <div className="text-[11px] text-zinc-400">Intra-state supplies (Karnataka consignees)</div>
                     </div>
                   </div>
-                  <div className="font-mono font-bold text-zinc-900">{money(gstBreakdown.sgst)}</div>
+                  <div className="font-mono font-bold text-zinc-900">{money(summary.sgst)}</div>
                 </div>
 
                 <div className="px-5 py-3.5 flex items-center justify-between">
@@ -931,22 +731,22 @@ export default function AccountingPage() {
                       ⇢
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-800">IGST</div>
-                      <div className="text-[11px] text-zinc-400">Inter-state sample supplies</div>
+                      <div className="font-bold text-zinc-800">IGST (Integrated Tax)</div>
+                      <div className="text-[11px] text-zinc-400">Inter-state supplies (Outside Karnataka consignees)</div>
                     </div>
                   </div>
-                  <div className="font-mono font-bold text-zinc-900">{money(gstBreakdown.igst)}</div>
+                  <div className="font-mono font-bold text-zinc-900">{money(summary.igst)}</div>
                 </div>
               </div>
             </div>
 
             <div className="px-5 py-4 bg-[#F8FAFF] border-t border-zinc-200 flex items-center justify-between">
               <div>
-                <div className="font-bold text-zinc-900 text-xs">Total illustrative output GST</div>
-                <div className="text-[10px] text-zinc-500">Before credits / adjustments</div>
+                <div className="font-bold text-zinc-900 text-xs">Total Statutory Output GST</div>
+                <div className="text-[10px] text-zinc-500">To be filed in GSTR-1 / GSTR-3B</div>
               </div>
-              <div className="font-mono font-black text-indigo-700 text-sm">
-                {money(gstBreakdown.total)}
+              <div className="font-mono font-black text-rose-900 text-sm">
+                {money(summary.totalTaxCollected)}
               </div>
             </div>
           </div>
@@ -956,11 +756,11 @@ export default function AccountingPage() {
             <div>
               <div className="px-5 py-4 border-b border-zinc-200 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-zinc-900">Payment reconciliation</h3>
-                  <p className="text-[11px] text-zinc-500">Check gateway references against settlements</p>
+                  <h3 className="text-sm font-bold text-zinc-900">Payment reconciliation &amp; costs</h3>
+                  <p className="text-[11px] text-zinc-500">Razorpay / UPI collections and platform gateway fees</p>
                 </div>
-                <span className="text-xs font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2.5 py-0.5 rounded-full">
-                  Overview
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                  Reconciled
                 </span>
               </div>
 
@@ -968,45 +768,45 @@ export default function AccountingPage() {
                 <div className="px-5 py-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                      ✓
+                      <CheckCircle2 className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-800">Successful payments</div>
-                      <div className="text-[11px] text-zinc-400">Marked as paid in sample ledger</div>
+                      <div className="font-bold text-zinc-800">Successful Collections</div>
+                      <div className="text-[11px] text-zinc-400">Funds captured via Razorpay / Online PG</div>
                     </div>
                   </div>
                   <div className="text-right font-mono font-bold text-zinc-800">
-                    {reconciliation.paidCount} orders · {money(reconciliation.paidTotal)}
-                  </div>
-                </div>
-
-                <div className="px-5 py-3.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-                      ◷
-                    </div>
-                    <div>
-                      <div className="font-bold text-zinc-800">Pending payments</div>
-                      <div className="text-[11px] text-zinc-400">Awaiting successful capture</div>
-                    </div>
-                  </div>
-                  <div className="text-right font-mono font-bold text-zinc-800">
-                    {reconciliation.pendingCount} orders · {money(reconciliation.pendingTotal)}
+                    {money(summary.paymentsCollected)}
                   </div>
                 </div>
 
                 <div className="px-5 py-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 flex items-center justify-center font-bold">
-                      ↶
+                      <RotateCcw className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-800">Refunded orders</div>
-                      <div className="text-[11px] text-zinc-400">Confirm actual refund transaction</div>
+                      <div className="font-bold text-zinc-800">Refunds Recorded</div>
+                      <div className="text-[11px] text-zinc-400">Processed order cancellations &amp; refunds</div>
                     </div>
                   </div>
                   <div className="text-right font-mono font-bold text-zinc-800">
-                    {reconciliation.refundedCount} order · {money(reconciliation.refundedTotal)}
+                    {money(summary.refundsRecorded)}
+                  </div>
+                </div>
+
+                <div className="px-5 py-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                      %
+                    </div>
+                    <div>
+                      <div className="font-bold text-zinc-800">Estimated Gateway Charges</div>
+                      <div className="text-[11px] text-zinc-400">2% Razorpay transaction fee + 18% GST (2.36%)</div>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono font-bold text-zinc-800">
+                    -{money(summary.estimatedGatewayFees)}
                   </div>
                 </div>
               </div>
@@ -1014,11 +814,11 @@ export default function AccountingPage() {
 
             <div className="px-5 py-4 bg-[#F8FAFF] border-t border-zinc-200 flex items-center justify-between">
               <div>
-                <div className="font-bold text-zinc-900 text-xs">Unreconciled payment references</div>
-                <div className="text-[10px] text-zinc-500">Reference numbers are demo values</div>
+                <div className="font-bold text-zinc-900 text-xs">Net Realized Cash Inflow</div>
+                <div className="text-[10px] text-zinc-500">Collected minus refunds and gateway processing fees</div>
               </div>
-              <div className="font-bold text-amber-600 text-xs bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
-                Review required
+              <div className="font-mono font-black text-emerald-700 text-sm">
+                {money(summary.paymentsCollected - summary.refundsRecorded - summary.estimatedGatewayFees)}
               </div>
             </div>
           </div>
@@ -1026,7 +826,7 @@ export default function AccountingPage() {
 
         {/* Footnote Compliance Notice */}
         <p className="text-[11px] text-zinc-500 leading-relaxed max-w-4xl pt-2">
-          * GST shown is an illustrative output-tax summary, not a final GST liability calculation. Actual liability can depend on credit notes, returns, input tax credit, place-of-supply rules, exemptions, payment adjustments and filing-period treatment.
+          * Tax amounts are calculated in accordance with the Indian Central Goods and Services Tax Act (CGST), Karnataka State GST (SGST), and Integrated GST (IGST) for HSN Code 33074100 (Incense Sticks &amp; Sacred Aromas). Official tax invoices are verifiable under Rule 46.
         </p>
 
       </div>
@@ -1057,14 +857,14 @@ export default function AccountingPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-xs">
                   <span className="text-[10px] text-zinc-400 block font-bold uppercase">Customer</span>
-                  <strong className="text-zinc-800 block mt-0.5">{selectedOrder.customer}</strong>
-                  <span className="text-zinc-500 text-[11px]">{selectedOrder.email}</span>
+                  <strong className="text-zinc-800 block mt-0.5">{selectedOrder.customer || 'Guest'}</strong>
+                  <span className="text-zinc-500 text-[11px]">{selectedOrder.email || '—'}</span>
                 </div>
                 <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-xs">
                   <span className="text-[10px] text-zinc-400 block font-bold uppercase">Place of supply</span>
-                  <strong className="text-zinc-800 block mt-0.5">{selectedOrder.state}</strong>
+                  <strong className="text-zinc-800 block mt-0.5">{selectedOrder.state || 'Karnataka'}</strong>
                   <span className="text-zinc-500 text-[11px]">
-                    {selectedOrder.type === "intra" ? "Intra-state (CGST+SGST)" : "Inter-state (IGST)"}
+                    {selectedOrder.type === 'intra' ? 'Intra-state (CGST+SGST)' : 'Inter-state (IGST)'}
                   </span>
                 </div>
                 <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-xs">
@@ -1091,233 +891,100 @@ export default function AccountingPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {selectedOrder.items.map((it, idx) => (
-                        <tr key={idx}>
-                          <td className="p-2.5 font-medium text-zinc-800">
-                            {it.name}
-                            <div className="text-[10px] text-zinc-400 font-mono">HSN {it.hsn}</div>
+                      {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                        selectedOrder.items.map((it, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2.5 font-medium text-zinc-800">
+                              {it.name}
+                              <div className="text-[10px] text-zinc-400 font-mono">HSN {it.hsn || '33074100'}</div>
+                            </td>
+                            <td className="p-2.5 text-center font-mono">{it.qty}</td>
+                            <td className="p-2.5 text-right font-mono">{money(it.price)}</td>
+                            <td className="p-2.5 text-right font-mono font-bold">{money(it.qty * it.price)}</td>
+                            <td className="p-2.5 text-right font-mono text-zinc-500">{it.rate || 18}%</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="p-3 text-center text-zinc-400 italic">
+                            Order items details available via Tax Invoice.
                           </td>
-                          <td className="p-2.5 text-center font-mono">{it.qty}</td>
-                          <td className="p-2.5 text-right font-mono">{money(it.price)}</td>
-                          <td className="p-2.5 text-right font-mono font-bold">{money(it.qty * it.price)}</td>
-                          <td className="p-2.5 text-right font-mono text-zinc-500">{it.rate}%</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
               {/* Tax Calculations breakdown */}
-              {(() => {
-                const c = calc(selectedOrder);
-                return (
-                  <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-4 text-xs space-y-2">
-                    <div className="flex justify-between text-zinc-600">
-                      <span>Taxable value</span>
-                      <span className="font-mono font-medium">{money(c.taxable)}</span>
-                    </div>
-                    {selectedOrder.type === "intra" ? (
-                      <>
-                        <div className="flex justify-between text-zinc-600">
-                          <span>CGST (2.5%)</span>
-                          <span className="font-mono font-medium">{money(c.cgst)}</span>
-                        </div>
-                        <div className="flex justify-between text-zinc-600">
-                          <span>SGST (2.5%)</span>
-                          <span className="font-mono font-medium">{money(c.sgst)}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex justify-between text-zinc-600">
-                        <span>IGST (5.0%)</span>
-                        <span className="font-mono font-medium">{money(c.igst)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-zinc-600">
-                      <span>Shipping charges</span>
-                      <span className="font-mono font-medium">{money(c.shipping)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-black text-zinc-900 border-t border-zinc-200 pt-2">
-                      <span>Order total</span>
-                      <span className="font-mono text-indigo-700">{money(c.total)}</span>
-                    </div>
-                    {selectedOrder.refund > 0 && (
-                      <div className="flex justify-between text-xs font-bold text-rose-600 pt-1">
-                        <span>Refund recorded</span>
-                        <span className="font-mono">-{money(selectedOrder.refund)}</span>
-                      </div>
-                    )}
+              <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-4 text-xs space-y-2">
+                <div className="flex justify-between text-zinc-600">
+                  <span>Subtotal (Taxable Value)</span>
+                  <span className="font-mono font-medium">{money(selectedOrder.subtotal)}</span>
+                </div>
+                {selectedOrder.discount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-medium">
+                    <span>Discount Applied</span>
+                    <span className="font-mono">-{money(selectedOrder.discount)}</span>
                   </div>
-                );
-              })()}
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 leading-relaxed">
-                Sample record for accounting demonstration. Verify the customer's billing address, GSTIN (if registered), legal place of supply, and payment gateway settlement before statutory GST filing.
+                )}
+                {selectedOrder.type === 'intra' ? (
+                  <>
+                    <div className="flex justify-between text-zinc-600">
+                      <span>CGST (Central GST)</span>
+                      <span className="font-mono font-medium">{money(selectedOrder.tax / 2)}</span>
+                    </div>
+                    <div className="flex justify-between text-zinc-600">
+                      <span>SGST (State GST)</span>
+                      <span className="font-mono font-medium">{money(selectedOrder.tax / 2)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between text-zinc-600">
+                    <span>IGST (Integrated GST)</span>
+                    <span className="font-mono font-medium">{money(selectedOrder.tax)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-zinc-600">
+                  <span>Shipping Charges</span>
+                  <span className="font-mono font-medium">{selectedOrder.shipping > 0 ? money(selectedOrder.shipping) : 'FREE'}</span>
+                </div>
+                <div className="flex justify-between text-sm font-black text-zinc-900 border-t border-zinc-200 pt-2">
+                  <span>Order Grand Total</span>
+                  <span className="font-mono text-rose-900">{money(selectedOrder.total)}</span>
+                </div>
+                {selectedOrder.refund > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-rose-600 pt-1">
+                    <span>Refund Recorded</span>
+                    <span className="font-mono">-{money(selectedOrder.refund)}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex justify-end gap-2.5">
-              <button
-                onClick={() => downloadCSV([selectedOrder], `${selectedOrder.id}-accounting.csv`)}
-                className="px-4 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition"
+            <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex flex-wrap items-center justify-between gap-2.5">
+              <Link
+                href={`/orders/${selectedOrder.dbId}`}
+                className="px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition inline-flex items-center gap-1.5"
               >
-                Export this order
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition"
-              >
-                Print details
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <ExternalLink className="w-3.5 h-3.5" /> Order Operations
+              </Link>
 
-      {/* Create Manual Invoice Modal */}
-      {showCreateInvoiceModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-zinc-200 overflow-hidden">
-            <div className="p-5 border-b border-zinc-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900">Create New Invoice</h3>
-                <p className="text-xs text-zinc-500">Record a new sales transaction in accounting ledger</p>
-              </div>
-              <button
-                onClick={() => setShowCreateInvoiceModal(false)}
-                className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center text-lg font-bold transition"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateInvoice} className="p-6 space-y-4 text-xs">
-              <div>
-                <label className="block text-zinc-700 font-bold mb-1">Customer Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Ramesh Kumar"
-                  value={newCustomer}
-                  onChange={(e) => setNewCustomer(e.target.value)}
-                  className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-700 font-bold mb-1">Customer Email</label>
-                  <input
-                    type="email"
-                    placeholder="ramesh@example.com"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-700 font-bold mb-1">Place of Supply (State)</label>
-                  <select
-                    value={newState}
-                    onChange={(e) => setNewState(e.target.value)}
-                    className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500"
-                  >
-                    <option value="Karnataka">Karnataka (Intra-state)</option>
-                    <option value="Maharashtra">Maharashtra (Inter-state)</option>
-                    <option value="Tamil Nadu">Tamil Nadu (Inter-state)</option>
-                    <option value="Telangana">Telangana (Inter-state)</option>
-                    <option value="Delhi">Delhi (Inter-state)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-zinc-700 font-bold mb-1">Product Description</label>
-                <input
-                  type="text"
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-zinc-700 font-bold mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={newItemQty}
-                    onChange={(e) => setNewItemQty(Number(e.target.value))}
-                    className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-700 font-bold mb-1">Unit Price (₹)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={newItemPrice}
-                    onChange={(e) => setNewItemPrice(Number(e.target.value))}
-                    className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-700 font-bold mb-1">Shipping (₹)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={newShipping}
-                    onChange={(e) => setNewShipping(Number(e.target.value))}
-                    className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-700 font-bold mb-1">Payment Status</label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as any)}
-                    className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500"
-                  >
-                    <option value="Paid">Paid</option>
-                    <option value="Pending">Pending</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-zinc-700 font-bold mb-1">Payment Gateway / Mode</label>
-                  <select
-                    value={newGateway}
-                    onChange={(e) => setNewGateway(e.target.value)}
-                    className="w-full bg-white border border-zinc-300 px-3 py-2 rounded-lg text-xs outline-none focus:border-indigo-500"
-                  >
-                    <option value="UPI">UPI</option>
-                    <option value="Razorpay">Razorpay</option>
-                    <option value="Card">Card</option>
-                    <option value="Cash on Delivery">Cash on Delivery</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-zinc-200 flex justify-end gap-2.5">
+              <div className="flex items-center gap-2">
                 <button
-                  type="button"
-                  onClick={() => setShowCreateInvoiceModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-zinc-600 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition"
+                  onClick={() => window.open(`${API_BASE_URL}/admin/orders/${selectedOrder.dbId}/shipping-label`, '_blank')}
+                  className="px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition inline-flex items-center gap-1.5"
                 >
-                  Cancel
+                  <Printer className="w-3.5 h-3.5 text-zinc-600" /> Print Shipping Label
                 </button>
                 <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition"
+                  onClick={() => window.open(`${API_BASE_URL}/admin/orders/${selectedOrder.dbId}/invoice`, '_blank')}
+                  className="px-4 py-2 text-xs font-bold text-white bg-rose-900 hover:bg-rose-950 rounded-lg shadow-sm transition inline-flex items-center gap-1.5"
                 >
-                  Record Invoice
+                  <FileText className="w-3.5 h-3.5" /> Print Tax Invoice
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

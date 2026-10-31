@@ -26,7 +26,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { ArrowLeft, Truck, Package, CreditCard, RefreshCw, AlertCircle, History } from 'lucide-react'
+import { ArrowLeft, Truck, Package, CreditCard, RefreshCw, AlertCircle, History, FileText, Printer } from 'lucide-react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -214,7 +214,23 @@ export default function OrderDetailView() {
             <span className="font-medium text-stone-900">{order.customer?.name} ({order.customer?.email})</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`, '_blank')}
+            className="border-stone-300 text-stone-700 font-inter text-xs hover:bg-stone-50"
+          >
+            <FileText className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Tax Invoice
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`, '_blank')}
+            className="border-stone-300 text-stone-700 font-inter text-xs hover:bg-stone-50"
+          >
+            <Printer className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Shipping Label
+          </Button>
           <Button variant="outline" size="sm" asChild className="border-stone-300 text-stone-700 font-inter text-xs">
             <Link href={`${STOREFRONT_URL}/track-order?orderId=${order.id}`} target="_blank" rel="noopener noreferrer">
               <Truck className="w-3.5 h-3.5 mr-1 text-stone-500" /> Open Tracking Page
@@ -681,6 +697,27 @@ export default function OrderDetailView() {
                   <span className="font-mono text-base">
                     ₹{(order.grandTotal ?? order.total ?? 0).toLocaleString('en-IN')}
                   </span>
+                </div>
+
+                <Separator className="my-2 bg-stone-200" />
+
+                <div className="pt-1 flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
+                    onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`, '_blank')}
+                  >
+                    <FileText className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Tax Invoice
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
+                    onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`, '_blank')}
+                  >
+                    <Printer className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Shipping Label
+                  </Button>
                 </div>
               </div>
             </CardContent>

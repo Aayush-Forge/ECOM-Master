@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FilterX, RefreshCw, Search, ArrowUpDown } from 'lucide-react'
+import { FilterX, RefreshCw, Search, ArrowUpDown, FileText, Printer } from 'lucide-react'
 
 export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn = getAllOrders, linkQuery = '' }) {
   const [orders, setOrders] = useState(() => getAllOrdersSync())
@@ -244,9 +244,29 @@ export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn 
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" asChild className="border-stone-300 font-inter text-xs">
-                        <Link href={`${basePath}/${order.id}${linkQuery}`}>View</Link>
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Print Tax Invoice"
+                          className="h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`, '_blank')}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Print Shipping Label (4x6)"
+                          className="h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`, '_blank')}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" asChild className="border-stone-300 font-inter text-xs">
+                          <Link href={`${basePath}/${order.id}${linkQuery}`}>View</Link>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

@@ -36,7 +36,6 @@ export const ROLE_NAV_ITEMS = {
   admin: [
     { label: 'Dashboard', href: '/overview', icon: 'LayoutDashboard', group: 'Overview' },
     { label: 'Orders', href: '/orders', icon: 'ClipboardList', group: 'Operations' },
-    { label: 'Invoices & Labels', href: '/invoices-labels', icon: 'ScrollText', group: 'Operations' },
     { label: 'Payments', href: '/payments', icon: 'CreditCard', group: 'Operations' },
     { label: 'Shipping', href: '/shipping', icon: 'Truck', group: 'Operations' },
     { label: 'Clubbing Module', href: '/clubbings', icon: 'Sparkles', group: 'Catalog' },
@@ -54,7 +53,6 @@ export const ROLE_NAV_ITEMS = {
   editor: [
     { label: 'Dashboard', href: '/overview', icon: 'LayoutDashboard', group: 'Overview' },
     { label: 'Orders', href: '/orders', icon: 'ClipboardList', group: 'Operations' },
-    { label: 'Invoices & Labels', href: '/invoices-labels', icon: 'ScrollText', group: 'Operations' },
     { label: 'Payments', href: '/payments', icon: 'CreditCard', group: 'Operations' },
     { label: 'Shipping', href: '/shipping', icon: 'Truck', group: 'Operations' },
     { label: 'Clubbing Module', href: '/clubbings', icon: 'Sparkles', group: 'Catalog' },
