@@ -23,6 +23,7 @@ import {
   RefreshCw,
   XCircle,
   AlertCircle,
+  Printer,
 } from 'lucide-react';
 
 const ORDER_STEPS = [
@@ -169,12 +170,24 @@ export default function OrderDetailsPage() {
         </div>
 
         {order && (
-          <Button
-            onClick={handleReorder}
-            className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs shrink-0 self-start sm:self-center"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" /> Buy Again
-          </Button>
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+                window.open(`${backendUrl}/orders/${order.id}/invoice`, '_blank');
+              }}
+              className="border-stone-300 hover:bg-stone-50 font-inter text-stone-700 font-medium shadow-2xs"
+            >
+              <Printer className="w-4 h-4 mr-2 text-stone-500" /> Print Tax Invoice
+            </Button>
+            <Button
+              onClick={handleReorder}
+              className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold font-inter shadow-xs"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" /> Buy Again
+            </Button>
+          </div>
         )}
       </div>
 

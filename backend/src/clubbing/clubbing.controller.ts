@@ -35,7 +35,7 @@ export class ClubbingController {
   ) {}
 
   @Post('upload-banner')
-  @Public()
+  @Roles(ROLES.EDITOR)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 10 * 1024 * 1024 },
@@ -86,7 +86,7 @@ export class ClubbingController {
   }
 
   @Post()
-  @Public()
+  @Roles(ROLES.EDITOR)
   @AuditLog('clubbing_rule.create')
   createRule(@Body() dto: any) {
     return this.clubbingService.createRule(dto);
@@ -101,7 +101,7 @@ export class ClubbingController {
   @Get('active')
   @Public()
   getActiveRules() {
-    return this.clubbingService.getActiveRules();
+    return this.clubbingService.getActiveRules(false);
   }
 
   @Get(':id')
@@ -111,28 +111,28 @@ export class ClubbingController {
   }
 
   @Patch(':id')
-  @Public()
+  @Roles(ROLES.EDITOR)
   @AuditLog('clubbing_rule.update')
   updateRule(@Param('id') id: string, @Body() dto: any) {
     return this.clubbingService.updateRule(id, dto);
   }
 
   @Patch(':id/toggle')
-  @Public()
+  @Roles(ROLES.EDITOR)
   @AuditLog('clubbing_rule.toggle')
   toggleRulePatch(@Param('id') id: string) {
     return this.clubbingService.toggleRule(id);
   }
 
   @Post(':id/toggle')
-  @Public()
+  @Roles(ROLES.EDITOR)
   @AuditLog('clubbing_rule.toggle')
   toggleRulePost(@Param('id') id: string) {
     return this.clubbingService.toggleRule(id);
   }
 
   @Delete(':id')
-  @Public()
+  @Roles(ROLES.EDITOR)
   @AuditLog('clubbing_rule.delete')
   deleteRule(@Param('id') id: string) {
     return this.clubbingService.deleteRule(id);

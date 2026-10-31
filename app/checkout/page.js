@@ -228,40 +228,15 @@ function CheckoutPage() {
   }, 0)
 
   useEffect(() => {
-    let isCancelled = false
-    const calculateDynamicShipping = async () => {
-      if (displayItems.length === 0) {
-        setDynamicShipping(null)
-        return
-      }
-      setCalculatingShipping(true)
-      try {
-        const dest = form.state || form.postcode || 'National'
-        const res = await fetch('http://localhost:5000/shipping-slabs/calculate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            weight: Number(totalWeight.toFixed(2)),
-            destinationRegion: dest,
-            orderSubtotal: displaySubtotal
-          })
-        })
-        if (res.ok) {
-          const data = await res.json()
-          if (!isCancelled) {
-            setDynamicShipping(data)
-          }
-        }
-      } catch (err) {
-        console.warn('Could not fetch dynamic shipping rate:', err)
-      } finally {
-        if (!isCancelled) setCalculatingShipping(false)
-      }
+    if (backendShippingCharge !== null && backendShippingCharge !== undefined) {
+      setDynamicShipping({
+        shippingFee: backendShippingCharge,
+        slab: { name: shippingCarrier || 'Standard Delivery' }
+      })
+    } else {
+      setDynamicShipping(null)
     }
-
-    calculateDynamicShipping()
-    return () => { isCancelled = true }
-  }, [totalWeight, form.state, form.postcode, displaySubtotal, displayItems.length])
+  }, [backendShippingCharge, shippingCarrier])
 
   // Shipping fee resolved: use dynamic rate if available, fallback to backend rate or free over ₹499 else ₹49
   const shippingCharge = dynamicShipping !== null && dynamicShipping.shippingFee !== undefined

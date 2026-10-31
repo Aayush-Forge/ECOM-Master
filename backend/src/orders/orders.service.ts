@@ -16,6 +16,9 @@ import { RefundWebhookDto } from './dto/refund-webhook.dto';
 import * as crypto from 'crypto';
 import { CartStatus, PaymentWebhookStatus, PaymentStatus } from '@prisma/client';
 import { PricingService } from '../pricing/pricing.service';
+import { generateBarcodeSvg } from './utils/barcode.util';
+import { numberToIndianRupeesWords } from './utils/number-to-words.util';
+import { getGstStateDetails } from './utils/state-codes.util';
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.payment_pending]: [OrderStatus.paid, OrderStatus.cancelled],
@@ -832,8 +835,9 @@ export class OrdersService {
       await tx.orderStatusHistory.create({
         data: {
           orderId: resolvedOrderId,
-          fromStatus: order.status,
+
           toStatus: OrderStatus.refunded,
+          changedBySystem: 'webhook:refund.processed',
           note: `Order automatically marked as refunded via webhook event ${eventId}`,
         },
       });
@@ -875,150 +879,332 @@ export class OrdersService {
       const order = await this.prisma.order.findUnique({
         where: { id },
         include: {
-          items: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
           addresses: true,
           payments: true,
           customer: true,
         },
       });
       if (order) {
-        if (!order.invoiceNumber) {
-          const inv = `INV-2026-${order.orderNumber.replace(/[^0-9]/g, '').slice(-5) || '10284'}`;
-          await this.prisma.order.update({
-            where: { id },
-            data: { invoiceNumber: inv, shippingLabelStatus: 'generated' },
-          }).catch(() => {});
-          order.invoiceNumber = inv;
-          order.shippingLabelStatus = 'generated';
-        }
         return order;
       }
     } catch {}
 
-    const mock = this.getMockOrders().find((o) => o.id === id) || this.getMockOrders()[0];
-    return mock;
+    const mock = this.getMockOrders().find((o) => o.id === id);
+    if (mock) {
+      return mock;
+    }
+
+    throw new NotFoundException(`Order with ID "${id}" not found`);
+  }
+
+  private async prepareTaxInvoiceData(order: any) {
+    const company = await this.prisma.companyProfile.findFirst().catch(() => null);
+    const sellerState = getGstStateDetails(company?.state || 'Karnataka');
+    const seller = {
+      legalName: (company?.legalName || 'SRIDATTAM ENTERPRISES PVT LTD').toUpperCase(),
+      tradeName: company?.tradeName || 'Sridattam',
+      addressLine1: company?.addressLine1 || 'Building #45, 100 Feet Ring Road',
+      addressLine2: company?.addressLine2 || 'JP Nagar 6th Phase',
+      city: company?.city || 'Bengaluru',
+      pincode: company?.pincode || '560078',
+      stateFormatted: sellerState.formatted,
+      stateCode: sellerState.code,
+      gstin: company?.gstin || '29AAACS1234F1Z5',
+    };
+
+    const rawShipping = order.addresses?.find((a: any) => a.type === 'shipping') || order.addresses?.[0] || {};
+    const rawBilling = order.addresses?.find((a: any) => a.type === 'billing') || rawShipping;
+
+    const buyerState = getGstStateDetails(rawBilling.state || rawShipping.state || 'Karnataka');
+    const shippingState = getGstStateDetails(rawShipping.state || rawBilling.state || 'Karnataka');
+
+    const buyer = {
+      fullName: (rawBilling.fullName && rawBilling.fullName.trim()) ||
+        (order.customer?.firstName ? `${order.customer.firstName} ${order.customer.lastName || ''}`.trim() : 'Valued Customer'),
+      phone: rawBilling.phone || rawShipping.phone || order.customer?.phone || '',
+      addressLine1: rawBilling.addressLine1 || 'Temple View Residences',
+      addressLine2: rawBilling.addressLine2 || null,
+      city: rawBilling.city || 'Bengaluru',
+      postalCode: rawBilling.postalCode || '560001',
+      stateFormatted: buyerState.formatted,
+    };
+
+    const recipient = {
+      fullName: (rawShipping.fullName && rawShipping.fullName.trim()) || buyer.fullName,
+      phone: rawShipping.phone || buyer.phone,
+      addressLine1: rawShipping.addressLine1 || buyer.addressLine1,
+      addressLine2: rawShipping.addressLine2 || buyer.addressLine2,
+      city: rawShipping.city || buyer.city,
+      postalCode: rawShipping.postalCode || buyer.postalCode,
+      stateFormatted: shippingState.formatted,
+    };
+
+    let invoiceNumber = order.invoiceNumber;
+    if (!invoiceNumber) {
+      const cleanSeq = order.orderNumber.replace(/[^0-9]/g, '').slice(-6) || '001001';
+      invoiceNumber = `${company?.invoicePrefix || 'SRI/26-27/'}${cleanSeq}`;
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { invoiceNumber },
+      }).catch(() => {});
+      order.invoiceNumber = invoiceNumber;
+    }
+
+    const fmtDate = (d: any) => {
+      try {
+        const dateObj = d ? new Date(d) : new Date();
+        return dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/\s/g, '-');
+      } catch {
+        return '31-Oct-2026';
+      }
+    };
+
+    const orderDate = fmtDate(order.placedAt || order.createdAt);
+    const invoiceDate = fmtDate(order.placedAt || order.createdAt);
+    const dispatchDate = fmtDate(new Date());
+
+    const isIntraState = seller.stateCode === shippingState.code;
+    const payment = order.payments?.[0];
+    const paymentMode = payment?.method?.toUpperCase() || (order.status === OrderStatus.paid ? 'PREPAID' : 'COD');
+
+    const awbNumber = order.trackingNumber || `SRID${order.orderNumber.replace(/[^0-9]/g, '').slice(-6) || '57361'}IN`;
+
+    const subtotal = Number(order.subtotal) || 0;
+    const discountTotal = order.discountTotal !== null && order.discountTotal !== undefined ? Number(order.discountTotal) : 0;
+    const shippingTotal = order.shippingTotal !== null && order.shippingTotal !== undefined ? Number(order.shippingTotal) : 0;
+
+    const rawItems = Array.isArray(order.items) && order.items.length > 0 ? order.items : [
+      {
+        titleSnapshot: 'Trishakthi Triple Emotion Bambooless Dhoop Sticks Combo',
+        skuSnapshot: 'DHS-TRI-21',
+        quantity: 1,
+        unitPriceSnapshot: subtotal > 0 ? subtotal : 499,
+        lineTotal: subtotal > 0 ? subtotal : 499,
+      },
+    ];
+
+    let runningTaxableTotal = 0;
+    let runningCgstTotal = 0;
+    let runningSgstTotal = 0;
+    let runningIgstTotal = 0;
+    let runningQtyTotal = 0;
+    let runningAmountTotal = 0;
+
+    const discountFactor = subtotal > 0 && discountTotal > 0 ? (1 - (discountTotal / subtotal)) : 1;
+
+    const computedItems = rawItems.map((item: any, idx: number) => {
+      const qty = Number(item.quantity) || 1;
+      runningQtyTotal += qty;
+      const rawLineTotal = Number(item.lineTotal || (item.unitPriceSnapshot * qty)) || 0;
+      const effectiveLineTotal = Math.round(rawLineTotal * discountFactor * 100) / 100;
+      runningAmountTotal += effectiveLineTotal;
+
+      // GST 5% for incense / agarbatti / dhoop under HSN 33074100
+      const taxableValue = Math.round((effectiveLineTotal / 1.05) * 100) / 100;
+      const taxAmount = Math.round((effectiveLineTotal - taxableValue) * 100) / 100;
+      const rate = Math.round((taxableValue / qty) * 100) / 100;
+
+      runningTaxableTotal += taxableValue;
+
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+
+      if (isIntraState) {
+        cgst = Math.round((taxAmount / 2) * 100) / 100;
+        sgst = Math.round((taxAmount - cgst) * 100) / 100;
+        runningCgstTotal += cgst;
+        runningSgstTotal += sgst;
+      } else {
+        igst = taxAmount;
+        runningIgstTotal += igst;
+      }
+
+      return {
+        srNo: idx + 1,
+        productName: item.titleSnapshot || item.product?.title || 'Sacred Vedic Incense',
+        productCode: item.skuSnapshot || item.product?.sku || 'INC-VD-01',
+        hsn: '33074100',
+        qty,
+        rate,
+        taxableValue,
+        cgst,
+        cgstRate: '2.500%',
+        sgst,
+        sgstRate: '2.500%',
+        igst,
+        igstRate: '5.000%',
+        amount: effectiveLineTotal,
+      };
+    });
+
+    if (shippingTotal > 0) {
+      runningQtyTotal += 1;
+      runningAmountTotal += shippingTotal;
+      const shippingTaxable = Math.round((shippingTotal / 1.18) * 100) / 100;
+      const shippingTax = Math.round((shippingTotal - shippingTaxable) * 100) / 100;
+      runningTaxableTotal += shippingTaxable;
+
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+
+      if (isIntraState) {
+        cgst = Math.round((shippingTax / 2) * 100) / 100;
+        sgst = Math.round((shippingTax - cgst) * 100) / 100;
+        runningCgstTotal += cgst;
+        runningSgstTotal += sgst;
+      } else {
+        igst = shippingTax;
+        runningIgstTotal += igst;
+      }
+
+      computedItems.push({
+        srNo: computedItems.length + 1,
+        productName: 'Shipping & Handling Charges',
+        productCode: 'FREIGHT',
+        hsn: '996812',
+        qty: 1,
+        rate: shippingTaxable,
+        taxableValue: shippingTaxable,
+        cgst,
+        cgstRate: '9.000%',
+        sgst,
+        sgstRate: '9.000%',
+        igst,
+        igstRate: '18.000%',
+        amount: shippingTotal,
+      });
+    }
+
+    const orderBarcodeSvg = generateBarcodeSvg(`#${order.orderNumber}`, 32, 1.25);
+    const amountInWords = numberToIndianRupeesWords(runningAmountTotal);
+
+    return {
+      seller,
+      buyer,
+      shippingAddress: recipient,
+      invoiceNumber,
+      orderNumber: order.orderNumber,
+      orderDate,
+      invoiceDate,
+      dispatchDate,
+      portal: 'SRIDATTAM',
+      paymentMode,
+      awbNumber,
+      isIntraState,
+      orderBarcodeSvg,
+      items: computedItems,
+      totals: {
+        totalQty: runningQtyTotal,
+        totalTaxable: Math.round(runningTaxableTotal * 100) / 100,
+        totalCgst: Math.round(runningCgstTotal * 100) / 100,
+        totalSgst: Math.round(runningSgstTotal * 100) / 100,
+        totalIgst: Math.round(runningIgstTotal * 100) / 100,
+        totalAmount: Math.round(runningAmountTotal * 100) / 100,
+      },
+      amountInWords,
+    };
   }
 
   async getOrderInvoice(id: string, format?: string): Promise<any> {
     const order = await this.getOrderOrMock(id);
-    const company = await this.prisma.companyProfile.findFirst().catch(() => null);
-    const seller = {
-      legalName: company?.legalName || 'Sridattam Vedic Wellness Pvt. Ltd.',
-      tradeName: company?.tradeName || 'Sridattam',
-      gstin: company?.gstin || '07AABCS1234F1Z8',
-      cin: company?.cin || 'U74999DL2026PTC123456',
-      address: company?.addressLine1 ? `${company.addressLine1}, ${company.city || ''}, ${company.state || ''} - ${company.pincode || ''}` : '42, Sacred Lotus Enclave, Mathura Road, New Delhi, 110001',
-      email: company?.email || 'care@sridattam.com',
-      phone: company?.phone || '+91 98765 43210',
-      website: company?.website || 'www.sridattam.com',
-    };
-    const invoiceNumber = order.invoiceNumber || `INV-2026-${order.orderNumber.replace(/[^0-9]/g, '').slice(-5) || '10284'}`;
-    const invoiceDate = order.placedAt ? new Date(order.placedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '24 Oct 2026';
-    const shippingAddress = order.addresses?.find((a: any) => a.type === 'shipping') || order.addresses?.[0] || {
-      fullName: 'Aayush Sharma',
-      phone: '+91 98765 43210',
-      addressLine1: 'B-402, Lotus Grandeur, Sector 62',
-      addressLine2: 'Near Tech Park',
-      city: 'Noida',
-      state: 'Uttar Pradesh',
-      postalCode: '201309',
-      country: 'India',
-    };
-
-    const subtotal = Number(order.subtotal) || 1299;
-    const discountTotal = Number(order.discountTotal) || 198;
-    const shippingTotal = Number(order.shippingTotal) || 0;
-    const taxTotal = Number(order.taxTotal) || Math.round((subtotal - discountTotal) * 0.18);
-    const grandTotal = Number(order.grandTotal) || (subtotal - discountTotal + shippingTotal);
+    const invoiceData = await this.prepareTaxInvoiceData(order);
 
     if (format === 'json') {
       return {
         orderId: order.id,
         orderNumber: order.orderNumber,
-        invoiceNumber,
-        invoiceDate,
-        buyer: shippingAddress,
-        items: order.items || [],
-        pricing: {
-          subtotal,
-          discountTotal,
-          taxTotal,
-          shippingTotal,
-          grandTotal,
-        },
+        invoiceNumber: invoiceData.invoiceNumber,
+        invoiceDate: invoiceData.invoiceDate,
+        orderDate: invoiceData.orderDate,
+        seller: invoiceData.seller,
+        buyer: invoiceData.buyer,
+        shippingAddress: invoiceData.shippingAddress,
+        dispatchDate: invoiceData.dispatchDate,
+        awbNumber: invoiceData.awbNumber,
+        paymentMode: invoiceData.paymentMode,
+        isIntraState: invoiceData.isIntraState,
+        items: invoiceData.items,
+        totals: invoiceData.totals,
+        amountInWords: invoiceData.amountInWords,
       };
     }
 
-    // Return printable HTML
-    return this.renderInvoiceHtml({
-      seller,
-      orderNumber: order.orderNumber,
-      invoiceNumber,
-      invoiceDate,
-      buyer: shippingAddress,
-      items: order.items && order.items.length > 0 ? order.items : [
-        { titleSnapshot: 'Diwali Dhamaka Clubbing Bundle (3 Sacred Dhoop Packs)', skuSnapshot: 'CLB-DIWALI-01', quantity: 1, unitPriceSnapshot: 999, lineTotal: 999 },
-        { titleSnapshot: 'Pure Vedic Loban & Sambrani Cups (Box of 24)', skuSnapshot: 'SMB-LOB-24', quantity: 1, unitPriceSnapshot: 300, lineTotal: 300 },
-      ],
-      subtotal,
-      discountTotal,
-      taxTotal,
-      shippingTotal,
-      grandTotal,
-    });
+    return this.renderTaxInvoicePackingSlipHtml(invoiceData);
   }
 
   async getOrderShippingLabel(id: string, format?: string): Promise<any> {
     const order = await this.getOrderOrMock(id);
-    const shippingAddress = order.addresses?.find((a: any) => a.type === 'shipping') || order.addresses?.[0] || {
-      fullName: 'Aayush Sharma',
-      phone: '+91 98765 43210',
-      addressLine1: 'B-402, Lotus Grandeur, Sector 62',
-      addressLine2: 'Near Tech Park',
-      city: 'Noida',
-      state: 'Uttar Pradesh',
-      postalCode: '201309',
-      country: 'India',
-    };
+    if (order.shippingLabelStatus !== 'generated') {
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { shippingLabelStatus: 'generated' },
+      }).catch(() => {});
+      order.shippingLabelStatus = 'generated';
+    }
 
-    const awbNumber = `SRID${order.orderNumber.replace(/[^0-9]/g, '').slice(-8) || '77894102'}IN`;
-    const weightKg = '0.85';
+    const invoiceData = await this.prepareTaxInvoiceData(order);
 
     if (format === 'json') {
       return {
         orderId: order.id,
         orderNumber: order.orderNumber,
-        awbNumber,
-        routingZone: 'NORTH-DEL-AIR',
-        carrier: 'Express Logistics (Air)',
-        weightKg,
-        recipient: shippingAddress,
+        invoiceNumber: invoiceData.invoiceNumber,
+        awbNumber: invoiceData.awbNumber,
+        carrier: order.shippingCarrier || 'Standard Delivery',
+        weightKg: '0.85',
+        recipient: invoiceData.shippingAddress,
+        items: invoiceData.items,
+        totals: invoiceData.totals,
       };
     }
 
-    return this.renderShippingLabelHtml({
-      orderNumber: order.orderNumber,
-      awbNumber,
-      weightKg,
-      recipient: shippingAddress,
-    });
+    return this.renderTaxInvoicePackingSlipHtml(invoiceData);
   }
 
-  private renderInvoiceHtml(data: any): string {
-    const itemsRows = data.items
+  private renderTaxInvoicePackingSlipHtml(data: any): string {
+    const isIntra = data.isIntraState;
+
+    const itemRows = data.items
       .map(
-        (item: any, idx: number) => `
-        <tr style="border-bottom: 1px solid #e5e7eb;">
-          <td style="padding: 12px; font-size: 13px; color: #4b5563;">${idx + 1}</td>
-          <td style="padding: 12px; font-size: 13px; color: #111827; font-weight: 500;">
-            ${item.titleSnapshot || item.title || 'Sacred Incense'}
-            <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">SKU: ${item.skuSnapshot || item.sku || 'N/A'}</div>
-          </td>
-          <td style="padding: 12px; font-size: 13px; color: #4b5563; text-align: center;">33074100</td>
-          <td style="padding: 12px; font-size: 13px; color: #111827; text-align: center; font-weight: 600;">${item.quantity}</td>
-          <td style="padding: 12px; font-size: 13px; color: #111827; text-align: right;">₹${Number(item.unitPriceSnapshot || item.price || 0).toFixed(2)}</td>
-          <td style="padding: 12px; font-size: 13px; color: #111827; text-align: right; font-weight: 600;">₹${Number(item.lineTotal || (item.quantity * item.unitPriceSnapshot) || 0).toFixed(2)}</td>
-        </tr>`,
+        (it: any) => `
+      <tr>
+        <td style="text-align: center; border: 1px solid #000; padding: 4px 6px;">${it.srNo}</td>
+        <td style="border: 1px solid #000; padding: 4px 6px; line-height: 1.35;">
+          <strong>${it.productName}</strong>
+        </td>
+        <td style="border: 1px solid #000; padding: 4px 6px; font-family: monospace;">
+          ${it.productCode}
+          <div style="font-size: 8px; color: #333; font-family: sans-serif;">HSN: ${it.hsn}</div>
+        </td>
+        <td style="text-align: center; border: 1px solid #000; padding: 4px 6px;">${it.qty}</td>
+        <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">${it.rate.toFixed(2)}</td>
+        <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">${it.taxableValue.toFixed(2)}</td>
+        ${
+          isIntra
+            ? `
+        <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">
+          ${it.cgst.toFixed(2)}
+          <div style="font-size: 8px; color: #444;">(${it.cgstRate})</div>
+        </td>
+        <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">
+          ${it.sgst.toFixed(2)}
+          <div style="font-size: 8px; color: #444;">(${it.sgstRate})</div>
+        </td>`
+            : `
+        <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">
+          ${it.igst.toFixed(2)}
+          <div style="font-size: 8px; color: #444;">(${it.igstRate})</div>
+        </td>`
+        }
+        <td style="text-align: right; border: 1px solid #000; padding: 4px 6px; font-weight: 700;">${it.amount.toFixed(2)}</td>
+      </tr>`,
       )
       .join('');
 
@@ -1028,247 +1214,216 @@ export class OrdersService {
   <meta charset="UTF-8">
   <title>Tax Invoice - ${data.invoiceNumber}</title>
   <style>
-    @page { size: A4; margin: 15mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1f2937; margin: 0; padding: 24px; background: #f9fafb; }
-    .invoice-card { max-width: 800px; margin: 0 auto; background: #ffffff; padding: 36px; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-    .header-bar { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6b1024; padding-bottom: 20px; margin-bottom: 24px; }
-    .brand-title { font-size: 24px; font-weight: 800; color: #6b1024; letter-spacing: 0.05em; text-transform: uppercase; margin: 0; }
-    .brand-tag { font-size: 11px; color: #d97706; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
-    .invoice-badge { display: inline-block; background: #6b1024; color: #ffffff; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 4px; text-transform: uppercase; margin-bottom: 8px; }
-    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
-    .info-box { background: #fdfaf6; border: 1px solid #fed7aa; padding: 14px 18px; border-radius: 6px; }
-    .info-box h4 { margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; color: #9a3412; letter-spacing: 0.05em; }
-    .info-box p { margin: 2px 0; font-size: 13px; color: #374151; line-height: 1.4; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-    th { background: #f3f4f6; color: #374151; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 12px; text-align: left; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
-    .summary-table { width: 340px; margin-left: auto; margin-bottom: 24px; }
-    .summary-table td { padding: 6px 12px; font-size: 13px; }
-    .grand-total-row { border-top: 2px solid #6b1024; border-bottom: 2px solid #6b1024; font-size: 16px; font-weight: 800; color: #6b1024; }
-    .no-print-btn { display: flex; justify-content: flex-end; gap: 12px; max-width: 800px; margin: 0 auto 16px auto; }
-    .btn { padding: 8px 18px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; border: none; text-decoration: none; }
-    .btn-print { background: #6b1024; color: white; }
-    .btn-print:hover { background: #520b1b; }
-    .btn-back { background: #e5e7eb; color: #374151; }
-    @media print {
-      body { background: white; padding: 0; }
-      .invoice-card { box-shadow: none; border: none; padding: 0; }
-      .no-print { display: none !important; }
+    @page { size: A4 portrait; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 12px;
+      background: #f5f5f5;
+      color: #000;
+      font-size: 9.5px;
+      line-height: 1.3;
     }
-  </style>
-</head>
-<body>
-  <div class="no-print no-print-btn">
-    <button class="btn btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
-  </div>
-  <div class="invoice-card">
-    <div class="header-bar">
-      <div>
-        <h1 class="brand-title">SRIDATTAM</h1>
-        <div class="brand-tag">Pure Vedic Aromas & Incense</div>
-        <p style="margin: 6px 0 0 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
-          ${data.seller?.legalName || 'Sridattam Vedic Wellness Pvt. Ltd.'}<br>
-          ${data.seller?.address || '42, Sacred Lotus Enclave, Mathura Road, New Delhi, 110001'}<br>
-          GSTIN: ${data.seller?.gstin || '07AABCS1234F1Z8'} | CIN: ${data.seller?.cin || 'U74999DL2026PTC123456'}<br>
-          Email: ${data.seller?.email || 'care@sridattam.com'} | Web: ${data.seller?.website || 'www.sridattam.com'}
-        </p>
-      </div>
-      <div style="text-align: right;">
-        <span class="invoice-badge">Tax Invoice</span>
-        <div style="font-size: 14px; font-weight: 700; color: #111827;">${data.invoiceNumber}</div>
-        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Invoice Date: <strong>${data.invoiceDate}</strong></div>
-        <div style="font-size: 12px; color: #6b7280;">Order Ref: <strong>${data.orderNumber}</strong></div>
-        <div style="font-size: 12px; color: #059669; font-weight: 600; margin-top: 4px;">● Payment: PREPAID (Razorpay)</div>
-      </div>
-    </div>
-
-    <div class="meta-grid">
-      <div class="info-box">
-        <h4>Bill To / Consignee:</h4>
-        <p style="font-weight: 700; color: #111827;">${data.buyer.fullName || 'Valued Customer'}</p>
-        <p>${data.buyer.addressLine1 || ''}${data.buyer.addressLine2 ? ', ' + data.buyer.addressLine2 : ''}</p>
-        <p>${data.buyer.city || 'Noida'}, ${data.buyer.state || 'Uttar Pradesh'} - <strong>${data.buyer.postalCode || '201309'}</strong></p>
-        <p>Phone: ${data.buyer.phone || '+91 98765 43210'}</p>
-      </div>
-      <div class="info-box">
-        <h4>Dispatch & Logistics:</h4>
-        <p><strong>Fulfillment Node:</strong> Delhi Hub (F-102)</p>
-        <p><strong>Shipping Mode:</strong> Dynamic Express Slab</p>
-        <p><strong>Delivery SLA:</strong> 2 - 4 Business Days</p>
-        <p><strong>Place of Supply:</strong> ${data.buyer.state || 'Uttar Pradesh'} (State Code: 09)</p>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 40px;">#</th>
-          <th>Item Description</th>
-          <th style="width: 90px; text-align: center;">HSN Code</th>
-          <th style="width: 60px; text-align: center;">Qty</th>
-          <th style="width: 100px; text-align: right;">Unit Rate</th>
-          <th style="width: 110px; text-align: right;">Amount (₹)</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${itemsRows}
-      </tbody>
-    </table>
-
-    <table class="summary-table">
-      <tr>
-        <td style="color: #4b5563;">Subtotal:</td>
-        <td style="text-align: right; font-weight: 600;">₹${Number(data.subtotal).toFixed(2)}</td>
-      </tr>
-      ${
-        data.discountTotal > 0
-          ? `<tr>
-        <td style="color: #059669; font-weight: 600;">Clubbing Bundle Savings:</td>
-        <td style="text-align: right; color: #059669; font-weight: 700;">- ₹${Number(data.discountTotal).toFixed(2)}</td>
-      </tr>`
-          : ''
-      }
-      <tr>
-        <td style="color: #4b5563;">Shipping & Handling:</td>
-        <td style="text-align: right; font-weight: 600;">${data.shippingTotal > 0 ? '₹' + Number(data.shippingTotal).toFixed(2) : '<span style="color: #059669; font-weight: 700;">FREE</span>'}</td>
-      </tr>
-      <tr>
-        <td style="color: #4b5563;">GST (18% inclusive):</td>
-        <td style="text-align: right; font-weight: 600;">₹${Number(data.taxTotal).toFixed(2)}</td>
-      </tr>
-      <tr class="grand-total-row">
-        <td>Grand Total:</td>
-        <td style="text-align: right;">₹${Number(data.grandTotal).toFixed(2)}</td>
-      </tr>
-    </table>
-
-    <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
-      <div style="font-size: 11px; color: #6b7280; max-width: 440px; line-height: 1.5;">
-        <strong>Terms & Conditions:</strong><br>
-        1. All goods sold are backed by Sridattam 100% Vedic Purity guarantee.<br>
-        2. This is a computer-generated tax invoice and requires no physical signature.<br>
-        3. For any return/exchange queries, reach us at support@sridattam.com.
-      </div>
-      <div style="text-align: center; border: 1px dashed #9ca3af; padding: 12px 24px; border-radius: 6px;">
-        <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.05em;">Authorized Signatory</div>
-        <div style="font-size: 13px; font-weight: 700; color: #6b1024; margin-top: 4px;">SRIDATTAM VEDIC WELLNESS</div>
-        <div style="font-size: 10px; color: #059669; margin-top: 2px;">✔ Digitally Verified</div>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
-  }
-
-  private renderShippingLabelHtml(data: any): string {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Shipping Label - ${data.orderNumber}</title>
-  <style>
-    @page { size: 100mm 150mm; margin: 4mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 16px; background: #f3f4f6; }
-    .label-box { max-width: 420px; margin: 0 auto; background: #ffffff; border: 2px solid #000000; padding: 14px; box-sizing: border-box; }
-    .top-carrier-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
-    .carrier-name { font-size: 18px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; }
-    .badge-prepaid { background: #000; color: #fff; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 3px; }
-    .barcode-container { text-align: center; padding: 10px 0; border-bottom: 2px solid #000; margin-bottom: 10px; }
-    .barcode-visual { height: 48px; display: flex; justify-content: center; align-items: stretch; gap: 2px; }
-    .barcode-bar { background: #000; width: 3px; }
-    .barcode-thin { width: 1.5px; }
-    .barcode-thick { width: 5px; }
-    .barcode-space { width: 2px; }
-    .awb-text { font-family: monospace; font-size: 14px; font-weight: 700; letter-spacing: 0.15em; margin-top: 4px; }
-    .section-title { font-size: 11px; text-transform: uppercase; font-weight: 800; color: #000; margin-bottom: 4px; letter-spacing: 0.05em; }
-    .consignee-box { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
-    .recipient-name { font-size: 16px; font-weight: 900; margin: 0 0 4px 0; }
-    .address-line { font-size: 13px; line-height: 1.35; margin: 0; }
-    .pincode-highlight { font-size: 24px; font-weight: 900; letter-spacing: 0.05em; margin-top: 6px; }
-    .consignor-box { border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; font-size: 11px; line-height: 1.3; }
-    .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; }
-    .routing-code { font-size: 16px; font-weight: 900; background: #e5e7eb; padding: 4px 8px; text-align: center; border-radius: 4px; }
-    .no-print { display: flex; justify-content: center; margin-bottom: 12px; }
-    .btn-print { background: #000; color: #fff; padding: 8px 20px; font-weight: 700; border-radius: 4px; cursor: pointer; border: none; }
+    .sheet {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 16px 20px;
+      border: 1px solid #ddd;
+    }
+    .no-print { display: flex; justify-content: flex-end; max-width: 800px; margin: 0 auto 12px auto; gap: 8px; }
+    .btn { padding: 8px 16px; font-size: 12px; font-weight: 700; border-radius: 4px; cursor: pointer; border: 1px solid #000; background: #000; color: #fff; }
+    .btn:hover { background: #222; }
+    .top-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; }
+    .brand-mark { font-size: 18px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+    .invoice-title { font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    table.border-grid { width: 100%; border-collapse: collapse; border: 1px solid #000; }
+    table.border-grid td, table.border-grid th { border: 1px solid #000; padding: 5px 7px; vertical-align: top; }
+    .cell-label { font-size: 8.5px; color: #333; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
+    .table-sub { font-size: 8px; color: #555; }
+    .signature-box { display: flex; border: 1px solid #000; margin-top: 8px; }
+    .signature-left { width: 62%; border-right: 1px solid #000; padding: 6px 8px; }
+    .signature-right { width: 38%; padding: 6px 8px; display: flex; flex-direction: column; justify-content: space-between; }
+    .footer-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 8.5px; }
+    .footer-pill { border: 1px solid #000; padding: 2px 6px; font-weight: 600; }
     @media print {
       body { background: #fff; padding: 0; }
-      .label-box { border: 2px solid #000; max-width: 100%; }
+      .sheet { border: none; padding: 0; max-width: 100%; }
       .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
   <div class="no-print">
-    <button class="btn-print" onclick="window.print()">🖨️ Print Shipping Label (4x6")</button>
+    <button class="btn" onclick="window.print()">🖨️ Print Tax Invoice / Packing Slip</button>
   </div>
-  <div class="label-box">
-    <div class="top-carrier-bar">
-      <div>
-        <div class="carrier-name">EXPRESS AIR</div>
-        <div style="font-size: 10px; font-weight: 700;">NORTH ZONE ROUTING</div>
-      </div>
-      <div class="badge-prepaid">PREPAID</div>
+  <div class="sheet">
+    <div class="top-header">
+      <div class="brand-mark">SRIDATTAM</div>
+      <div class="invoice-title">Tax Invoice</div>
     </div>
 
-    <div class="barcode-container">
-      <div class="barcode-visual">
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-space"></div>
-        <div class="barcode-bar barcode-thin"></div>
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-bar barcode-thin"></div>
-        <div class="barcode-space"></div>
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-bar barcode-thin"></div>
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-space"></div>
-        <div class="barcode-bar barcode-thin"></div>
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-space"></div>
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-bar barcode-thin"></div>
-        <div class="barcode-space"></div>
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-bar barcode-thin"></div>
-        <div class="barcode-bar barcode-thick"></div>
-        <div class="barcode-space"></div>
-        <div class="barcode-bar barcode-thin"></div>
+    <!-- 3-Column Header Grid -->
+    <table class="border-grid" style="margin-bottom: 0;">
+      <tr>
+        <td style="width: 38%;">
+          <div style="font-weight: 800; font-size: 10.5px; text-transform: uppercase;">${data.seller.legalName}</div>
+          <div>${data.seller.addressLine1}</div>
+          ${data.seller.addressLine2 ? `<div>${data.seller.addressLine2}</div>` : ''}
+          <div>${data.seller.city} - ${data.seller.pincode}</div>
+          <div>${data.seller.stateFormatted}, India</div>
+          <div style="margin-top: 3px; font-weight: 700;">GSTIN: ${data.seller.gstin}</div>
+        </td>
+        <td style="width: 32%;">
+          <div><strong>Invoice No:</strong> ${data.invoiceNumber}</div>
+          <div><strong>Order No:</strong> #${data.orderNumber}</div>
+          <div><strong>Order Date:</strong> ${data.orderDate}</div>
+          <div style="text-align: center; margin-top: 6px;">
+            ${data.orderBarcodeSvg}
+            <div style="font-size: 9px; font-weight: 700; margin-top: 2px;">#${data.orderNumber}</div>
+          </div>
+        </td>
+        <td style="width: 30%; padding: 0;">
+          <div style="border-bottom: 1px solid #000; padding: 4px 6px;"><strong>Invoice Date:</strong> ${data.invoiceDate}</div>
+          <div style="border-bottom: 1px solid #000; padding: 4px 6px;"><strong>Portal:</strong> ${data.portal}</div>
+          <div style="padding: 4px 6px;"><strong>Payment Mode:</strong> ${data.paymentMode}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="cell-label">Bill To:</div>
+          <div style="font-weight: 700; font-size: 10px;">${data.buyer.fullName}</div>
+          <div>${data.buyer.addressLine1}</div>
+          ${data.buyer.addressLine2 ? `<div>${data.buyer.addressLine2}</div>` : ''}
+          <div>${data.buyer.city} - ${data.buyer.postalCode}</div>
+          <div>${data.buyer.stateFormatted}, India</div>
+          ${data.buyer.phone ? `<div style="font-size: 9px; margin-top: 2px;">Phone: ${data.buyer.phone}</div>` : ''}
+        </td>
+        <td>
+          <div class="cell-label">Ship To:</div>
+          <div style="font-weight: 700; font-size: 10px;">${data.shippingAddress.fullName}</div>
+          <div>${data.shippingAddress.addressLine1}</div>
+          ${data.shippingAddress.addressLine2 ? `<div>${data.shippingAddress.addressLine2}</div>` : ''}
+          <div>${data.shippingAddress.city} - ${data.shippingAddress.postalCode}</div>
+          <div>${data.shippingAddress.stateFormatted}, India</div>
+          ${data.shippingAddress.phone ? `<div style="font-size: 9px; margin-top: 2px;">Phone: ${data.shippingAddress.phone}</div>` : ''}
+        </td>
+        <td>
+          <div class="cell-label">Dispatch Details:</div>
+          <div><strong>Dispatch Date:</strong> ${data.dispatchDate}</div>
+          <div style="margin-top: 4px;"><strong>AWB No:</strong> ${data.awbNumber || '—'}</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Items Table (9 columns) -->
+    <table class="border-grid" style="margin-top: -1px; border-top: none;">
+      <thead>
+        <tr style="background: #fafafa;">
+          <th style="width: 32px; text-align: center;">Sr No</th>
+          <th>Product Name</th>
+          <th style="width: 105px;">Product Code</th>
+          <th style="width: 32px; text-align: center;">Qty</th>
+          <th style="width: 60px; text-align: right;">Rate</th>
+          <th style="width: 75px; text-align: right;">Taxable Value (INR)</th>
+          ${
+            isIntra
+              ? `
+          <th style="width: 65px; text-align: right;">CGST (INR)</th>
+          <th style="width: 65px; text-align: right;">SGST (INR)</th>`
+              : `
+          <th style="width: 130px; text-align: right;">IGST (INR)</th>`
+          }
+          <th style="width: 75px; text-align: right;">Amount (INR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+        <!-- 2 empty padding rows -->
+        <tr>
+          <td style="height: 18px; border: 1px solid #000;">&nbsp;</td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          ${isIntra ? `<td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td>` : `<td style="border: 1px solid #000;"></td>`}
+          <td style="border: 1px solid #000;"></td>
+        </tr>
+        <tr>
+          <td style="height: 18px; border: 1px solid #000;">&nbsp;</td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;"></td>
+          ${isIntra ? `<td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td>` : `<td style="border: 1px solid #000;"></td>`}
+          <td style="border: 1px solid #000;"></td>
+        </tr>
+        <!-- Total Row -->
+        <tr style="font-weight: 700; background: #fff;">
+          <td style="border: 1px solid #000;"></td>
+          <td style="border: 1px solid #000;">Total</td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="text-align: center; border: 1px solid #000;">${data.totals.totalQty}</td>
+          <td style="border: 1px solid #000;"></td>
+          <td style="text-align: right; border: 1px solid #000;">${data.totals.totalTaxable.toFixed(2)}</td>
+          ${
+            isIntra
+              ? `
+          <td style="text-align: right; border: 1px solid #000;">${data.totals.totalCgst.toFixed(2)}</td>
+          <td style="text-align: right; border: 1px solid #000;">${data.totals.totalSgst.toFixed(2)}</td>`
+              : `
+          <td style="text-align: right; border: 1px solid #000;">${data.totals.totalIgst.toFixed(2)}</td>`
+          }
+          <td style="text-align: right; border: 1px solid #000;">${data.totals.totalAmount.toFixed(2)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Amount Chargeable in words -->
+    <div style="margin-top: 6px;">
+      <div style="font-size: 8.5px; color: #333;">Amount Chargeable (in words)</div>
+      <div style="font-weight: 800; font-size: 10px; margin: 1px 0 3px 0;">${data.amountInWords}</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 8.5px;">
+        <div><strong>Tax is payable on reverse charge basis:</strong> No</div>
+        <div style="font-weight: 700;">E. & O.E</div>
       </div>
-      <div class="awb-text">AWB: ${data.awbNumber}</div>
     </div>
 
-    <div class="consignee-box">
-      <div class="section-title">DELIVER TO:</div>
-      <div class="recipient-name">${data.recipient.fullName || 'Valued Customer'}</div>
-      <p class="address-line">${data.recipient.addressLine1 || 'Lotus Grandeur, Sector 62'}</p>
-      ${data.recipient.addressLine2 ? `<p class="address-line">${data.recipient.addressLine2}</p>` : ''}
-      <p class="address-line">${data.recipient.city || 'Noida'}, ${data.recipient.state || 'Uttar Pradesh'}</p>
-      <div class="pincode-highlight">PIN: ${data.recipient.postalCode || '201309'}</div>
-      <div style="font-size: 12px; font-weight: 700; margin-top: 4px;">Contact: ${data.recipient.phone || '+91 98765 43210'}</div>
+    <!-- Declaration and Signature -->
+    <div class="signature-box">
+      <div class="signature-left">
+        <div style="font-weight: 700; text-decoration: underline;">Declaration</div>
+        <ol style="margin: 3px 0 0 14px; padding: 0; font-size: 8.5px; line-height: 1.35;">
+          <li>This is a computer generated invoice. Does not require signature or stamp.</li>
+          <li>All figures are showing in INR.</li>
+          <li>Ship/Handling Charges inclusive of GST.</li>
+          <li>All Disputes are subject to ${data.seller.stateFormatted} jurisdiction only.</li>
+        </ol>
+      </div>
+      <div class="signature-right">
+        <div style="font-weight: 800; font-size: 9px; text-transform: uppercase;">For ${data.seller.legalName}</div>
+        <div style="height: 30px; display: flex; align-items: center; justify-content: center;">
+          <span style="font-family: 'Brush Script MT', cursive, sans-serif; font-size: 18px; color: #1e3a8a;">Sridattam Vedic</span>
+        </div>
+        <div style="text-align: center; font-size: 8.5px; border-top: 1px dashed #aaa; padding-top: 2px;">Authorised Signatory</div>
+      </div>
     </div>
 
-    <div class="consignor-box">
-      <div class="section-title">RETURN TO / SHIPPED BY:</div>
-      <strong>SRIDATTAM VEDIC WELLNESS FULFILLMENT</strong><br>
-      Plot 42, Logistics Park, Okhla Industrial Area Phase-III, New Delhi - 110020<br>
-      Support: care@sridattam.com | +91 98765 43210
-    </div>
-
-    <div class="meta-row">
-      <div>
-        <strong>Order:</strong> ${data.orderNumber}<br>
-        <strong>Dead Wt:</strong> ${data.weightKg} KG<br>
-        <strong>Contents:</strong> Sacred Incense & Cups
+    <!-- Footer -->
+    <div class="footer-bar">
+      <div class="footer-pill">
+        Bill By: Sridattam &nbsp;|&nbsp; Powered By Sridattam Vedic Wellness
       </div>
-      <div>
-        <div class="routing-code">DEL / AIR-01</div>
-        <div style="font-size: 9px; text-align: center; margin-top: 4px; font-weight: 700;">STANDARD LOGISTICS SLAB</div>
-      </div>
+      <div>This is a computer generated Invoice</div>
     </div>
   </div>
 </body>
 </html>`;
   }
-
   private getMockOrders(): any[] {
     return [
       {

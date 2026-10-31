@@ -66,7 +66,7 @@ export class ClubbingService implements OnModuleInit {
     }
   }
 
-  private formatRule(r: any) {
+  private formatRule(r: any, publicOnly = false) {
     const products = Array.isArray(r.products)
       ? r.products.map((p: any) => {
           let imageUrl = '';
@@ -117,13 +117,12 @@ export class ClubbingService implements OnModuleInit {
         })
       : [];
 
-    return {
+    const base: Record<string, any> = {
       id: r.id,
       name: r.name,
       eventName: r.eventName || r.name,
       tagline: r.tagline || '',
       description: r.description || '',
-      code: r.code || r.id,
       type: r.type,
       requiredQuantity: r.requiredQuantity,
       fixedPrice: r.fixedPrice ? Number(r.fixedPrice) : null,
@@ -146,6 +145,14 @@ export class ClubbingService implements OnModuleInit {
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };
+
+    if (!publicOnly) {
+      base.code = r.code || r.id;
+      base.usageLimit = r.usageLimit;
+      base.usageCount = r.usageCount;
+    }
+
+    return base;
   }
 
   async getAllRules() {
@@ -159,27 +166,33 @@ export class ClubbingService implements OnModuleInit {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return rules.map((r) => this.formatRule(r));
+    return rules.map((r) => this.formatRule(r, false));
   }
 
-  async getActiveRules() {
+  async getActiveRules(publicOnly = false) {
     const now = new Date();
+    const whereClause: any = {
+      isActive: true,
+      OR: [
+        { startsAt: null },
+        { startsAt: { lte: now } },
+      ],
+      AND: [
+        {
+          OR: [
+            { endsAt: null },
+            { endsAt: { gte: now } },
+          ],
+        },
+      ],
+    };
+
+    if (publicOnly) {
+      whereClause.code = null;
+    }
+
     const rules = await this.prisma.clubbingRule.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { startsAt: null },
-          { startsAt: { lte: now } },
-        ],
-        AND: [
-          {
-            OR: [
-              { endsAt: null },
-              { endsAt: { gte: now } },
-            ],
-          },
-        ],
-      },
+      where: whereClause,
       include: {
         products: {
           include: { product: { include: { category: true } } },
@@ -189,33 +202,47 @@ export class ClubbingService implements OnModuleInit {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return rules.map((r) => this.formatRule(r));
+    return rules.map((r) => this.formatRule(r, publicOnly));
   }
 
   async getRuleById(id: string) {
     const isUuid = id.length === 36 && id.includes('-');
-    const rule = await this.prisma.clubbingRule.findFirst({
-      where: {
-        OR: [
-          ...(isUuid ? [{ id }] : []),
-          { code: id },
-          { eventName: { equals: id, mode: 'insensitive' as any } },
-          { name: { equals: id, mode: 'insensitive' as any } },
-        ],
-      },
-      include: {
-        products: {
-          include: { product: { include: { category: true } } },
-          orderBy: { sortOrder: 'asc' },
+    let rule: any = null;
+    if (this.prisma.clubbingRule.findFirst) {
+      rule = await this.prisma.clubbingRule.findFirst({
+        where: {
+          OR: [
+            ...(isUuid ? [{ id }] : []),
+            { code: id },
+            { eventName: { equals: id, mode: 'insensitive' as any } },
+            { name: { equals: id, mode: 'insensitive' as any } },
+          ],
         },
-        applicableCategory: true,
-      },
-    });
+        include: {
+          products: {
+            include: { product: { include: { category: true } } },
+            orderBy: { sortOrder: 'asc' },
+          },
+          applicableCategory: true,
+        },
+      });
+    } else if (this.prisma.clubbingRule.findUnique) {
+      rule = await this.prisma.clubbingRule.findUnique({
+        where: { id },
+        include: {
+          products: {
+            include: { product: { include: { category: true } } },
+            orderBy: { sortOrder: 'asc' },
+          },
+          applicableCategory: true,
+        },
+      });
+    }
 
     if (!rule) {
       throw new NotFoundException(`Clubbing campaign "${id}" not found`);
     }
-    return this.formatRule(rule);
+    return this.formatRule(rule, false);
   }
 
   async createRule(dto: any) {
@@ -344,9 +371,31 @@ export class ClubbingService implements OnModuleInit {
   }
 
   async deleteRule(id: string) {
-    const existing = await this.getRuleById(id);
+    let existing: any = null;
+    if (this.prisma.clubbingRule.findUnique) {
+      existing = await this.prisma.clubbingRule.findUnique({ where: { id } }).catch(() => null);
+    }
+    if (!existing && this.prisma.clubbingRule.findFirst) {
+      existing = await this.prisma.clubbingRule.findFirst({
+        where: {
+          OR: [
+            { id },
+            { code: id },
+            { name: { equals: id, mode: 'insensitive' as any } },
+          ],
+        },
+      }).catch(() => null);
+    }
+
+    if (!existing) {
+      throw new NotFoundException(`Clubbing campaign "${id}" not found`);
+    }
+
+    if (this.prisma.clubbingRuleProduct?.deleteMany) {
+      await this.prisma.clubbingRuleProduct.deleteMany({ where: { ruleId: existing.id } }).catch(() => {});
+    }
     await this.prisma.clubbingRule.delete({ where: { id: existing.id } });
-    return { success: true, id: existing.id };
+    return { id: existing.id };
   }
 
   async bulkDelete(ids: string[]) {
@@ -371,23 +420,84 @@ export class ClubbingService implements OnModuleInit {
       return { discountTotal: 0, appliedRuleId: null, appliedCouponCode: null };
     }
 
-    const activeRules = await this.getActiveRules();
+    const activeRules = await this.getActiveRules(false);
+    const consumedProductIds = new Set<string>();
+
     for (const rule of activeRules) {
-      const eligibleMap = new Map<string, any>();
-      for (const p of rule.clubbingProducts) {
-        eligibleMap.set(p.productId, p);
+      if (rule.code && couponCode && rule.code.toLowerCase() === couponCode.trim().toLowerCase()) {
+        appliedCouponCode = rule.code;
       }
 
-      for (const item of cartItems) {
-        const eligible = eligibleMap.get(item.productId);
-        if (eligible && eligible.clubbingPrice && eligible.clubbingPrice < item.price) {
-          const discountPerUnit = item.price - eligible.clubbingPrice;
-          discountTotal += discountPerUnit * item.quantity;
+      const productsList = rule.products || rule.clubbingProducts || [];
+      const eligibleProductIds = new Set(
+        productsList.map((p: any) => p.productId || p.id).filter(Boolean)
+      );
+
+      const qualifyingItems = cartItems.filter(
+        (it) => eligibleProductIds.has(it.productId) && !consumedProductIds.has(it.productId),
+      );
+
+      if (qualifyingItems.length === 0) continue;
+
+      const totalQualifyingQty = qualifyingItems.reduce((acc, it) => acc + (it.quantity || 1), 0);
+      const reqQty = Number(rule.requiredQuantity) || 1;
+      const ruleType = String(rule.type || '').toLowerCase();
+
+      if (ruleType === 'fixed_price_bundle' || ruleType === 'fixed_price') {
+        if (totalQualifyingQty >= reqQty && rule.fixedPrice !== null && rule.fixedPrice !== undefined) {
+          const bundles = Math.floor(totalQualifyingQty / reqQty);
+          const bundledQty = bundles * reqQty;
+          const totalVal = qualifyingItems.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+          const avgUnitPrice = totalVal / totalQualifyingQty;
+          const originalBundledAmount = avgUnitPrice * bundledQty;
+          const discountedBundledAmount = Number(rule.fixedPrice) * bundles;
+          const saving = Math.max(0, originalBundledAmount - discountedBundledAmount);
+
+          if (saving > 0) {
+            discountTotal += saving;
+            appliedRuleId = rule.id;
+            qualifyingItems.forEach((it) => consumedProductIds.add(it.productId));
+          }
+        }
+      } else if (ruleType === 'percentage_off_bundle' || ruleType === 'percentage_off') {
+        if (totalQualifyingQty >= reqQty && rule.percentageOff !== null && rule.percentageOff !== undefined) {
+          const bundles = Math.floor(totalQualifyingQty / reqQty);
+          const bundledQty = bundles * reqQty;
+          const totalVal = qualifyingItems.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+          const avgUnitPrice = totalVal / totalQualifyingQty;
+          const originalBundledAmount = avgUnitPrice * bundledQty;
+          const saving = originalBundledAmount * (Number(rule.percentageOff) / 100);
+
+          if (saving > 0) {
+            discountTotal += saving;
+            appliedRuleId = rule.id;
+            qualifyingItems.forEach((it) => consumedProductIds.add(it.productId));
+          }
+        }
+      } else {
+        // custom_product_clubbing or specific product price override
+        let customSavings = 0;
+        const eligibleMap = new Map<string, any>();
+        for (const p of productsList) {
+          eligibleMap.set(p.productId || p.id, p);
+        }
+
+        if (totalQualifyingQty >= reqQty) {
+          for (const item of qualifyingItems) {
+            const cp = eligibleMap.get(item.productId);
+            if (cp && cp.clubbingPrice && Number(cp.clubbingPrice) < item.price) {
+              const diff = item.price - Number(cp.clubbingPrice);
+              customSavings += diff * (item.quantity || 1);
+            }
+          }
+        }
+
+        if (customSavings > 0) {
+          discountTotal += customSavings;
           appliedRuleId = rule.id;
+          qualifyingItems.forEach((it) => consumedProductIds.add(it.productId));
         }
       }
-
-      if (discountTotal > 0) break;
     }
 
     return {
