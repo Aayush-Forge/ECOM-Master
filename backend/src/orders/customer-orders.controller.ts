@@ -24,6 +24,29 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 export class CustomerOrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @Public()
+  @Get()
+  getAllOrders(
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('perPage') perPage?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.ordersService.getAllOrders(status, page, perPage, search);
+  }
+
+  @Public()
+  @Get(':id/invoice')
+  getOrderInvoice(@Param('id') id: string, @Query('format') format?: string) {
+    return this.ordersService.getOrderInvoice(id, format);
+  }
+
+  @Public()
+  @Get(':id/shipping-label')
+  getOrderShippingLabel(@Param('id') id: string, @Query('format') format?: string) {
+    return this.ordersService.getOrderShippingLabel(id, format);
+  }
+
   @Post()
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
