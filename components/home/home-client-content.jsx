@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import ClubbingShowcaseSection from './clubbing-showcase-section'
 
 function normalizeStoreProduct(p) {
   if (!p) return null
@@ -272,7 +273,8 @@ const testimonials = [
   }
 ]
 
-export default function HomeClientContent({ initialProducts = [], initialCategories = [], initialTopReviews = [] }) {
+export default function HomeClientContent({ initialProducts = [], initialCategories = [], initialTopReviews = [], initialClubbingRules = [] }) {
+  const [clubbingRules, setClubbingRules] = useState(initialClubbingRules)
   const { addItem, openDrawer } = useCart()
   
   // Backend connection state
@@ -316,8 +318,13 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
         if (!r.ok) return []
         return r.json()
       }).catch(() => []),
+      fetch(`${backendUrl}/clubbing-rules/active`).then(async (r) => {
+        if (!r.ok) return []
+        return r.json()
+      }).catch(() => []),
     ])
-      .then(([pData, cData, rData]) => {
+      .then(([pData, cData, rData, clData]) => {
+        if (Array.isArray(clData) && clData.length > 0) setClubbingRules(clData)
         const rawProducts = Array.isArray(pData) ? pData : pData?.data || []
         const mappedProducts = rawProducts.map(normalizeStoreProduct).filter(Boolean)
         setProducts(mappedProducts)
@@ -680,6 +687,12 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
           )}
         </div>
       </section>
+
+      {/* SECTION 3B — FESTIVAL CLUBBING & BUNDLE SPECIALS */}
+      <ClubbingShowcaseSection
+        clubbingRules={clubbingRules}
+        allProducts={products}
+      />
 
       {/* SECTION 4 — COMPLETE RITUAL KITS */}
       <section className="py-16 md:py-24 bg-gradient-to-b from-stone-50/40 via-white to-stone-50/40 text-[#6B1024] border-y border-stone-150 relative z-10">

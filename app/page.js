@@ -17,12 +17,14 @@ export default async function HomePage() {
   let products = []
   let categories = []
   let topReviews = []
+  let clubbingRules = []
 
   try {
-    const [pRes, cRes, rRes] = await Promise.all([
+    const [pRes, cRes, rRes, clRes] = await Promise.all([
       fetch(`${BACKEND_URL}/all-products?per_page=13`, { next: { revalidate: 3600, tags: ['products'] } }),
       fetch(`${BACKEND_URL}/categories`, { next: { revalidate: 3600, tags: ['categories'] } }),
       fetch(`${BACKEND_URL}/reviews/top?limit=10`, { next: { revalidate: 3600, tags: ['reviews'] } }).catch(() => null),
+      fetch(`${BACKEND_URL}/clubbing-rules/active`, { next: { revalidate: 60, tags: ['clubbing-rules'] } }).catch(() => null),
     ])
 
     if (pRes?.ok) {
@@ -37,6 +39,10 @@ export default async function HomePage() {
       const rData = await rRes.json()
       topReviews = Array.isArray(rData) ? rData : []
     }
+    if (clRes?.ok) {
+      const clData = await clRes.json()
+      clubbingRules = Array.isArray(clData) ? clData : []
+    }
   } catch (err) {
     console.error('Failed to pre-fetch homepage data on server:', err)
   }
@@ -46,6 +52,7 @@ export default async function HomePage() {
       initialProducts={products}
       initialCategories={categories}
       initialTopReviews={topReviews}
+      initialClubbingRules={clubbingRules}
     />
   )
 }
