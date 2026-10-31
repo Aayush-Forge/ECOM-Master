@@ -1,27 +1,89 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Patch,
   Post,
+  ServiceUnavailableException,
+  UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { ClubbingService, CartItemDiscountInput } from './clubbing.service';
-import { CreateClubbingRuleDto } from './dto/create-clubbing-rule.dto';
-import { UpdateClubbingRuleDto } from './dto/update-clubbing-rule.dto';
-import { BulkIdsDto, BulkStatusDto, CalculateDiscountDto } from './dto/clubbing-bulk.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { randomUUID } from 'crypto';
+import { extname } from 'path';
+import { ClubbingService } from './clubbing.service';
+import { BulkIdsDto, BulkStatusDto } from './dto/clubbing-bulk.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
 import { AuditLog } from '../audit/decorators/audit-log.decorator';
 import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
+import { R2Service } from '../r2/r2.service';
 
 @Controller(['clubbing-rules', 'clubbing'])
 @UseInterceptors(AuditLogInterceptor)
 export class ClubbingController {
-  constructor(private readonly clubbingService: ClubbingService) {}
+  private readonly logger = new Logger(ClubbingController.name);
+
+  constructor(
+    private readonly clubbingService: ClubbingService,
+    private readonly r2Service: R2Service,
+  ) {}
+
+  @Post('upload-banner')
+  @Public()
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (req, file, callback) => {
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedMimes.includes(file.mimetype)) {
+          return callback(
+            new BadRequestException(
+              `Unsupported file type "${file.mimetype}". Allowed types: image/jpeg, image/png, image/webp.`,
+            ),
+            false,
+          );
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  async uploadBanner(@UploadedFile() file?: any) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('No banner image file provided.');
+    }
+
+    const ext =
+      extname(file.originalname).toLowerCase() ||
+      (file.mimetype === 'image/png'
+        ? '.png'
+        : file.mimetype === 'image/webp'
+          ? '.webp'
+          : '.jpg');
+    const key = `clubbings/${randomUUID()}${ext}`;
+
+    try {
+      await this.r2Service.uploadFile(key, file.buffer, file.mimetype);
+      const url = this.r2Service.getPublicUrl(key);
+      return { url, key };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to upload banner image for key "${key}": ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new ServiceUnavailableException(
+        'Banner upload storage service is unavailable. Please try again later.',
+      );
+    }
+  }
 
   @Post()
   @Public()
@@ -55,10 +117,17 @@ export class ClubbingController {
     return this.clubbingService.updateRule(id, dto);
   }
 
+  @Patch(':id/toggle')
+  @Public()
+  @AuditLog('clubbing_rule.toggle')
+  toggleRulePatch(@Param('id') id: string) {
+    return this.clubbingService.toggleRule(id);
+  }
+
   @Post(':id/toggle')
   @Public()
   @AuditLog('clubbing_rule.toggle')
-  toggleRule(@Param('id') id: string) {
+  toggleRulePost(@Param('id') id: string) {
     return this.clubbingService.toggleRule(id);
   }
 

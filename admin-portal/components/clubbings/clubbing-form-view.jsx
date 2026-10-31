@@ -7,7 +7,8 @@ import {
   createClubbing,
   updateClubbing,
   getClubbingById,
-  FESTIVE_BANNER_PRESETS
+  uploadClubbingBanner,
+  FESTIVE_BANNER_PRESETS,
 } from '@/lib/api/clubbings'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,20 +31,17 @@ import {
   Upload,
   Sparkles,
   Image as ImageIcon,
-  Calendar,
   Layers,
   IndianRupee,
   CheckCircle2,
-  AlertCircle,
   Plus,
   Trash2,
   Search,
   Monitor,
   Smartphone,
   Tag,
-  Check,
-  X,
-  Package
+  Package,
+  Loader2,
 } from 'lucide-react'
 
 const CATEGORY_OPTIONS = [
@@ -81,6 +79,8 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
   const [endsAt, setEndsAt] = useState(initialData?.endsAt ? initialData.endsAt.slice(0, 10) : '')
   const [isActive, setIsActive] = useState(initialData?.isActive !== undefined ? initialData.isActive : true)
   const [featuredOnHomepage, setFeaturedOnHomepage] = useState(initialData?.featuredOnHomepage !== undefined ? initialData.featuredOnHomepage : true)
+  const [showInHero, setShowInHero] = useState(initialData?.showInHero !== undefined ? initialData.showInHero : true)
+  const [heroCtaText, setHeroCtaText] = useState(initialData?.heroCtaText || 'Shop Festive Deals')
 
   // Bundle Rules & Pricing
   const [ruleType, setRuleType] = useState(initialData?.type === 'percentage_off_bundle' ? 'percentage' : 'fixed_price')
@@ -88,9 +88,13 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
   const [fixedPrice, setFixedPrice] = useState(initialData?.fixedPrice !== null && initialData?.fixedPrice !== undefined ? initialData.fixedPrice : 999)
   const [percentageOff, setPercentageOff] = useState(initialData?.percentageOff !== null && initialData?.percentageOff !== undefined ? initialData.percentageOff : 20)
 
-  // Banners: Desktop & Mobile (Uploaded picture files only)
+  // Banners: Desktop & Mobile (Uploaded picture files via Cloudflare R2)
   const [bannerImageDesktop, setBannerImageDesktop] = useState(initialData?.bannerImageDesktop || initialData?.bannerImage || FESTIVE_BANNER_PRESETS[0].url)
+  const [bannerKeyDesktop, setBannerKeyDesktop] = useState(initialData?.bannerKeyDesktop || '')
   const [bannerImageMobile, setBannerImageMobile] = useState(initialData?.bannerImageMobile || initialData?.bannerImageDesktop || initialData?.bannerImage || FESTIVE_BANNER_PRESETS[0].url)
+  const [bannerKeyMobile, setBannerKeyMobile] = useState(initialData?.bannerKeyMobile || '')
+  const [uploadingDesktop, setUploadingDesktop] = useState(false)
+  const [uploadingMobile, setUploadingMobile] = useState(false)
   const [previewMode, setPreviewMode] = useState('desktop') // 'desktop' | 'mobile'
 
   // Selected Products with Custom Clubbing Prices
@@ -112,7 +116,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
               price: parseFloat(p.salePrice || p.basePrice || p.price || 299),
               originalPrice: parseFloat(p.compareAtPrice || p.basePrice || p.regular_price || 399),
               image: Array.isArray(p.images) && p.images[0] ? p.images[0] : (p.image || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'),
-              category: p.category?.name || 'Sacred Incense'
+              category: p.category?.name || 'Sacred Incense',
             })))
             return
           }
@@ -141,6 +145,8 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
           if (found.endsAt) setEndsAt(found.endsAt.slice(0, 10))
           setIsActive(found.isActive !== undefined ? found.isActive : true)
           setFeaturedOnHomepage(found.featuredOnHomepage !== undefined ? found.featuredOnHomepage : true)
+          setShowInHero(found.showInHero !== undefined ? found.showInHero : true)
+          setHeroCtaText(found.heroCtaText || 'Shop Festive Deals')
 
           setRuleType(found.type === 'percentage_off_bundle' ? 'percentage' : 'fixed_price')
           if (found.requiredQuantity) setRequiredQuantity(found.requiredQuantity)
@@ -148,7 +154,9 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
           if (found.percentageOff !== null && found.percentageOff !== undefined) setPercentageOff(found.percentageOff)
 
           if (found.bannerImageDesktop) setBannerImageDesktop(found.bannerImageDesktop)
+          if (found.bannerKeyDesktop) setBannerKeyDesktop(found.bannerKeyDesktop)
           if (found.bannerImageMobile) setBannerImageMobile(found.bannerImageMobile)
+          if (found.bannerKeyMobile) setBannerKeyMobile(found.bannerKeyMobile)
           if (Array.isArray(found.clubbingProducts)) setClubbingProducts(found.clubbingProducts)
         } else {
           toast.error('Campaign not found')
@@ -163,8 +171,8 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
     loadData()
   }, [isEdit, initialData, recordId])
 
-  // Handle Desktop Banner File Upload
-  const handleDesktopFileChange = (e) => {
+  // Handle Desktop Banner File Upload to Cloudflare R2
+  const handleDesktopFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -173,28 +181,32 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
       return
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error('Image exceeds 8MB limit')
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image exceeds 10MB limit')
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result
-      if (typeof dataUrl === 'string') {
-        setBannerImageDesktop(dataUrl)
-        // If mobile banner is not customized yet, mirror it
-        if (!bannerImageMobile || bannerImageMobile === FESTIVE_BANNER_PRESETS[0].url) {
-          setBannerImageMobile(dataUrl)
-        }
-        toast.success('Desktop banner picture uploaded!')
+    setUploadingDesktop(true)
+    try {
+      const res = await uploadClubbingBanner(file)
+      setBannerImageDesktop(res.url)
+      if (res.key) setBannerKeyDesktop(res.key)
+      if (!bannerImageMobile || bannerImageMobile === FESTIVE_BANNER_PRESETS[0].url) {
+        setBannerImageMobile(res.url)
+        if (res.key) setBannerKeyMobile(res.key)
       }
+      toast.success('Desktop banner picture uploaded to R2!')
+    } catch (err) {
+      console.error('Desktop upload failed:', err)
+      toast.error(err.message || 'Failed to upload desktop banner')
+    } finally {
+      setUploadingDesktop(false)
+      if (desktopFileInputRef.current) desktopFileInputRef.current.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
-  // Handle Mobile Banner File Upload
-  const handleMobileFileChange = (e) => {
+  // Handle Mobile Banner File Upload to Cloudflare R2
+  const handleMobileFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -203,20 +215,24 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
       return
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error('Image exceeds 8MB limit')
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image exceeds 10MB limit')
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result
-      if (typeof dataUrl === 'string') {
-        setBannerImageMobile(dataUrl)
-        toast.success('Mobile banner picture uploaded!')
-      }
+    setUploadingMobile(true)
+    try {
+      const res = await uploadClubbingBanner(file)
+      setBannerImageMobile(res.url)
+      if (res.key) setBannerKeyMobile(res.key)
+      toast.success('Mobile banner picture uploaded to R2!')
+    } catch (err) {
+      console.error('Mobile upload failed:', err)
+      toast.error(err.message || 'Failed to upload mobile banner')
+    } finally {
+      setUploadingMobile(false)
+      if (mobileFileInputRef.current) mobileFileInputRef.current.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
   // Add Product to Clubbing Collection
@@ -236,7 +252,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
       category: product.category,
       originalPrice: product.originalPrice || product.price,
       clubbingPrice: defaultDealPrice,
-      discountPercentage: Math.round(((product.price - defaultDealPrice) / product.price) * 100)
+      discountPercentage: Math.round(((product.price - defaultDealPrice) / product.price) * 100),
     }
 
     setClubbingProducts(prev => [...prev, newEntry])
@@ -253,7 +269,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
         return {
           ...item,
           clubbingPrice: numPrice,
-          discountPercentage: discount
+          discountPercentage: discount,
         }
       }
       return item
@@ -278,7 +294,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
 
   // Form Submit
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    if (e && e.preventDefault) e.preventDefault()
     if (!validate()) {
       toast.error('Please fix the errors before submitting')
       return
@@ -297,14 +313,28 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
         percentageOff: ruleType === 'percentage' ? Number(percentageOff) : null,
         applicableCategory: applicableCategory || 'all',
         applicableProductIds: clubbingProducts.map(p => p.productId || p.id).filter(Boolean),
-        clubbingProducts: clubbingProducts,
+        clubbingProducts: clubbingProducts.map((p, idx) => ({
+          productId: p.productId || p.id,
+          name: p.name,
+          slug: p.slug,
+          image: p.image,
+          category: p.category,
+          originalPrice: Number(p.originalPrice || p.price || 0),
+          clubbingPrice: Number(p.clubbingPrice || p.price || 0),
+          discountPercentage: Number(p.discountPercentage || 0),
+          sortOrder: idx,
+        })),
         bannerImageDesktop,
+        bannerKeyDesktop,
         bannerImageMobile,
+        bannerKeyMobile,
         bannerImage: bannerImageDesktop,
         startsAt: startsAt ? new Date(startsAt).toISOString() : new Date().toISOString(),
         endsAt: endsAt ? new Date(endsAt).toISOString() : null,
         isActive,
         featuredOnHomepage,
+        showInHero,
+        heroCtaText: heroCtaText.trim() || 'Shop Festive Deals',
       }
 
       if (isEdit && recordId) {
@@ -366,7 +396,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || uploadingDesktop || uploadingMobile}
             className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-semibold shadow-xs"
           >
             {submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Publish Campaign'}
@@ -725,10 +755,10 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
           <Card className="bg-white border-stone-200 shadow-xs">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-bold text-stone-900 flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-[#FF6B00]" /> Banner Image
+                <ImageIcon className="w-4 h-4 text-[#FF6B00]" /> Banner Image (R2 Storage)
               </CardTitle>
               <CardDescription className="text-xs text-stone-500">
-                Upload custom festive art for desktop and mobile versions
+                Upload custom festive art for desktop and mobile directly to Cloudflare R2
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -750,10 +780,15 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
                 />
 
                 <div
-                  onClick={() => desktopFileInputRef.current?.click()}
+                  onClick={() => !uploadingDesktop && desktopFileInputRef.current?.click()}
                   className="border-2 border-dashed border-stone-200 hover:border-[#FF6B00] rounded-xl p-3 bg-stone-50/50 hover:bg-orange-50/30 transition text-center cursor-pointer group"
                 >
-                  {bannerImageDesktop ? (
+                  {uploadingDesktop ? (
+                    <div className="py-8 flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#FF6B00]" />
+                      <p className="text-xs font-semibold text-stone-700">Uploading to R2...</p>
+                    </div>
+                  ) : bannerImageDesktop ? (
                     <div className="space-y-2">
                       <div className="aspect-16/7 w-full rounded-lg overflow-hidden border border-stone-200 bg-stone-100 relative">
                         <img src={bannerImageDesktop} alt="Desktop Preview" className="w-full h-full object-cover" />
@@ -766,7 +801,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
                     <div className="py-4 space-y-1.5">
                       <Upload className="w-6 h-6 text-stone-400 mx-auto group-hover:text-[#FF6B00] transition" />
                       <p className="text-xs font-bold text-stone-700">Upload Desktop Banner Picture</p>
-                      <p className="text-[10px] text-stone-400">PNG, JPG, or WEBP up to 8MB</p>
+                      <p className="text-[10px] text-stone-400">PNG, JPG, or WEBP up to 10MB</p>
                     </div>
                   )}
                 </div>
@@ -790,10 +825,15 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
                 />
 
                 <div
-                  onClick={() => mobileFileInputRef.current?.click()}
+                  onClick={() => !uploadingMobile && mobileFileInputRef.current?.click()}
                   className="border-2 border-dashed border-stone-200 hover:border-[#FF6B00] rounded-xl p-3 bg-stone-50/50 hover:bg-orange-50/30 transition text-center cursor-pointer group"
                 >
-                  {bannerImageMobile ? (
+                  {uploadingMobile ? (
+                    <div className="py-8 flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#FF6B00]" />
+                      <p className="text-xs font-semibold text-stone-700">Uploading to R2...</p>
+                    </div>
+                  ) : bannerImageMobile ? (
                     <div className="space-y-2">
                       <div className="aspect-4/3 w-full rounded-lg overflow-hidden border border-stone-200 bg-stone-100 relative">
                         <img src={bannerImageMobile} alt="Mobile Preview" className="w-full h-full object-cover" />
@@ -806,7 +846,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
                     <div className="py-4 space-y-1.5">
                       <Upload className="w-6 h-6 text-stone-400 mx-auto group-hover:text-[#FF6B00] transition" />
                       <p className="text-xs font-bold text-stone-700">Upload Mobile Banner Picture</p>
-                      <p className="text-[10px] text-stone-400">PNG, JPG, or WEBP up to 8MB</p>
+                      <p className="text-[10px] text-stone-400">PNG, JPG, or WEBP up to 10MB</p>
                     </div>
                   )}
                 </div>
@@ -849,13 +889,11 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
                   previewMode === 'desktop' ? 'aspect-16/8' : 'aspect-4/4'
                 }`}
               >
-                {/* Background Image */}
                 <img
                   src={previewMode === 'desktop' ? (bannerImageDesktop || FESTIVE_BANNER_PRESETS[0].url) : (bannerImageMobile || bannerImageDesktop || FESTIVE_BANNER_PRESETS[0].url)}
                   alt="Preview"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-                {/* Gradient Overlay for Text Readability */}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent p-4 flex flex-col justify-end text-white">
                   <div className="space-y-1.5 max-w-[85%]">
                     <span className="inline-block px-2 py-0.5 rounded-md bg-[#FF6B00] text-white text-[9px] font-bold tracking-wider uppercase">
@@ -869,7 +907,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
                     </p>
                     <div className="pt-1">
                       <span className="inline-flex items-center text-[10px] font-bold bg-white text-stone-900 px-2.5 py-1 rounded shadow-xs">
-                        Shop Clubbing Deals →
+                        {heroCtaText || 'Shop Clubbing Deals'} →
                       </span>
                     </div>
                   </div>
@@ -878,9 +916,14 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
             </CardContent>
           </Card>
 
-          {/* Card 6: Campaign Active Switch */}
+          {/* Card 6: Campaign Activation & Display Settings */}
           <Card className="bg-white border-stone-200 shadow-xs">
-            <CardContent className="p-4 space-y-3">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                Display & Visibility
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="activeSwitch" className="text-xs font-bold text-stone-900 cursor-pointer">
@@ -900,11 +943,42 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
 
               <div className="flex items-center justify-between pt-2 border-t border-stone-100">
                 <div>
-                  <Label htmlFor="featuredSwitch" className="text-xs font-bold text-stone-900 cursor-pointer">
-                    Homepage Hero Banner
+                  <Label htmlFor="heroSwitch" className="text-xs font-bold text-stone-900 cursor-pointer">
+                    Homepage Hero Carousel
                   </Label>
                   <p className="text-[11px] text-stone-500">
-                    Showcase this campaign in the hero slider
+                    Feature this campaign as a hero slide on the storefront
+                  </p>
+                </div>
+                <Switch
+                  id="heroSwitch"
+                  checked={showInHero}
+                  onCheckedChange={setShowInHero}
+                  className="data-[state=checked]:bg-[#FF6B00]"
+                />
+              </div>
+
+              {showInHero && (
+                <div className="space-y-1.5 pt-1">
+                  <Label htmlFor="heroCtaText" className="text-xs font-semibold text-stone-700">
+                    Hero Slide Button CTA
+                  </Label>
+                  <Input
+                    id="heroCtaText"
+                    value={heroCtaText}
+                    onChange={(e) => setHeroCtaText(e.target.value)}
+                    placeholder="e.g. Shop Festive Deals"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+                <div>
+                  <Label htmlFor="featuredSwitch" className="text-xs font-bold text-stone-900 cursor-pointer">
+                    Homepage Festive Tab / Section
+                  </Label>
+                  <p className="text-[11px] text-stone-500">
+                    Display products in the dedicated festival showcase
                   </p>
                 </div>
                 <Switch
@@ -918,7 +992,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
               <div className="pt-2">
                 <Button
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || uploadingDesktop || uploadingMobile}
                   className="w-full bg-[#FF6B00] hover:bg-[#e05e00] text-white font-semibold py-2"
                 >
                   {submitting ? 'Saving...' : isEdit ? 'Update Campaign' : 'Publish Campaign'}

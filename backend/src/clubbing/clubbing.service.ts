@@ -1,14 +1,12 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateClubbingRuleDto } from './dto/create-clubbing-rule.dto';
-import { UpdateClubbingRuleDto } from './dto/update-clubbing-rule.dto';
+import { ClubbingRuleType } from '@prisma/client';
 
 export interface CartItemDiscountInput {
   productId: string;
@@ -17,412 +15,356 @@ export interface CartItemDiscountInput {
 }
 
 @Injectable()
-export class ClubbingService {
-  private fallbackRules: any[] = [
-    {
-      id: 'diwali',
-      name: 'Diwali',
-      eventName: 'Diwali',
-      tagline: 'Diwali Sale',
-      description: 'Exclusive Diwali festive clubbing collection. Hand-selected premium incense and sacred dhoop at special celebratory prices.',
-      type: 'custom_product_clubbing',
-      requiredQuantity: 1,
-      fixedPrice: null,
-      percentageOff: null,
-      applicableProductIds: ['sd-001', 'sd-002', 'sd-003', 'sd-004', 'sd-005', 'sd-006'],
-      bannerImageDesktop: 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1600&q=80',
-      bannerImageMobile: 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=80',
-      bannerImage: 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1600&q=80',
-      clubbingProducts: [
-        {
-          productId: 'sd-001',
-          name: 'Royal Mysore Sandalwood',
-          slug: 'royal-mysore-sandalwood',
-          image: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=600&q=80',
-          category: 'Mysore Sandalwood',
-          originalPrice: 399,
-          clubbingPrice: 299,
-          discountPercentage: 25,
-        },
-        {
-          productId: 'sd-002',
-          name: 'Divine Rose',
-          slug: 'divine-rose-incense',
-          image: 'https://images.pexels.com/photos/31280796/pexels-photo-31280796.jpeg?auto=format&fit=crop&w=600&q=80',
-          category: 'Floral Notes',
-          originalPrice: 349,
-          clubbingPrice: 249,
-          discountPercentage: 29,
-        },
-        {
-          productId: 'sd-003',
-          name: 'Sacred Frankincense',
-          slug: 'sacred-frankincense-incense',
-          image: 'https://images.unsplash.com/photo-1777732339789-5dc3483ed951?auto=format&fit=crop&w=600&q=80',
-          category: 'Sacred Resins',
-          originalPrice: 449,
-          clubbingPrice: 329,
-          discountPercentage: 27,
-        },
-        {
-          productId: 'sd-004',
-          name: 'The Maharaja Luxury Sticks',
-          slug: 'maharaja-luxury-sticks',
-          image: 'https://images.unsplash.com/photo-1760835249761-dc1ad2d7d759?auto=format&fit=crop&w=600&q=80',
-          category: 'Mysore Sandalwood',
-          originalPrice: 549,
-          clubbingPrice: 399,
-          discountPercentage: 27,
-        },
-        {
-          productId: 'sd-005',
-          name: 'The Monk Meditation Cones',
-          slug: 'monk-meditation-cones',
-          image: 'https://images.unsplash.com/photo-1771929712193-fce37df50681?auto=format&fit=crop&w=600&q=80',
-          category: 'Mysore Sandalwood',
-          originalPrice: 499,
-          clubbingPrice: 389,
-          discountPercentage: 22,
-        },
-        {
-          productId: 'sd-006',
-          name: 'Vedic Havan Sambrani Cups',
-          slug: 'vedic-havan-sambrani-cups',
-          image: 'https://images.unsplash.com/photo-1777732340986-bc27a8b5d522?auto=format&fit=crop&w=600&q=80',
-          category: 'Sacred Resins',
-          originalPrice: 399,
-          clubbingPrice: 299,
-          discountPercentage: 25,
-        },
-      ],
-      isActive: true,
-      featuredOnHomepage: true,
-    },
-  ];
-
-  private readonly dataFilePath = path.resolve(process.cwd(), 'data/clubbings.json');
+export class ClubbingService implements OnModuleInit {
+  private readonly logger = new Logger(ClubbingService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private loadCampaigns(): any[] {
-    try {
-      if (fs.existsSync(this.dataFilePath)) {
-        const raw = fs.readFileSync(this.dataFilePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (err) {
-      console.warn('Error reading clubbings.json, falling back to defaults:', err);
-    }
-    return [...this.fallbackRules];
+  async onModuleInit() {
+    await this.seedDefaultCampaignIfEmpty();
   }
 
-  private saveCampaigns(campaigns: any[]) {
+  private async seedDefaultCampaignIfEmpty() {
     try {
-      const dir = path.dirname(this.dataFilePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(this.dataFilePath, JSON.stringify(campaigns, null, 2), 'utf8');
-    } catch (err) {
-      console.error('Error saving clubbings.json:', err);
+      const count = await this.prisma.clubbingRule.count();
+      if (count > 0) return;
+
+      const products = await this.prisma.product.findMany({
+        take: 6,
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const rule = await this.prisma.clubbingRule.create({
+        data: {
+          name: 'Diwali Festive Clubbing',
+          eventName: 'Diwali',
+          tagline: 'Diwali Special Offer',
+          description:
+            'Exclusive Diwali festive clubbing collection. Hand-selected premium incense and sacred dhoop at special celebratory prices.',
+          type: ClubbingRuleType.custom_product_clubbing,
+          code: 'diwali',
+          requiredQuantity: 1,
+          bannerImageDesktop:
+            'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1600&q=80',
+          bannerImageMobile:
+            'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=80',
+          featuredOnHomepage: true,
+          showInHero: true,
+          heroCtaText: 'Shop Festive Deals',
+          isActive: true,
+          products: {
+            create: products.map((p, idx) => ({
+              productId: p.id,
+              clubbingPrice: Number(p.basePrice) > 50 ? Number(p.basePrice) - 50 : Number(p.basePrice),
+              discountPercentage: 20,
+              sortOrder: idx,
+            })),
+          },
+        },
+      });
+      this.logger.log(`Seeded default Diwali clubbing campaign: ${rule.id}`);
+    } catch (err: any) {
+      this.logger.warn(`Failed to seed default clubbing campaign: ${err.message}`);
     }
   }
 
-  async createRule(dto: any) {
-    const campaigns = this.loadCampaigns();
-    const id = dto.id || (dto.name ? dto.name.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/[\s-]+/g, '-') : `clb_${Date.now()}`);
+  private formatRule(r: any) {
+    const products = Array.isArray(r.products)
+      ? r.products.map((p: any) => ({
+          productId: p.productId,
+          name: p.product?.title || 'Sacred Item',
+          slug: p.product?.slug || p.productId,
+          image:
+            p.product?.images?.[0] ||
+            'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=600&q=80',
+          category: p.product?.categoryId || '',
+          originalPrice: p.product?.basePrice ? Number(p.product.basePrice) : 299,
+          clubbingPrice: p.clubbingPrice
+            ? Number(p.clubbingPrice)
+            : p.product?.basePrice
+              ? Number(p.product.basePrice)
+              : 249,
+          discountPercentage: p.discountPercentage ? Number(p.discountPercentage) : 15,
+        }))
+      : [];
 
-    const desktopImg = dto.bannerImageDesktop || dto.bannerImage || 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1600&q=80';
-    const mobileImg = dto.bannerImageMobile || desktopImg;
-
-    const clubbingProducts = Array.isArray(dto.clubbingProducts) ? dto.clubbingProducts : [];
-    const applicableProductIds = Array.isArray(dto.applicableProductIds) && dto.applicableProductIds.length > 0
-      ? dto.applicableProductIds
-      : clubbingProducts.map((p: any) => p.productId || p.id).filter(Boolean);
-
-    const newCampaign = {
-      id,
-      name: String(dto.name || '').trim(),
-      eventName: String(dto.eventName || dto.name || '').trim(),
-      tagline: String(dto.tagline || 'Special Clubbing').trim(),
-      description: String(dto.description || '').trim(),
-      type: dto.type || 'custom_product_clubbing',
-      requiredQuantity: dto.requiredQuantity ? Number(dto.requiredQuantity) : 1,
-      fixedPrice: dto.fixedPrice !== undefined && dto.fixedPrice !== null ? Number(dto.fixedPrice) : null,
-      percentageOff: dto.percentageOff !== undefined && dto.percentageOff !== null ? Number(dto.percentageOff) : null,
-      applicableCategory: dto.applicableCategory || dto.applicableCategoryId || 'all',
-      applicableProductIds,
-      clubbingProducts,
-      bannerImageDesktop: desktopImg,
-      bannerImageMobile: mobileImg,
-      bannerImage: desktopImg,
-      startsAt: dto.startsAt || new Date().toISOString(),
-      endsAt: dto.endsAt || null,
-      isActive: dto.isActive !== false,
-      featuredOnHomepage: dto.featuredOnHomepage !== false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    return {
+      id: r.id,
+      name: r.name,
+      eventName: r.eventName || r.name,
+      tagline: r.tagline || '',
+      description: r.description || '',
+      code: r.code || r.id,
+      type: r.type,
+      requiredQuantity: r.requiredQuantity,
+      fixedPrice: r.fixedPrice ? Number(r.fixedPrice) : null,
+      percentageOff: r.percentageOff ? Number(r.percentageOff) : null,
+      applicableCategoryId: r.applicableCategoryId,
+      bannerImageDesktop: r.bannerImageDesktop || '',
+      bannerImageMobile: r.bannerImageMobile || r.bannerImageDesktop || '',
+      bannerImage: r.bannerImageDesktop || '',
+      bannerKeyDesktop: r.bannerKeyDesktop || '',
+      bannerKeyMobile: r.bannerKeyMobile || '',
+      featuredOnHomepage: r.featuredOnHomepage !== false,
+      showInHero: r.showInHero !== false,
+      heroCtaText: r.heroCtaText || 'Shop Festive Deals',
+      isActive: r.isActive !== false,
+      startsAt: r.startsAt,
+      endsAt: r.endsAt,
+      products,
+      clubbingProducts: products,
+      applicableProductIds: products.map((p) => p.productId),
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
     };
-
-    const existingIdx = campaigns.findIndex((c) => c.id === id);
-    if (existingIdx !== -1) {
-      campaigns[existingIdx] = newCampaign;
-    } else {
-      campaigns.unshift(newCampaign);
-    }
-
-    this.saveCampaigns(campaigns);
-    return newCampaign;
   }
 
   async getAllRules() {
-    return this.loadCampaigns();
+    const rules = await this.prisma.clubbingRule.findMany({
+      include: {
+        products: {
+          include: { product: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        applicableCategory: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rules.map((r) => this.formatRule(r));
   }
 
-  async getActiveRules(publicOnly = true) {
-    const all = this.loadCampaigns();
+  async getActiveRules() {
     const now = new Date();
-    return all.filter((c) => {
-      if (!c || c.isActive === false) return false;
-      if (c.startsAt && new Date(c.startsAt) > now) return false;
-      if (c.endsAt && new Date(c.endsAt) < now) return false;
-      return true;
+    const rules = await this.prisma.clubbingRule.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { startsAt: null },
+          { startsAt: { lte: now } },
+        ],
+        AND: [
+          {
+            OR: [
+              { endsAt: null },
+              { endsAt: { gte: now } },
+            ],
+          },
+        ],
+      },
+      include: {
+        products: {
+          include: { product: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        applicableCategory: true,
+      },
+      orderBy: { createdAt: 'desc' },
     });
+    return rules.map((r) => this.formatRule(r));
   }
 
   async getRuleById(id: string) {
-    const all = this.loadCampaigns();
-    const lower = id.toLowerCase();
-    const found = all.find((c) => c.id === id || c.id?.toLowerCase() === lower);
-    if (found) return found;
+    const isUuid = id.length === 36 && id.includes('-');
+    const rule = await this.prisma.clubbingRule.findFirst({
+      where: {
+        OR: [
+          ...(isUuid ? [{ id }] : []),
+          { code: id },
+          { eventName: { equals: id, mode: 'insensitive' as any } },
+          { name: { equals: id, mode: 'insensitive' as any } },
+        ],
+      },
+      include: {
+        products: {
+          include: { product: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        applicableCategory: true,
+      },
+    });
 
-    try {
-      const dbRule = await this.prisma.clubbingRule.findUnique({
-        where: { id },
-        include: { applicableCategory: true, products: { include: { product: true } } },
-      });
-      if (dbRule) return dbRule;
-    } catch {}
+    if (!rule) {
+      throw new NotFoundException(`Clubbing campaign "${id}" not found`);
+    }
+    return this.formatRule(rule);
+  }
 
-    throw new NotFoundException(`Clubbing campaign with ID "${id}" not found`);
+  async createRule(dto: any) {
+    const name = String(dto.name || '').trim();
+    if (!name) {
+      throw new BadRequestException('Clubbing campaign name is required');
+    }
+
+    const eventName = String(dto.eventName || dto.name || '').trim();
+    let code = (dto.code || eventName.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/[\s-]+/g, '-')) || `clb-${Date.now()}`;
+    const existingCode = await this.prisma.clubbingRule.findUnique({ where: { code } });
+    if (existingCode) {
+      code = `${code}-${Date.now().toString().slice(-4)}`;
+    }
+
+    const desktopImg = dto.bannerImageDesktop || dto.bannerImage || null;
+    const mobileImg = dto.bannerImageMobile || desktopImg;
+
+    const clubbingProducts: any[] = Array.isArray(dto.clubbingProducts)
+      ? dto.clubbingProducts
+      : Array.isArray(dto.applicableProductIds)
+        ? dto.applicableProductIds.map((pId: string, idx: number) => ({ productId: pId, sortOrder: idx }))
+        : [];
+
+    const rule = await this.prisma.clubbingRule.create({
+      data: {
+        name,
+        eventName,
+        tagline: dto.tagline ? String(dto.tagline).trim() : null,
+        description: dto.description ? String(dto.description).trim() : null,
+        type: dto.type || ClubbingRuleType.custom_product_clubbing,
+        code,
+        requiredQuantity: Number(dto.requiredQuantity) || 1,
+        fixedPrice: dto.fixedPrice !== undefined && dto.fixedPrice !== null ? Number(dto.fixedPrice) : null,
+        percentageOff: dto.percentageOff !== undefined && dto.percentageOff !== null ? Number(dto.percentageOff) : null,
+        applicableCategoryId: dto.applicableCategoryId || null,
+        bannerImageDesktop: desktopImg,
+        bannerImageMobile: mobileImg,
+        bannerKeyDesktop: dto.bannerKeyDesktop || null,
+        bannerKeyMobile: dto.bannerKeyMobile || null,
+        featuredOnHomepage: dto.featuredOnHomepage !== undefined ? Boolean(dto.featuredOnHomepage) : true,
+        showInHero: dto.showInHero !== undefined ? Boolean(dto.showInHero) : true,
+        heroCtaText: dto.heroCtaText || 'Shop Festive Deals',
+        startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
+        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : true,
+        products: {
+          create: clubbingProducts
+            .filter((p) => p && (p.productId || p.id))
+            .map((p, idx) => ({
+              productId: p.productId || p.id,
+              clubbingPrice: p.clubbingPrice ? Number(p.clubbingPrice) : null,
+              discountPercentage: p.discountPercentage ? Number(p.discountPercentage) : null,
+              sortOrder: p.sortOrder !== undefined ? Number(p.sortOrder) : idx,
+            })),
+        },
+      },
+      include: {
+        products: { include: { product: true } },
+      },
+    });
+
+    return this.formatRule(rule);
   }
 
   async updateRule(id: string, dto: any) {
-    const campaigns = this.loadCampaigns();
-    const lower = id.toLowerCase();
-    const idx = campaigns.findIndex((c) => c.id === id || c.id?.toLowerCase() === lower);
+    const existing = await this.getRuleById(id);
 
-    if (idx === -1) {
-      // If not in file, create it with this id
-      return this.createRule({ ...dto, id });
+    const updateData: any = {};
+    if (dto.name !== undefined) updateData.name = String(dto.name).trim();
+    if (dto.eventName !== undefined) updateData.eventName = String(dto.eventName).trim();
+    if (dto.tagline !== undefined) updateData.tagline = dto.tagline;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.code !== undefined) updateData.code = dto.code;
+    if (dto.type !== undefined) updateData.type = dto.type;
+    if (dto.requiredQuantity !== undefined) updateData.requiredQuantity = Number(dto.requiredQuantity);
+    if (dto.fixedPrice !== undefined) updateData.fixedPrice = dto.fixedPrice !== null ? Number(dto.fixedPrice) : null;
+    if (dto.percentageOff !== undefined) updateData.percentageOff = dto.percentageOff !== null ? Number(dto.percentageOff) : null;
+    if (dto.applicableCategoryId !== undefined) updateData.applicableCategoryId = dto.applicableCategoryId || null;
+    if (dto.bannerImageDesktop !== undefined) updateData.bannerImageDesktop = dto.bannerImageDesktop;
+    if (dto.bannerImageMobile !== undefined) updateData.bannerImageMobile = dto.bannerImageMobile;
+    if (dto.bannerKeyDesktop !== undefined) updateData.bannerKeyDesktop = dto.bannerKeyDesktop;
+    if (dto.bannerKeyMobile !== undefined) updateData.bannerKeyMobile = dto.bannerKeyMobile;
+    if (dto.featuredOnHomepage !== undefined) updateData.featuredOnHomepage = Boolean(dto.featuredOnHomepage);
+    if (dto.showInHero !== undefined) updateData.showInHero = Boolean(dto.showInHero);
+    if (dto.heroCtaText !== undefined) updateData.heroCtaText = dto.heroCtaText;
+    if (dto.startsAt !== undefined) updateData.startsAt = dto.startsAt ? new Date(dto.startsAt) : null;
+    if (dto.endsAt !== undefined) updateData.endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
+    if (dto.isActive !== undefined) updateData.isActive = Boolean(dto.isActive);
+
+    const clubbingProducts = dto.clubbingProducts || (Array.isArray(dto.applicableProductIds) ? dto.applicableProductIds.map((pId: string, idx: number) => ({ productId: pId, sortOrder: idx })) : null);
+
+    if (clubbingProducts) {
+      await this.prisma.clubbingRuleProduct.deleteMany({ where: { ruleId: existing.id } });
+      updateData.products = {
+        create: clubbingProducts
+          .filter((p: any) => p && (p.productId || p.id))
+          .map((p: any, idx: number) => ({
+            productId: p.productId || p.id,
+            clubbingPrice: p.clubbingPrice ? Number(p.clubbingPrice) : null,
+            discountPercentage: p.discountPercentage ? Number(p.discountPercentage) : null,
+            sortOrder: p.sortOrder !== undefined ? Number(p.sortOrder) : idx,
+          })),
+      };
     }
 
-    const existing = campaigns[idx];
-    const desktopImg = dto.bannerImageDesktop !== undefined ? dto.bannerImageDesktop : existing.bannerImageDesktop;
-    const mobileImg = dto.bannerImageMobile !== undefined ? dto.bannerImageMobile : (existing.bannerImageMobile || desktopImg);
+    const updated = await this.prisma.clubbingRule.update({
+      where: { id: existing.id },
+      data: updateData,
+      include: {
+        products: { include: { product: true } },
+      },
+    });
 
-    const clubbingProducts = Array.isArray(dto.clubbingProducts) ? dto.clubbingProducts : existing.clubbingProducts || [];
-    const applicableProductIds = Array.isArray(dto.applicableProductIds) && dto.applicableProductIds.length > 0
-      ? dto.applicableProductIds
-      : clubbingProducts.map((p: any) => p.productId || p.id).filter(Boolean);
-
-    const updated = {
-      ...existing,
-      ...dto,
-      id: existing.id,
-      applicableProductIds,
-      clubbingProducts,
-      bannerImageDesktop: desktopImg,
-      bannerImageMobile: mobileImg,
-      bannerImage: desktopImg,
-      isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : existing.isActive,
-      updatedAt: new Date().toISOString(),
-    };
-
-    campaigns[idx] = updated;
-    this.saveCampaigns(campaigns);
-    return updated;
+    return this.formatRule(updated);
   }
 
   async toggleRule(id: string) {
-    const campaigns = this.loadCampaigns();
-    const lower = id.toLowerCase();
-    const idx = campaigns.findIndex((c) => c.id === id || c.id?.toLowerCase() === lower);
-
-    if (idx === -1) {
-      throw new NotFoundException(`Clubbing campaign with ID "${id}" not found`);
-    }
-
-    campaigns[idx].isActive = !campaigns[idx].isActive;
-    campaigns[idx].updatedAt = new Date().toISOString();
-    this.saveCampaigns(campaigns);
-    return campaigns[idx];
+    const existing = await this.getRuleById(id);
+    const updated = await this.prisma.clubbingRule.update({
+      where: { id: existing.id },
+      data: { isActive: !existing.isActive },
+      include: { products: { include: { product: true } } },
+    });
+    return this.formatRule(updated);
   }
 
   async deleteRule(id: string) {
-    const campaigns = this.loadCampaigns();
-    const lower = id.toLowerCase();
-    const filtered = campaigns.filter((c) => c.id !== id && c.id?.toLowerCase() !== lower);
-    this.saveCampaigns(filtered);
-    return { success: true, id };
+    const existing = await this.getRuleById(id);
+    await this.prisma.clubbingRule.delete({ where: { id: existing.id } });
+    return { success: true, id: existing.id };
   }
 
   async bulkDelete(ids: string[]) {
-    if (!ids || ids.length === 0) return { count: 0 };
-    const idSet = new Set(ids.map((i) => i.toLowerCase()));
-    const campaigns = this.loadCampaigns();
-    const filtered = campaigns.filter((c) => !idSet.has(c.id?.toLowerCase()));
-    const count = campaigns.length - filtered.length;
-    this.saveCampaigns(filtered);
-    return { count };
+    await this.prisma.clubbingRule.deleteMany({ where: { id: { in: ids } } });
+    return { success: true, count: ids.length };
   }
 
   async bulkUpdateStatus(ids: string[], isActive: boolean) {
-    if (!ids || ids.length === 0) return { count: 0 };
-    const idSet = new Set(ids.map((i) => i.toLowerCase()));
-    const campaigns = this.loadCampaigns();
-    let count = 0;
-    for (const c of campaigns) {
-      if (idSet.has(c.id?.toLowerCase())) {
-        c.isActive = isActive;
-        c.updatedAt = new Date().toISOString();
-        count++;
-      }
-    }
-    this.saveCampaigns(campaigns);
-    return { count };
+    await this.prisma.clubbingRule.updateMany({
+      where: { id: { in: ids } },
+      data: { isActive },
+    });
+    return { success: true, count: ids.length, isActive };
   }
 
-  private async findActiveRulesInternal(onlyWithoutCode = false) {
-    const now = new Date();
-    try {
-      const rules = await this.prisma.clubbingRule.findMany({
-        where: {
-          isActive: true,
-          ...(onlyWithoutCode ? { code: null } : {}),
-          OR: [
-            { startsAt: null, endsAt: null },
-            { startsAt: { lte: now }, endsAt: null },
-            { startsAt: null, endsAt: { gte: now } },
-            { startsAt: { lte: now }, endsAt: { gte: now } },
-          ],
-        },
-        include: {
-          applicableCategory: true,
-          products: {
-            include: {
-              product: true,
-            },
-          },
-        },
-      });
-
-      return rules.filter(
-        (rule) => rule.usageLimit == null || rule.usageCount < rule.usageLimit,
-      );
-    } catch {
-      return this.getActiveRules();
-    }
-  }
-
-  async calculateCartDiscount(
-    cartItems: CartItemDiscountInput[],
-    couponCode?: string,
-  ) {
-    let activeRules: any[] = [];
-    try {
-      activeRules = await this.findActiveRulesInternal();
-    } catch {
-      activeRules = [];
-    }
-
-    const cleanCode = couponCode && couponCode.trim() ? couponCode.trim().toUpperCase() : null;
-
-    if (cleanCode && (!activeRules || activeRules.length === 0)) {
-      const found = await this.prisma.clubbingRule.findFirst({
-        where: {
-          code: { equals: cleanCode, mode: 'insensitive' },
-        },
-        include: {
-          applicableCategory: true,
-          products: {
-            include: {
-              product: true,
-            },
-          },
-        },
-      });
-
-      if (!found || !found.isActive) {
-        throw new BadRequestException('Invalid coupon code');
-      }
-
-      const now = new Date();
-      if (found.startsAt && found.startsAt > now) {
-        throw new BadRequestException('Coupon is not yet active');
-      }
-      if (found.endsAt && found.endsAt < now) {
-        throw new BadRequestException('Coupon has expired');
-      }
-      if (found.usageLimit != null && found.usageCount >= found.usageLimit) {
-        throw new BadRequestException('Coupon usage limit reached');
-      }
-
-      activeRules = [found];
-    }
-
-    let totalDiscount = 0;
-    let appliedCode: string | null = null;
+  async calculateCartDiscount(cartItems: CartItemDiscountInput[], couponCode?: string) {
+    let discountTotal = 0;
     let appliedRuleId: string | null = null;
+    let appliedCouponCode: string | null = null;
 
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      return { discountTotal: 0, appliedRuleId: null, appliedCouponCode: null };
+    }
+
+    const activeRules = await this.getActiveRules();
     for (const rule of activeRules) {
-      if (rule.code) {
-        if (!cleanCode || rule.code.toUpperCase() !== cleanCode) {
-          continue;
+      const eligibleMap = new Map<string, any>();
+      for (const p of rule.clubbingProducts) {
+        eligibleMap.set(p.productId, p);
+      }
+
+      for (const item of cartItems) {
+        const eligible = eligibleMap.get(item.productId);
+        if (eligible && eligible.clubbingPrice && eligible.clubbingPrice < item.price) {
+          const discountPerUnit = item.price - eligible.clubbingPrice;
+          discountTotal += discountPerUnit * item.quantity;
+          appliedRuleId = rule.id;
         }
       }
 
-      const ruleProductIds = new Set((rule.products || []).map((p: any) => p.productId));
-
-      const applicableItems = cartItems.filter((item) =>
-        ruleProductIds.size === 0 || ruleProductIds.has(item.productId),
-      );
-
-      const totalQuantity = applicableItems.reduce(
-        (sum, item) => sum + (item.quantity || 1),
-        0,
-      );
-
-      if (totalQuantity >= (rule.requiredQuantity || 1)) {
-        const originalPrice = applicableItems.reduce(
-          (sum, item) => sum + (Number(item.price) || 0) * (item.quantity || 1),
-          0,
-        );
-
-        let ruleDiscount = 0;
-        if (rule.type === 'fixed_price_bundle' && rule.fixedPrice) {
-          ruleDiscount = Math.max(0, originalPrice - Number(rule.fixedPrice));
-        } else if (rule.type === 'percentage_off_bundle' && rule.percentageOff) {
-          ruleDiscount = Math.max(0, originalPrice * (Number(rule.percentageOff) / 100));
-        }
-
-        if (ruleDiscount > 0) {
-          totalDiscount += ruleDiscount;
-          if (rule.code) {
-            appliedCode = rule.code;
-            appliedRuleId = rule.id;
-          }
-        }
-      }
+      if (discountTotal > 0) break;
     }
 
     return {
-      discountTotal: Math.round(Math.max(0, totalDiscount)),
-      appliedCouponCode: appliedCode,
+      discountTotal: Math.round(discountTotal * 100) / 100,
       appliedRuleId,
+      appliedCouponCode,
     };
   }
 }

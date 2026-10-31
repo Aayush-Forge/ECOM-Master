@@ -396,10 +396,10 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
     openDrawer()
   }
 
-  // Hero Slider Data
-  const slides = [
+  // Base Hero Slider Data
+  const baseSlides = [
     {
-      id: 1,
+      id: 'base-1',
       headline: 'SRIDATTAM Agarbatti',
       subheadline: 'Premium botanical incense sticks crafted for daily rituals, peace, and reflection.',
       cta: 'Explore Collection',
@@ -410,7 +410,7 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
       layoutType: 'right'
     },
     {
-      id: 2,
+      id: 'base-2',
       headline: 'Devotional Fragrances',
       subheadline: 'Hand-rolled sticks prepared with sun-dried petals and pure botanical oils.',
       cta: 'Explore Collection',
@@ -421,7 +421,7 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
       layoutType: 'right'
     },
     {
-      id: 3,
+      id: 'base-3',
       headline: 'Natural Dhoop Sticks',
       subheadline: 'Charcoal-free bamboo-free dhoop sticks for a clean and pure atmosphere.',
       cta: 'Explore Collection',
@@ -432,7 +432,7 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
       layoutType: 'right'
     },
     {
-      id: 4,
+      id: 'base-4',
       headline: 'Sambrani Kits',
       subheadline: 'Complete traditional sambrani cups and accessories for positive energy.',
       cta: 'Explore Collection',
@@ -443,6 +443,24 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
       layoutType: 'right'
     }
   ]
+
+  // Dynamic Festive Hero Slides created from active Clubbing campaigns
+  const festiveHeroSlides = (clubbingRules || [])
+    .filter((c) => c && c.isActive !== false && c.showInHero !== false && (c.bannerImageDesktop || c.bannerImage))
+    .map((c, idx) => ({
+      id: `festive-${c.id || idx}`,
+      headline: c.name || c.eventName || 'Festive Clubbing Special',
+      subheadline: c.tagline || c.description || 'Exclusive celebratory offers on curated sacred incense',
+      cta: c.heroCtaText || 'Shop Festive Deals',
+      link: `/festive?campaign=${encodeURIComponent(c.code || c.id || c.name || '')}`,
+      desktopImage: c.bannerImageDesktop || c.bannerImage,
+      mobileImage: c.bannerImageMobile || c.bannerImageDesktop || c.bannerImage,
+      image: c.bannerImageDesktop || c.bannerImage,
+      layoutType: 'festive',
+      isFestive: true,
+    }))
+
+  const slides = festiveHeroSlides.length > 0 ? [...festiveHeroSlides, ...baseSlides] : baseSlides
 
   // Auto transition hero slides
   useEffect(() => {
@@ -589,6 +607,7 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
                     sizes="100vw"
                     priority={idx === 0}
                     className="object-cover"
+                    unoptimized={activeImageSrc?.startsWith('http')}
                   />
                 </div>
               </Link>

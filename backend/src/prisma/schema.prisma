@@ -20,6 +20,7 @@ enum ProductType {
 enum ClubbingRuleType {
   fixed_price_bundle
   percentage_off_bundle
+  custom_product_clubbing
 }
 
 enum CartStatus {
@@ -177,13 +178,25 @@ model Category {
 model ClubbingRule {
   id                   String           @id @default(uuid()) @db.Uuid
   name                 String
-  description          String?
-  type                 ClubbingRuleType
+  eventName            String?          @map("event_name")
+  tagline              String?
+  description          String?          @db.Text
+  type                 ClubbingRuleType @default(custom_product_clubbing)
   code                 String?          @unique
-  requiredQuantity     Int              @map("required_quantity")
+  requiredQuantity     Int              @default(1) @map("required_quantity")
   fixedPrice           Decimal?         @map("fixed_price") @db.Decimal(10, 2)
   percentageOff        Decimal?         @map("percentage_off") @db.Decimal(5, 2)
   applicableCategoryId String?          @map("applicable_category_id") @db.Uuid
+
+  bannerImageDesktop   String?          @map("banner_image_desktop") @db.VarChar(500)
+  bannerImageMobile    String?          @map("banner_image_mobile") @db.VarChar(500)
+  bannerKeyDesktop     String?          @map("banner_key_desktop") @db.VarChar(255)
+  bannerKeyMobile      String?          @map("banner_key_mobile") @db.VarChar(255)
+
+  featuredOnHomepage   Boolean          @default(true) @map("featured_on_homepage")
+  showInHero           Boolean          @default(true) @map("show_in_hero")
+  heroCtaText          String?          @default("Shop Festive Deals") @map("hero_cta_text")
+
   startsAt             DateTime?        @map("starts_at")
   endsAt               DateTime?        @map("ends_at")
   usageLimit           Int?             @map("usage_limit")
@@ -192,8 +205,8 @@ model ClubbingRule {
   createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt            DateTime         @updatedAt @map("updated_at")
 
-  applicableCategory Category?             @relation(fields: [applicableCategoryId], references: [id])
-  products           ClubbingRuleProduct[]
+  applicableCategory   Category?             @relation(fields: [applicableCategoryId], references: [id])
+  products             ClubbingRuleProduct[]
 
   @@index([applicableCategoryId])
   @@index([isActive])
@@ -203,11 +216,14 @@ model ClubbingRule {
 }
 
 model ClubbingRuleProduct {
-  ruleId    String @map("rule_id") @db.Uuid
-  productId String @map("product_id") @db.Uuid
+  ruleId             String   @map("rule_id") @db.Uuid
+  productId          String   @map("product_id") @db.Uuid
+  clubbingPrice      Decimal? @map("clubbing_price") @db.Decimal(10, 2)
+  discountPercentage Decimal? @map("discount_percentage") @db.Decimal(5, 2)
+  sortOrder          Int      @default(0) @map("sort_order")
 
-  rule    ClubbingRule @relation(fields: [ruleId], references: [id])
-  product Product      @relation(fields: [productId], references: [id])
+  rule               ClubbingRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  product            Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@id([ruleId, productId])
   @@map("clubbing_rule_products")

@@ -4,6 +4,35 @@
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
+function getAuthToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    let raw = localStorage.getItem('auth_session');
+    if (!raw) {
+      const match = document.cookie.match(/(?:^|;\s*)sd_auth_session=([^;]+)/);
+      if (match) {
+        try {
+          raw = decodeURIComponent(match[1]);
+        } catch {}
+      }
+    }
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    return session.access_token || session.token || null;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthHeaders(extra = {}) {
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json', ...extra };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export const FESTIVE_BANNER_PRESETS = [
   {
     id: 'diwali_gold',
@@ -30,6 +59,33 @@ export const FESTIVE_BANNER_PRESETS = [
     bgColor: '#1A0208',
   },
 ];
+
+export async function uploadClubbingBanner(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = getAuthToken();
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${BACKEND_URL}/clubbing/upload-banner`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const message = Array.isArray(err.message)
+      ? err.message.join(', ')
+      : err.message || `Failed to upload banner image (${res.status})`;
+    throw new Error(message);
+  }
+
+  return await res.json(); // { url: string, key: string }
+}
 
 export async function getAllClubbings() {
   try {
@@ -78,7 +134,7 @@ export async function getClubbingById(id) {
 export async function createClubbing(data) {
   const res = await fetch(`${BACKEND_URL}/clubbing-rules`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -91,7 +147,7 @@ export async function createClubbing(data) {
 export async function updateClubbing(id, data) {
   const res = await fetch(`${BACKEND_URL}/clubbing-rules/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -104,7 +160,7 @@ export async function updateClubbing(id, data) {
 export async function toggleClubbingStatus(id) {
   const res = await fetch(`${BACKEND_URL}/clubbing/${encodeURIComponent(id)}/toggle`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     // Fallback: try PATCH with flipped status
@@ -118,7 +174,7 @@ export async function toggleClubbingStatus(id) {
 export async function deleteClubbing(id) {
   const res = await fetch(`${BACKEND_URL}/clubbing-rules/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
