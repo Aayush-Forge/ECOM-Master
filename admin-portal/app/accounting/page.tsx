@@ -482,6 +482,12 @@ export default function AccountingPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <a
+              href="/overview"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-2xs hover:bg-zinc-50 transition"
+            >
+              ← Dashboard
+            </a>
             <button
               onClick={() => downloadCSV(filteredOrders, "accounting-ledger.csv")}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-2xs hover:bg-zinc-50 transition"

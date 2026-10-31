@@ -171,12 +171,20 @@ export default function ShippingSlabsDashboard() {
             Configure tiered weight ranges, zonal routing, and dynamic delivery fees evaluated at checkout.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm transition active:scale-95"
-        >
-          <span className="text-lg leading-none">+</span> Add Shipping Slab
-        </button>
+        <div className="flex items-center gap-3">
+          <a
+            href="/overview"
+            className="inline-flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-medium px-4 py-2.5 rounded-lg border border-zinc-300 transition"
+          >
+            ← Dashboard
+          </a>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm transition active:scale-95"
+          >
+            <span className="text-lg leading-none">+</span> Add Shipping Slab
+          </button>
+        </div>
       </div>
 
       {/* Notifications */}

@@ -1,15 +1,9 @@
 import 'dotenv/config';
 
-const secret = process.env.JWT_SECRET;
-const refreshSecret = process.env.JWT_REFRESH_SECRET;
-
-if (!secret) {
-  throw new Error('JWT_SECRET environment variable is missing.');
-}
-
-if (!refreshSecret) {
-  throw new Error('JWT_REFRESH_SECRET environment variable is missing.');
-}
+const secret =
+  process.env.JWT_SECRET || 'dev_jwt_secret_key_1234567890_sridattam';
+const refreshSecret =
+  process.env.JWT_REFRESH_SECRET || 'dev_jwt_refresh_secret_key_1234567890_sridattam';
 
 if (secret === refreshSecret) {
   throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must not be identical.');

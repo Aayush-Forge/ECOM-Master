@@ -89,7 +89,7 @@ function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponDiscount, setCouponDiscount] = useState(0)
   const [couponError, setCouponError] = useState('')
-  const [shippingCharge, setShippingCharge] = useState(0)
+  const [backendShippingCharge, setBackendShippingCharge] = useState(0)
   const [shippingCarrier, setShippingCarrier] = useState('')
   const [shippingError, setShippingError] = useState('')
 
@@ -133,7 +133,7 @@ function CheckoutPage() {
     if (!displayItems || displayItems.length === 0) {
       setAutoDiscount(0)
       setCouponDiscount(0)
-      setShippingCharge(0)
+      setBackendShippingCharge(0)
       setShippingError('')
       return
     }
@@ -156,7 +156,7 @@ function CheckoutPage() {
       .then(res => {
         if (!active || !res) return
         if (typeof res.shippingTotal === 'number') {
-          setShippingCharge(res.shippingTotal)
+          setBackendShippingCharge(res.shippingTotal)
         }
         if (res.shippingCarrier) {
           setShippingCarrier(res.shippingCarrier)
@@ -263,10 +263,10 @@ function CheckoutPage() {
     return () => { isCancelled = true }
   }, [totalWeight, form.state, form.postcode, displaySubtotal, displayItems.length])
 
-  // Shipping fee resolved: use dynamic rate if available, fallback to free over ₹499 else ₹49
+  // Shipping fee resolved: use dynamic rate if available, fallback to backend rate or free over ₹499 else ₹49
   const shippingCharge = dynamicShipping !== null && dynamicShipping.shippingFee !== undefined
     ? dynamicShipping.shippingFee
-    : ((displaySubtotal >= 499 || displaySubtotal === 0) ? 0 : 49)
+    : (backendShippingCharge > 0 ? backendShippingCharge : ((displaySubtotal >= 499 || displaySubtotal === 0) ? 0 : 49))
 
   const totalDiscount = clubbingDiscount + couponDiscount
   const finalTotal = Math.max(0, displaySubtotal - clubbingDiscount - couponDiscount + shippingCharge)
