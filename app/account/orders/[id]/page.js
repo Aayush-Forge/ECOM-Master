@@ -24,6 +24,7 @@ import {
   XCircle,
   AlertCircle,
   Printer,
+  Download,
 } from 'lucide-react';
 
 const ORDER_STEPS = [
@@ -175,11 +176,11 @@ export default function OrderDetailsPage() {
               variant="outline"
               onClick={() => {
                 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
-                window.open(`${backendUrl}/orders/${order.id}/invoice`, '_blank');
+                window.open(`${backendUrl}/orders/${order.id}/invoice?download=true`, '_blank');
               }}
               className="border-stone-300 hover:bg-stone-50 font-inter text-stone-700 font-medium shadow-2xs"
             >
-              <Printer className="w-4 h-4 mr-2 text-stone-500" /> Print Tax Invoice
+              <Download className="w-4 h-4 mr-2 text-stone-500" /> Download Tax Invoice (PDF)
             </Button>
             <Button
               onClick={handleReorder}

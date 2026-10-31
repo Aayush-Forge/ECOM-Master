@@ -1112,6 +1112,7 @@ export class OrdersService {
     };
   }
 
+  
   async getOrderInvoice(id: string, format?: string): Promise<any> {
     const order = await this.getOrderOrMock(id);
     const invoiceData = await this.prepareTaxInvoiceData(order);
@@ -1136,7 +1137,7 @@ export class OrdersService {
       };
     }
 
-    return this.renderTaxInvoicePackingSlipHtml(invoiceData);
+    return this.renderTaxInvoiceA4Html(invoiceData);
   }
 
   async getOrderShippingLabel(id: string, format?: string): Promise<any> {
@@ -1155,20 +1156,409 @@ export class OrdersService {
       return {
         orderId: order.id,
         orderNumber: order.orderNumber,
-        invoiceNumber: invoiceData.invoiceNumber,
         awbNumber: invoiceData.awbNumber,
-        carrier: order.shippingCarrier || 'Standard Delivery',
-        weightKg: '0.85',
-        recipient: invoiceData.shippingAddress,
+        shippingAddress: invoiceData.shippingAddress,
+        dispatchDate: invoiceData.dispatchDate,
         items: invoiceData.items,
-        totals: invoiceData.totals,
+        totalQuantity: invoiceData.totals.totalQty,
       };
     }
 
-    return this.renderTaxInvoicePackingSlipHtml(invoiceData);
+    return this.renderShippingLabelHtml(invoiceData);
   }
 
-  private renderTaxInvoicePackingSlipHtml(data: any): string {
+  /**
+   * Official Full A4 GST Tax Invoice (GST Rule 46 Compliant)
+   */
+  private renderTaxInvoiceA4Html(data: any): string {
+    const isIntra = data.isIntraState;
+
+    const itemRows = data.items
+      .map(
+        (it: any) => `
+      <tr>
+        <td style="text-align: center; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px;">${it.srNo}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 7px 8px;">
+          <div style="font-weight: 700; font-size: 10.5px; color: #1e293b;">${it.productName}</div>
+          <div style="font-size: 9px; color: #64748b; margin-top: 1px;">SKU: ${it.productCode}</div>
+        </td>
+        <td style="text-align: center; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px; font-family: monospace;">
+          ${it.hsn}
+        </td>
+        <td style="text-align: center; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px; font-weight: 600;">${it.qty}</td>
+        <td style="text-align: right; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px;">${it.rate.toFixed(2)}</td>
+        <td style="text-align: right; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px; font-weight: 600;">${it.taxableValue.toFixed(2)}</td>
+        ${
+          isIntra
+            ? `
+        <td style="text-align: right; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px;">
+          ${it.cgst.toFixed(2)}
+          <div style="font-size: 8px; color: #64748b;">(2.5%)</div>
+        </td>
+        <td style="text-align: right; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px;">
+          ${it.sgst.toFixed(2)}
+          <div style="font-size: 8px; color: #64748b;">(2.5%)</div>
+        </td>`
+            : `
+        <td style="text-align: right; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10px;">
+          ${it.igst.toFixed(2)}
+          <div style="font-size: 8px; color: #64748b;">(5.0%)</div>
+        </td>`
+        }
+        <td style="text-align: right; border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10.5px; font-weight: 700; color: #0f172a;">${it.amount.toFixed(2)}</td>
+      </tr>`
+      )
+      .join('');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tax Invoice - ${data.invoiceNumber}</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm 12mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 16px 10px;
+      background: #f1f5f9;
+      color: #0f172a;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 820px;
+      margin: 0 auto 14px auto;
+      background: #ffffff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .action-info { font-size: 12px; color: #334155; }
+    .action-info strong { color: #0f172a; font-weight: 700; }
+    .action-buttons { display: flex; gap: 10px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 16px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .btn-primary { background: #6b1024; color: #ffffff; border-color: #6b1024; }
+    .btn-primary:hover { background: #500c1b; }
+    .btn-secondary { background: #ffffff; color: #334155; border-color: #cbd5e1; }
+    .btn-secondary:hover { background: #f8fafc; border-color: #94a3b8; }
+    .sheet {
+      width: 100%;
+      max-width: 820px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 28px 32px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      border-radius: 4px;
+    }
+    .header-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .header-table td { vertical-align: top; }
+    .brand-title { font-size: 22px; font-weight: 900; letter-spacing: 0.05em; color: #6b1024; line-height: 1.1; margin: 0; }
+    .brand-tagline { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; font-weight: 600; margin-top: 2px; }
+    .doc-badge { display: inline-block; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+    .invoice-title { font-size: 18px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin: 0; letter-spacing: 0.02em; }
+    .meta-box { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-bottom: 14px; background: #f8fafc; }
+    .meta-box td { border: 1px solid #cbd5e1; padding: 6px 10px; font-size: 9.5px; }
+    .meta-label { color: #64748b; font-size: 8.5px; text-transform: uppercase; font-weight: 600; }
+    .meta-val { font-weight: 700; color: #0f172a; font-size: 10.5px; margin-top: 2px; }
+    .address-grid { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-bottom: 14px; }
+    .address-grid td { width: 50%; border: 1px solid #cbd5e1; padding: 10px 12px; vertical-align: top; }
+    .address-header { font-size: 9px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: #6b1024; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 6px; }
+    .address-name { font-size: 11.5px; font-weight: 700; color: #0f172a; }
+    .items-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin-bottom: 14px; }
+    .items-table th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.04em; }
+    .summary-grid { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .summary-grid td { vertical-align: top; }
+    .words-box { border: 1px solid #cbd5e1; background: #f8fafc; padding: 10px 12px; border-radius: 4px; }
+    .totals-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; }
+    .totals-table td { border: 1px solid #cbd5e1; padding: 6px 10px; font-size: 10px; }
+    .declaration-table { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-top: 14px; }
+    .declaration-table td { border: 1px solid #cbd5e1; padding: 10px 12px; vertical-align: top; }
+    .footer-note { margin-top: 16px; padding-top: 8px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 8.5px; color: #94a3b8; }
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      .sheet { border: none; padding: 0; max-width: 100%; box-shadow: none; }
+      .action-bar { display: none !important; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <div class="no-print action-bar">
+    <div class="action-info">
+      Tax Invoice: <strong>${data.invoiceNumber}</strong> &nbsp;•&nbsp; Order: <strong>#${data.orderNumber}</strong>
+    </div>
+    <div class="action-buttons">
+      <button id="btn-download-pdf" class="btn btn-primary" onclick="downloadPDF()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download PDF
+      </button>
+      <button class="btn btn-secondary" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print / Save as PDF
+      </button>
+    </div>
+  </div>
+
+  <div id="printable-sheet" class="sheet">
+    <!-- Header -->
+    <table class="header-table">
+      <tr>
+        <td style="width: 55%;">
+          <div class="brand-title">SRIDATTAM</div>
+          <div class="brand-tagline">Vedic Wellness &amp; Pure Botanical Aromas</div>
+          <div style="margin-top: 6px; font-weight: 700; font-size: 11px;">${data.seller.legalName}</div>
+          <div style="color: #475569; font-size: 9.5px; line-height: 1.35; margin-top: 2px;">
+            ${data.seller.addressLine1}, ${data.seller.addressLine2}<br>
+            ${data.seller.city} - ${data.seller.pincode}, ${data.seller.stateFormatted}, India<br>
+            <strong>GSTIN:</strong> ${data.seller.gstin}
+          </div>
+        </td>
+        <td style="width: 45%; text-align: right;">
+          <div class="doc-badge">Original For Recipient</div>
+          <h1 class="invoice-title">Tax Invoice</h1>
+          <div style="font-size: 8.5px; color: #64748b; margin-top: 2px;">
+            (Issued under Section 31 of CGST Act, 2017 read with Rule 46)
+          </div>
+          <div style="margin-top: 8px; font-size: 9.5px; color: #334155;">
+            <div><strong>Invoice No:</strong> <span style="font-size: 11px; font-weight: 700; color: #0f172a;">${data.invoiceNumber}</span></div>
+            <div><strong>Invoice Date:</strong> ${data.invoiceDate}</div>
+            <div><strong>Order No:</strong> #${data.orderNumber}</div>
+            <div><strong>Order Date:</strong> ${data.orderDate}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Metadata Strip -->
+    <table class="meta-box">
+      <tr>
+        <td style="width: 25%;">
+          <div class="meta-label">Place of Supply</div>
+          <div class="meta-val">${data.buyer.stateFormatted}</div>
+        </td>
+        <td style="width: 25%;">
+          <div class="meta-label">Reverse Charge</div>
+          <div class="meta-val">No</div>
+        </td>
+        <td style="width: 25%;">
+          <div class="meta-label">Payment Mode</div>
+          <div class="meta-val">${data.paymentMode}</div>
+        </td>
+        <td style="width: 25%;">
+          <div class="meta-label">Portal / Channel</div>
+          <div class="meta-val">SRIDATTAM.COM</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Billing & Shipping Blocks -->
+    <table class="address-grid">
+      <tr>
+        <td>
+          <div class="address-header">Details of Receiver (Billed To)</div>
+          <div class="address-name">${data.buyer.fullName}</div>
+          <div style="color: #334155; font-size: 9.5px; margin-top: 3px; line-height: 1.4;">
+            ${data.buyer.addressLine1}${data.buyer.addressLine2 ? ', ' + data.buyer.addressLine2 : ''}<br>
+            ${data.buyer.city} - ${data.buyer.postalCode}<br>
+            ${data.buyer.stateFormatted}, India<br>
+            <strong>Phone:</strong> ${data.buyer.phone || 'N/A'}<br>
+            <strong>GSTIN:</strong> Unregistered Consumer
+          </div>
+        </td>
+        <td>
+          <div class="address-header">Details of Consignee (Shipped To)</div>
+          <div class="address-name">${data.shippingAddress.fullName}</div>
+          <div style="color: #334155; font-size: 9.5px; margin-top: 3px; line-height: 1.4;">
+            ${data.shippingAddress.addressLine1}${data.shippingAddress.addressLine2 ? ', ' + data.shippingAddress.addressLine2 : ''}<br>
+            ${data.shippingAddress.city} - ${data.shippingAddress.postalCode}<br>
+            ${data.shippingAddress.stateFormatted}, India<br>
+            <strong>Phone:</strong> ${data.shippingAddress.phone || 'N/A'}<br>
+            <strong>Dispatch Date:</strong> ${data.dispatchDate} &nbsp;|&nbsp; <strong>AWB:</strong> ${data.awbNumber}
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Line Items Table -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width: 32px; text-align: center;">#</th>
+          <th style="text-align: left;">Description of Goods</th>
+          <th style="width: 75px; text-align: center;">HSN/SAC</th>
+          <th style="width: 40px; text-align: center;">Qty</th>
+          <th style="width: 70px; text-align: right;">Unit Rate (₹)</th>
+          <th style="width: 85px; text-align: right;">Taxable (₹)</th>
+          ${
+            isIntra
+              ? `
+          <th style="width: 70px; text-align: right;">CGST (₹)</th>
+          <th style="width: 70px; text-align: right;">SGST (₹)</th>`
+              : `
+          <th style="width: 80px; text-align: right;">IGST (₹)</th>`
+          }
+          <th style="width: 85px; text-align: right;">Total (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+      </tbody>
+    </table>
+
+    <!-- Summary & Totals -->
+    <table class="summary-grid">
+      <tr>
+        <td style="width: 58%; padding-right: 14px;">
+          <div class="words-box">
+            <div style="font-size: 8.5px; text-transform: uppercase; font-weight: 700; color: #64748b;">Amount Chargeable (in words)</div>
+            <div style="font-size: 11px; font-weight: 800; color: #0f172a; margin-top: 3px; line-height: 1.35;">
+              ${data.amountInWords}
+            </div>
+            <div style="margin-top: 8px; font-size: 9px; color: #475569;">
+              <strong>Taxation Note:</strong> Goods classified under HSN 33074100 (Agarbatti &amp; Dhoop Products) attract 5% GST (${isIntra ? '2.5% CGST + 2.5% SGST' : '5.0% IGST'}). Delivery &amp; handling charges attract 18% GST.
+            </div>
+          </div>
+          <div style="margin-top: 10px; font-size: 9px; color: #64748b;">
+            <strong>Bank Remittance:</strong> HDFC Bank Ltd &nbsp;|&nbsp; <strong>A/C:</strong> 50200012345678 &nbsp;|&nbsp; <strong>IFSC:</strong> HDFC0001234
+          </div>
+        </td>
+        <td style="width: 42%;">
+          <table class="totals-table">
+            <tr>
+              <td style="color: #64748b;">Taxable Value</td>
+              <td style="text-align: right; font-weight: 600;">₹${data.totals.totalTaxable.toFixed(2)}</td>
+            </tr>
+            ${
+              isIntra
+                ? `
+            <tr>
+              <td style="color: #64748b;">Central Tax (CGST 2.5%)</td>
+              <td style="text-align: right; font-weight: 600;">₹${data.totals.totalCgst.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="color: #64748b;">State Tax (SGST 2.5%)</td>
+              <td style="text-align: right; font-weight: 600;">₹${data.totals.totalSgst.toFixed(2)}</td>
+            </tr>`
+                : `
+            <tr>
+              <td style="color: #64748b;">Integrated Tax (IGST 5.0%)</td>
+              <td style="text-align: right; font-weight: 600;">₹${data.totals.totalIgst.toFixed(2)}</td>
+            </tr>`
+            }
+            <tr style="background: #f8fafc; font-size: 11px;">
+              <td style="font-weight: 800; color: #0f172a;">Grand Total (INR)</td>
+              <td style="text-align: right; font-weight: 900; color: #6b1024; font-size: 12px;">₹${data.totals.totalAmount.toFixed(2)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Declarations & Signatory -->
+    <table class="declaration-table">
+      <tr>
+        <td style="width: 62%;">
+          <div style="font-weight: 700; font-size: 9.5px; text-transform: uppercase; color: #334155;">Declaration</div>
+          <ol style="margin: 4px 0 0 16px; padding: 0; font-size: 8.5px; color: #475569; line-height: 1.45;">
+            <li>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</li>
+            <li>All goods sold are guaranteed authentic botanical and natural incense creations.</li>
+            <li>All disputes are subject to Karnataka (29) jurisdiction only.</li>
+            <li>This is a computer-generated tax invoice issued under Rule 46 of the CGST Rules, 2017.</li>
+          </ol>
+        </td>
+        <td style="width: 38%; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="font-size: 9.5px; font-weight: 700; text-transform: uppercase; color: #334155;">For ${data.seller.legalName}</div>
+          <div style="height: 38px; display: flex; align-items: center; justify-content: center; margin: 4px 0;">
+            <span style="font-family: 'Brush Script MT', cursive, sans-serif; font-size: 20px; color: #1e3a8a;">Sridattam Vedic</span>
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 3px;">Authorised Signatory</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="footer-note">
+      This is a digitally generated Tax Invoice compliant with GST Rule 46. No physical signature is required.<br>
+      Sridattam Enterprises Pvt Ltd • care@sridattam.com • www.sridattam.com
+    </div>
+  </div>
+
+  <script>
+    function downloadPDF() {
+      var btn = document.getElementById('btn-download-pdf');
+      var originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.innerHTML = '⏳ Generating PDF...';
+        btn.disabled = true;
+      }
+
+      var element = document.getElementById('printable-sheet');
+      var filename = 'Tax-Invoice-' + '${data.invoiceNumber}' + '.pdf';
+
+      var opt = {
+        margin: [10, 12, 10, 12],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      if (window.html2pdf) {
+        window.html2pdf().set(opt).from(element).save().then(function() {
+          if (btn) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+          }
+        }).catch(function(err) {
+          console.warn('PDF direct generation fallback to print:', err);
+          if (btn) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+          }
+          window.print();
+        });
+      } else {
+        window.print();
+        if (btn) {
+          btn.innerHTML = originalHtml;
+          btn.disabled = false;
+        }
+      }
+    }
+
+    // Auto-trigger download if format=pdf or download=true
+    window.addEventListener('DOMContentLoaded', function() {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('download') === 'true' || params.get('format') === 'pdf') {
+        setTimeout(downloadPDF, 700);
+      }
+    });
+  </script>
+</body>
+</html>`;
+  }
+
+  /**
+   * Dedicated Shipping Packing Slip & Courier Label (Specimen layout)
+   */
+  private renderShippingLabelHtml(data: any): string {
     const isIntra = data.isIntraState;
 
     const itemRows = data.items
@@ -1191,20 +1581,20 @@ export class OrdersService {
             ? `
         <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">
           ${it.cgst.toFixed(2)}
-          <div style="font-size: 8px; color: #444;">(${it.cgstRate})</div>
+          <div style="font-size: 8px; color: #444;">(2.500%)</div>
         </td>
         <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">
           ${it.sgst.toFixed(2)}
-          <div style="font-size: 8px; color: #444;">(${it.sgstRate})</div>
+          <div style="font-size: 8px; color: #444;">(2.500%)</div>
         </td>`
             : `
         <td style="text-align: right; border: 1px solid #000; padding: 4px 6px;">
           ${it.igst.toFixed(2)}
-          <div style="font-size: 8px; color: #444;">(${it.igstRate})</div>
+          <div style="font-size: 8px; color: #444;">(5.000%)</div>
         </td>`
         }
         <td style="text-align: right; border: 1px solid #000; padding: 4px 6px; font-weight: 700;">${it.amount.toFixed(2)}</td>
-      </tr>`,
+      </tr>`
       )
       .join('');
 
@@ -1212,7 +1602,7 @@ export class OrdersService {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tax Invoice - ${data.invoiceNumber}</title>
+  <title>Shipping Packing Slip - #${data.orderNumber}</title>
   <style>
     @page { size: A4 portrait; margin: 10mm; }
     * { box-sizing: border-box; }
@@ -1233,9 +1623,22 @@ export class OrdersService {
       padding: 16px 20px;
       border: 1px solid #ddd;
     }
-    .no-print { display: flex; justify-content: flex-end; max-width: 800px; margin: 0 auto 12px auto; gap: 8px; }
-    .btn { padding: 8px 16px; font-size: 12px; font-weight: 700; border-radius: 4px; cursor: pointer; border: 1px solid #000; background: #000; color: #fff; }
-    .btn:hover { background: #222; }
+    .action-bar { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 12px auto; gap: 8px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 16px;
+      font-size: 11.5px;
+      font-weight: 700;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid #000;
+      transition: all 0.15s ease;
+    }
+    .btn-primary { background: #000; color: #fff; }
+    .btn-primary:hover { background: #222; }
+    .btn-secondary { background: #fff; color: #000; border-color: #000; }
+    .btn-secondary:hover { background: #f0f0f0; }
     .top-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; }
     .brand-mark { font-size: 18px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
     .invoice-title { font-size: 11px; font-weight: 700; text-transform: uppercase; }
@@ -1251,18 +1654,31 @@ export class OrdersService {
     @media print {
       body { background: #fff; padding: 0; }
       .sheet { border: none; padding: 0; max-width: 100%; }
-      .no-print { display: none !important; }
+      .action-bar { display: none !important; }
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
-  <div class="no-print">
-    <button class="btn" onclick="window.print()">🖨️ Print Tax Invoice / Packing Slip</button>
+  <div class="no-print action-bar">
+    <div style="font-size: 11px; font-weight: 600;">
+      Shipping Packing Slip: <strong>#${data.orderNumber}</strong> &nbsp;•&nbsp; AWB: <strong>${data.awbNumber}</strong>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="btn-download-pdf" class="btn btn-primary" onclick="downloadPDF()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download PDF
+      </button>
+      <button class="btn btn-secondary" onclick="window.print()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print Label
+      </button>
+    </div>
   </div>
-  <div class="sheet">
+  <div id="printable-sheet" class="sheet">
     <div class="top-header">
       <div class="brand-mark">SRIDATTAM</div>
-      <div class="invoice-title">Tax Invoice</div>
+      <div class="invoice-title">Tax Invoice / Packing Slip</div>
     </div>
 
     <!-- 3-Column Header Grid -->
@@ -1271,7 +1687,7 @@ export class OrdersService {
         <td style="width: 38%;">
           <div style="font-weight: 800; font-size: 10.5px; text-transform: uppercase;">${data.seller.legalName}</div>
           <div>${data.seller.addressLine1}</div>
-          ${data.seller.addressLine2 ? `<div>${data.seller.addressLine2}</div>` : ''}
+          <div>${data.seller.addressLine2}</div>
           <div>${data.seller.city} - ${data.seller.pincode}</div>
           <div>${data.seller.stateFormatted}, India</div>
           <div style="margin-top: 3px; font-weight: 700;">GSTIN: ${data.seller.gstin}</div>
@@ -1287,7 +1703,7 @@ export class OrdersService {
         </td>
         <td style="width: 30%; padding: 0;">
           <div style="border-bottom: 1px solid #000; padding: 4px 6px;"><strong>Invoice Date:</strong> ${data.invoiceDate}</div>
-          <div style="border-bottom: 1px solid #000; padding: 4px 6px;"><strong>Portal:</strong> ${data.portal}</div>
+          <div style="border-bottom: 1px solid #000; padding: 4px 6px;"><strong>Portal:</strong> SRIDATTAM</div>
           <div style="padding: 4px 6px;"><strong>Payment Mode:</strong> ${data.paymentMode}</div>
         </td>
       </tr>
@@ -1299,7 +1715,7 @@ export class OrdersService {
           ${data.buyer.addressLine2 ? `<div>${data.buyer.addressLine2}</div>` : ''}
           <div>${data.buyer.city} - ${data.buyer.postalCode}</div>
           <div>${data.buyer.stateFormatted}, India</div>
-          ${data.buyer.phone ? `<div style="font-size: 9px; margin-top: 2px;">Phone: ${data.buyer.phone}</div>` : ''}
+          <div style="font-size: 9px; margin-top: 2px;">Phone: ${data.buyer.phone || 'N/A'}</div>
         </td>
         <td>
           <div class="cell-label">Ship To:</div>
@@ -1308,12 +1724,12 @@ export class OrdersService {
           ${data.shippingAddress.addressLine2 ? `<div>${data.shippingAddress.addressLine2}</div>` : ''}
           <div>${data.shippingAddress.city} - ${data.shippingAddress.postalCode}</div>
           <div>${data.shippingAddress.stateFormatted}, India</div>
-          ${data.shippingAddress.phone ? `<div style="font-size: 9px; margin-top: 2px;">Phone: ${data.shippingAddress.phone}</div>` : ''}
+          <div style="font-size: 9px; margin-top: 2px;">Phone: ${data.shippingAddress.phone || 'N/A'}</div>
         </td>
         <td>
           <div class="cell-label">Dispatch Details:</div>
           <div><strong>Dispatch Date:</strong> ${data.dispatchDate}</div>
-          <div style="margin-top: 4px;"><strong>AWB No:</strong> ${data.awbNumber || '—'}</div>
+          <div style="margin-top: 4px;"><strong>AWB No:</strong> ${data.awbNumber}</div>
         </td>
       </tr>
     </table>
@@ -1334,14 +1750,14 @@ export class OrdersService {
           <th style="width: 65px; text-align: right;">CGST (INR)</th>
           <th style="width: 65px; text-align: right;">SGST (INR)</th>`
               : `
-          <th style="width: 130px; text-align: right;">IGST (INR)</th>`
+          <th style="width: 80px; text-align: right;">IGST (INR)</th>`
           }
           <th style="width: 75px; text-align: right;">Amount (INR)</th>
         </tr>
       </thead>
       <tbody>
         ${itemRows}
-        <!-- 2 empty padding rows -->
+        <!-- 2 empty padding rows matching specimen -->
         <tr>
           <td style="height: 18px; border: 1px solid #000;">&nbsp;</td>
           <td style="border: 1px solid #000;"></td>
@@ -1349,7 +1765,7 @@ export class OrdersService {
           <td style="border: 1px solid #000;"></td>
           <td style="border: 1px solid #000;"></td>
           <td style="border: 1px solid #000;"></td>
-          ${isIntra ? `<td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td>` : `<td style="border: 1px solid #000;"></td>`}
+          ${isIntra ? '<td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td>' : '<td style="border: 1px solid #000;"></td>'}
           <td style="border: 1px solid #000;"></td>
         </tr>
         <tr>
@@ -1359,7 +1775,7 @@ export class OrdersService {
           <td style="border: 1px solid #000;"></td>
           <td style="border: 1px solid #000;"></td>
           <td style="border: 1px solid #000;"></td>
-          ${isIntra ? `<td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td>` : `<td style="border: 1px solid #000;"></td>`}
+          ${isIntra ? '<td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td>' : '<td style="border: 1px solid #000;"></td>'}
           <td style="border: 1px solid #000;"></td>
         </tr>
         <!-- Total Row -->
@@ -1389,7 +1805,7 @@ export class OrdersService {
       <div style="font-weight: 800; font-size: 10px; margin: 1px 0 3px 0;">${data.amountInWords}</div>
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 8.5px;">
         <div><strong>Tax is payable on reverse charge basis:</strong> No</div>
-        <div style="font-weight: 700;">E. & O.E</div>
+        <div style="font-weight: 700;">E. &amp; O.E</div>
       </div>
     </div>
 
@@ -1416,14 +1832,67 @@ export class OrdersService {
     <!-- Footer -->
     <div class="footer-bar">
       <div class="footer-pill">
-        Bill By: Sridattam &nbsp;|&nbsp; Powered By Sridattam Vedic Wellness
+        Bill By: Sridattam &nbsp;|&nbsp; Powered By Sridattam Logistics
       </div>
       <div>This is a computer generated Invoice</div>
     </div>
   </div>
+
+  <script>
+    function downloadPDF() {
+      var btn = document.getElementById('btn-download-pdf');
+      var originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.innerHTML = '⏳ Generating PDF...';
+        btn.disabled = true;
+      }
+
+      var element = document.getElementById('printable-sheet');
+      var filename = 'Shipping-Label-' + '${data.orderNumber}' + '.pdf';
+
+      var opt = {
+        margin: [8, 10, 8, 10],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      if (window.html2pdf) {
+        window.html2pdf().set(opt).from(element).save().then(function() {
+          if (btn) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+          }
+        }).catch(function(err) {
+          console.warn('PDF direct generation fallback to print:', err);
+          if (btn) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+          }
+          window.print();
+        });
+      } else {
+        window.print();
+        if (btn) {
+          btn.innerHTML = originalHtml;
+          btn.disabled = false;
+        }
+      }
+    }
+
+    // Auto-trigger download if format=pdf or download=true
+    window.addEventListener('DOMContentLoaded', function() {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('download') === 'true' || params.get('format') === 'pdf') {
+        setTimeout(downloadPDF, 700);
+      }
+    });
+  </script>
 </body>
 </html>`;
   }
+
   private getMockOrders(): any[] {
     return [
       {
@@ -1532,4 +2001,5 @@ export class OrdersService {
       },
     ];
   }
+
 }
