@@ -109,15 +109,27 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
           const data = await res.json()
           const list = Array.isArray(data) ? data : data.data || []
           if (list.length > 0) {
-            setCatalogProducts(list.map(p => ({
-              id: p.id,
-              name: p.title || p.name,
-              slug: p.slug,
-              price: parseFloat(p.salePrice || p.basePrice || p.price || 299),
-              originalPrice: parseFloat(p.compareAtPrice || p.basePrice || p.regular_price || 399),
-              image: Array.isArray(p.images) && p.images[0] ? p.images[0] : (p.image || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'),
-              category: p.category?.name || 'Sacred Incense',
-            })))
+            setCatalogProducts(list.map(p => {
+              let rawImg = ''
+              if (Array.isArray(p.images) && p.images.length > 0) {
+                const first = p.images[0]
+                rawImg = typeof first === 'string' ? first : (first?.src || first?.url || '')
+              } else if (typeof p.image === 'string' && p.image) {
+                rawImg = p.image
+              }
+              if (!rawImg && p.sku) {
+                rawImg = `https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev/products/${p.sku}.png`
+              }
+              return {
+                id: p.id,
+                name: p.title || p.name,
+                slug: p.slug,
+                price: parseFloat(p.salePrice || p.basePrice || p.price || 299),
+                originalPrice: parseFloat(p.compareAtPrice || p.basePrice || p.regular_price || 399),
+                image: rawImg || '/HD1.png',
+                category: p.category?.name || 'Sacred Incense',
+              }
+            }))
             return
           }
         }
@@ -700,7 +712,7 @@ export default function ClubbingFormView({ initialData = null, isEdit = false, b
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <img
-                              src={item.image || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'}
+                              src={item.image || '/HD1.png'}
                               alt={item.name}
                               className="w-12 h-12 rounded-lg object-cover border border-stone-200 shrink-0"
                             />

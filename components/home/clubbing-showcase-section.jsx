@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Sparkles, ShoppingBag, Plus, Minus, Check, ArrowRight, Package } from 'lucide-react'
+import { Sparkles, ShoppingBag, Plus, Minus, Check, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/lib/cart-context'
 import { toast } from 'sonner'
@@ -22,16 +22,56 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
   if (!activeRule) return null
 
   // Determine eligible products for this rule
-  let eligibleProducts = Array.isArray(activeRule.products)
-    ? activeRule.products.map((p) => p.product || p).filter((p) => p && (p.id || p.title))
-    : []
+  const rawList = Array.isArray(activeRule.clubbingProducts) && activeRule.clubbingProducts.length > 0
+    ? activeRule.clubbingProducts
+    : Array.isArray(activeRule.products) && activeRule.products.length > 0
+      ? activeRule.products
+      : []
 
-  if (eligibleProducts.length === 0 && activeRule.applicableCategoryId) {
-    eligibleProducts = allProducts.filter((p) => p.categoryId === activeRule.applicableCategoryId)
-  }
+  let eligibleProducts = rawList.map((item) => {
+    const prod = item.product || item
+    const rawImages = Array.isArray(prod.images) ? prod.images : []
+    const firstImg = item.image || (rawImages.length > 0 ? (typeof rawImages[0] === 'string' ? rawImages[0] : rawImages[0]?.src) : '') || (prod.sku ? `https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev/products/${prod.sku}.png` : '/HD1.png')
+    
+    const orig = Number(item.originalPrice || prod.basePrice || prod.regular_price || prod.price || 180)
+    const deal = Number(item.clubbingPrice || prod.salePrice || (orig > 40 ? Math.round(orig * 0.8) : orig))
+    const disc = Number(item.discountPercentage || (orig > deal ? Math.round(((orig - deal) / orig) * 100) : 20))
 
-  if (eligibleProducts.length === 0) {
-    eligibleProducts = allProducts.slice(0, 4)
+    return {
+      id: item.productId || prod.id,
+      productId: item.productId || prod.id,
+      title: prod.title || item.name || prod.name || 'Sacred Incense',
+      name: prod.title || item.name || prod.name || 'Sacred Incense',
+      slug: prod.slug || item.slug || '',
+      image: firstImg,
+      category: item.category || prod.category?.name || 'Incense Sticks',
+      originalPrice: orig,
+      clubbingPrice: deal,
+      discountPercentage: disc,
+      shortDescription: prod.shortDescription || prod.description || 'Authentic pure botanical fragrance.',
+    }
+  }).filter((p) => p.id)
+
+  if (eligibleProducts.length === 0 && allProducts.length > 0) {
+    eligibleProducts = allProducts.slice(0, 4).map((prod) => {
+      const rawImages = Array.isArray(prod.images) ? prod.images : []
+      const firstImg = rawImages.length > 0 ? (typeof rawImages[0] === 'string' ? rawImages[0] : rawImages[0]?.src) : (prod.sku ? `https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev/products/${prod.sku}.png` : '/HD1.png')
+      const orig = Number(prod.basePrice || 180)
+      const deal = Math.round(orig * 0.8)
+      return {
+        id: prod.id,
+        productId: prod.id,
+        title: prod.title || prod.name,
+        name: prod.title || prod.name,
+        slug: prod.slug || '',
+        image: firstImg,
+        category: prod.category?.name || 'Incense Sticks',
+        originalPrice: orig,
+        clubbingPrice: deal,
+        discountPercentage: Math.round(((orig - deal) / orig) * 100),
+        shortDescription: prod.shortDescription || 'Authentic pure botanical fragrance.',
+      }
+    })
   }
 
   // Calculate live bundle progress from the customer's cart
@@ -45,7 +85,7 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
     (sum, item) => sum + (Number(item.quantity) || 1),
     0,
   )
-  const targetQuantity = Number(activeRule.requiredQuantity) || 2
+  const targetQuantity = Number(activeRule.requiredQuantity) || 1
   const isUnlocked = currentCartCount >= targetQuantity
   const remaining = Math.max(0, targetQuantity - currentCartCount)
   const progressPercent = Math.min(100, Math.round((currentCartCount / targetQuantity) * 100))
@@ -56,22 +96,23 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
 
     const qty = quantities[product.id] || 1
     try {
-      await addItem(product, qty)
-      const newTotal = currentCartCount + qty
-      if (newTotal >= targetQuantity) {
-        toast.success(
-          `✨ "${product.title}" added! You've unlocked the ${activeRule.name} bundle savings!`,
-        )
-      } else {
-        const left = targetQuantity - newTotal
-        toast.success(
-          `Added to bundle! Add ${left} more qualifying item${left > 1 ? 's' : ''} to activate this deal.`,
-        )
-      }
+      await addItem({
+        product_id: product.id,
+        id: product.id,
+        title: product.title,
+        name: product.title,
+        slug: product.slug,
+        price: product.clubbingPrice,
+        regular_price: product.originalPrice,
+        image: product.image,
+      }, qty)
+
+      toast.success(`✨ Added ×${qty} "${product.title}" to cart at clubbing price ₹${product.clubbingPrice}!`)
+      openDrawer()
       setQuantities((prev) => ({ ...prev, [product.id]: 1 }))
     } catch (err) {
       console.error('Failed to add bundle item:', err)
-      toast.error('Failed to add item to bundle')
+      toast.error('Failed to add item to cart')
     }
   }
 
@@ -93,7 +134,7 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
         <div className="text-center max-w-2xl mx-auto mb-10 space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#6B1024]/10 border border-[#6B1024]/20 text-[#6B1024] text-xs font-semibold tracking-widest uppercase">
             <Sparkles className="w-3.5 h-3.5 text-[#D7A65B]" />
-            <span>FESTIVAL CLUBBING & BUNDLE OFFERS</span>
+            <span>{activeRule.tagline || 'FESTIVAL CLUBBING & BUNDLE OFFERS'}</span>
           </div>
 
           <h2 className="font-cormorant text-3xl sm:text-4xl md:text-5xl text-[#6B1024] tracking-wide uppercase font-bold leading-tight">
@@ -102,7 +143,7 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
 
           <p className="text-xs sm:text-sm text-[#6B1024]/80 font-light max-w-lg mx-auto">
             {activeRule.description ||
-              'Mix and match qualifying sacred aromas below. Bundle discounts are calculated automatically upon meeting the required quantity.'}
+              'Handcrafted sacred temple agarbatti and pure bamboo-free dhoop at celebratory clubbing prices.'}
           </p>
 
           <div className="w-16 h-px bg-[#D7A65B] mx-auto mt-2" />
@@ -129,58 +170,37 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
         )}
 
         {/* Bundle Banner & Live Progress Strip */}
-        <div className="bg-gradient-to-r from-[#6B1024] via-[#851932] to-[#6B1024] text-white rounded-2xl p-6 sm:p-8 mb-12 shadow-xl border border-[#D7A65B]/40 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#6B1024] via-[#851932] to-[#6B1024] text-white rounded-none p-6 sm:p-8 mb-12 shadow-xl border border-[#D7A65B]/40 relative overflow-hidden">
           <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 opacity-10 pointer-events-none">
             <Sparkles size={220} />
           </div>
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="space-y-2 max-w-xl">
-              <div className="inline-flex items-center gap-2 bg-[#D7A65B] text-[#130306] px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider">
+              <div className="inline-flex items-center gap-2 bg-[#D7A65B] text-[#130306] px-3 py-1 rounded-none text-xs font-bold uppercase tracking-wider">
                 <Sparkles size={13} />
                 {activeRule.type === 'fixed_price_bundle'
                   ? `Any ${targetQuantity} Items for ₹${Number(activeRule.fixedPrice || 0).toLocaleString('en-IN')}`
-                  : `Buy Any ${targetQuantity} & Save ${activeRule.percentageOff}% OFF`}
+                  : `Special Clubbing Pricing • Up to 25% Savings`}
               </div>
 
               <h3 className="text-xl sm:text-2xl font-cormorant font-bold text-white tracking-wide">
-                Unlock Special Festival Savings
+                Special Celebratory Offerings
               </h3>
 
               <p className="text-xs text-white/80 font-light">
-                Add any {targetQuantity} items from this collection to your cart. The clubbing discount will apply instantly at checkout.
+                Add qualifying items below to your cart. Special clubbing prices apply directly to your festive order.
               </p>
             </div>
 
-            {/* Live Progress Box */}
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 sm:p-5 min-w-[280px] sm:min-w-[320px] space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-white/90">Your Bundle Progress</span>
-                <span className="font-bold text-[#D7A65B]">
-                  {currentCartCount} of {targetQuantity} items
-                </span>
-              </div>
-
-              {/* Progress bar track */}
-              <div className="w-full h-2.5 bg-black/20 rounded-full overflow-hidden p-0.5 border border-white/10">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-300 to-[#D7A65B] rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-
-              <div className="flex items-center gap-2 text-xs">
-                {isUnlocked ? (
-                  <div className="flex items-center gap-1.5 text-emerald-300 font-semibold">
-                    <Check size={14} className="stroke-[3]" />
-                    <span>Bundle Deal Unlocked in Cart!</span>
-                  </div>
-                ) : (
-                  <span className="text-white/80">
-                    Add <strong className="text-amber-200">{remaining} more</strong> item{remaining > 1 ? 's' : ''} to activate deal
-                  </span>
-                )}
-              </div>
+            {/* Quick Link to Dedicated Festive Page */}
+            <div className="flex items-center">
+              <Button asChild className="bg-[#D7A65B] hover:bg-[#c29348] text-[#130306] font-bold text-xs uppercase tracking-wider rounded-none px-6 py-3">
+                <Link href="/festive" className="flex items-center gap-2">
+                  <span>View Festive Showcase</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -188,17 +208,8 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
         {/* Qualifying Products Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 md:gap-8">
           {eligibleProducts.map((product) => {
-            const rawImages = Array.isArray(product.images) ? product.images : []
-            const firstImg = rawImages.length > 0
-              ? typeof rawImages[0] === 'string'
-                ? rawImages[0]
-                : rawImages[0]?.src
-              : '/placeholder.png'
-
-            const basePrice = Number(product.basePrice ?? product.regular_price ?? product.price ?? 0)
-            const salePrice = product.salePrice ? Number(product.salePrice) : null
-            const displayPrice = salePrice || basePrice
             const cardQty = quantities[product.id] || 1
+            const hasDiscount = product.originalPrice > product.clubbingPrice
 
             return (
               <div
@@ -206,15 +217,15 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
                 className="group relative flex flex-col justify-between bg-white border border-stone-200/90 rounded-none p-3 sm:p-4 hover:shadow-xl hover:border-[#6B1024]/40 transition-all duration-300"
               >
                 <div className="space-y-3">
-                  {/* Badge */}
+                  {/* Badges */}
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#6B1024] bg-[#6B1024]/5 px-2 py-0.5 border border-[#6B1024]/15">
                       <Sparkles size={10} className="text-[#D7A65B]" />
-                      Clubbing Item
+                      {product.category}
                     </span>
-                    {salePrice && basePrice > salePrice && (
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-xs">
-                        SAVE ₹{Math.round(basePrice - salePrice)}
+                    {hasDiscount && (
+                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 border border-emerald-200">
+                        SAVE ₹{product.originalPrice - product.clubbingPrice} ({product.discountPercentage}% OFF)
                       </span>
                     )}
                   </div>
@@ -225,45 +236,48 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
                     className="relative aspect-square w-full block overflow-hidden bg-stone-50"
                   >
                     <Image
-                      src={firstImg}
-                      alt={product.title || product.name || 'Incense Product'}
+                      src={product.image}
+                      alt={product.title}
                       fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      unoptimized={product.image.startsWith('http')}
                     />
                   </Link>
 
                   {/* Title and details */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 text-left">
                     <Link
                       href={`/products/${product.slug || product.id}`}
                       className="block font-cormorant text-base sm:text-lg font-bold text-[#6B1024] hover:underline line-clamp-1"
                     >
-                      {product.title || product.name}
+                      {product.title}
                     </Link>
                     <p className="text-[10px] text-stone-500 line-clamp-2 h-7 font-light">
-                      {product.shortDescription || product.description || 'Authentic pure botanical fragrance.'}
+                      {product.shortDescription}
                     </p>
 
                     <div className="flex items-center gap-2 pt-1">
                       <span className="font-cormorant font-bold text-[#6B1024] text-base sm:text-lg">
-                        ₹{displayPrice.toFixed(0)}
+                        ₹{product.clubbingPrice}
                       </span>
-                      {salePrice && basePrice > salePrice && (
+                      {hasDiscount && (
                         <span className="text-xs text-stone-400 line-through">
-                          ₹{basePrice.toFixed(0)}
+                          ₹{product.originalPrice}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Add to Bundle Controls */}
+                {/* Add to Cart Actions */}
                 <div className="pt-3 mt-3 border-t border-stone-100 space-y-2">
                   <div className="flex items-center justify-center border border-stone-200 bg-stone-50/70 h-8 gap-2 w-full">
                     <button
                       type="button"
                       onClick={() => updateCardQty(product.id, -1)}
                       className="p-1 hover:bg-stone-200 text-stone-600 transition"
+                      aria-label="Decrease quantity"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
@@ -274,6 +288,7 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
                       type="button"
                       onClick={() => updateCardQty(product.id, 1)}
                       className="p-1 hover:bg-stone-200 text-stone-600 transition"
+                      aria-label="Increase quantity"
                     >
                       <Plus className="w-3 h-3" />
                     </button>
@@ -281,29 +296,15 @@ export default function ClubbingShowcaseSection({ clubbingRules = [], allProduct
 
                   <Button
                     onClick={(e) => handleAddBundleItem(e, product)}
-                    className="w-full bg-[#6B1024] hover:bg-[#4D0013] text-white py-2 font-bold uppercase tracking-wider text-[10px] flex items-center justify-center gap-1.5 h-9 rounded-none transition-colors"
+                    className="w-full bg-[#6B1024] hover:bg-[#4D0013] text-white border border-[#6B1024] rounded-none font-bold uppercase tracking-wider text-[9px] flex items-center justify-center gap-1.5 h-10 transition-colors"
                   >
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    Add to Bundle
+                    <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" />
+                    <span>Add at Clubbing Price</span>
                   </Button>
                 </div>
               </div>
             )
           })}
-        </div>
-
-        {/* View All Products in Bundle CTA */}
-        <div className="mt-12 text-center">
-          <Button
-            asChild
-            variant="outline"
-            className="border-[#6B1024] text-[#6B1024] hover:bg-[#6B1024] hover:text-white uppercase tracking-widest text-xs px-8 py-5 rounded-none font-bold transition-colors"
-          >
-            <Link href="/products" className="inline-flex items-center gap-2">
-              <span>EXPLORE ALL QUALIFYING PRODUCTS</span>
-              <ArrowRight size={14} />
-            </Link>
-          </Button>
         </div>
       </div>
     </section>

@@ -44,10 +44,8 @@ export class ClubbingService implements OnModuleInit {
           type: ClubbingRuleType.custom_product_clubbing,
           code: 'diwali',
           requiredQuantity: 1,
-          bannerImageDesktop:
-            'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1600&q=80',
-          bannerImageMobile:
-            'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=80',
+          bannerImageDesktop: '/HD1.png',
+          bannerImageMobile: '/HM1.png',
           featuredOnHomepage: true,
           showInHero: true,
           heroCtaText: 'Shop Festive Deals',
@@ -55,7 +53,7 @@ export class ClubbingService implements OnModuleInit {
           products: {
             create: products.map((p, idx) => ({
               productId: p.id,
-              clubbingPrice: Number(p.basePrice) > 50 ? Number(p.basePrice) - 50 : Number(p.basePrice),
+              clubbingPrice: Number(p.basePrice) > 40 ? Math.round(Number(p.basePrice) * 0.8) : Number(p.basePrice),
               discountPercentage: 20,
               sortOrder: idx,
             })),
@@ -70,22 +68,53 @@ export class ClubbingService implements OnModuleInit {
 
   private formatRule(r: any) {
     const products = Array.isArray(r.products)
-      ? r.products.map((p: any) => ({
-          productId: p.productId,
-          name: p.product?.title || 'Sacred Item',
-          slug: p.product?.slug || p.productId,
-          image:
-            p.product?.images?.[0] ||
-            'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=600&q=80',
-          category: p.product?.categoryId || '',
-          originalPrice: p.product?.basePrice ? Number(p.product.basePrice) : 299,
-          clubbingPrice: p.clubbingPrice
+      ? r.products.map((p: any) => {
+          let imageUrl = '';
+          const rawImages = p.product?.images;
+          if (Array.isArray(rawImages) && rawImages.length > 0) {
+            const first = rawImages[0];
+            imageUrl = typeof first === 'string' ? first : (first?.src || first?.url || '');
+          } else if (typeof p.image === 'string' && p.image) {
+            imageUrl = p.image;
+          }
+          if (!imageUrl && p.product?.sku) {
+            imageUrl = `https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev/products/${p.product.sku}.png`;
+          }
+
+          const originalPrice = p.product?.basePrice
+            ? Number(p.product.basePrice)
+            : p.originalPrice
+              ? Number(p.originalPrice)
+              : 299;
+          const clubbingPrice = p.clubbingPrice
             ? Number(p.clubbingPrice)
-            : p.product?.basePrice
-              ? Number(p.product.basePrice)
-              : 249,
-          discountPercentage: p.discountPercentage ? Number(p.discountPercentage) : 15,
-        }))
+            : p.product?.salePrice
+              ? Number(p.product.salePrice)
+              : originalPrice > 40
+                ? Math.round(originalPrice * 0.8)
+                : originalPrice;
+          const discountPercentage = p.discountPercentage
+            ? Number(p.discountPercentage)
+            : originalPrice > clubbingPrice
+              ? Math.round(((originalPrice - clubbingPrice) / originalPrice) * 100)
+              : 20;
+
+          const categoryName = p.product?.category?.name || p.category || 'Incense Sticks';
+
+          return {
+            productId: p.productId,
+            name: p.product?.title || 'Sacred Item',
+            title: p.product?.title || 'Sacred Item',
+            slug: p.product?.slug || p.productId,
+            image: imageUrl,
+            images: imageUrl ? [{ src: imageUrl }] : [],
+            category: categoryName,
+            originalPrice,
+            clubbingPrice,
+            discountPercentage,
+            sortOrder: p.sortOrder ?? 0,
+          };
+        })
       : [];
 
     return {
@@ -123,7 +152,7 @@ export class ClubbingService implements OnModuleInit {
     const rules = await this.prisma.clubbingRule.findMany({
       include: {
         products: {
-          include: { product: true },
+          include: { product: { include: { category: true } } },
           orderBy: { sortOrder: 'asc' },
         },
         applicableCategory: true,
@@ -153,7 +182,7 @@ export class ClubbingService implements OnModuleInit {
       },
       include: {
         products: {
-          include: { product: true },
+          include: { product: { include: { category: true } } },
           orderBy: { sortOrder: 'asc' },
         },
         applicableCategory: true,
@@ -176,7 +205,7 @@ export class ClubbingService implements OnModuleInit {
       },
       include: {
         products: {
-          include: { product: true },
+          include: { product: { include: { category: true } } },
           orderBy: { sortOrder: 'asc' },
         },
         applicableCategory: true,

@@ -764,7 +764,7 @@ function ProductsContent() {
                   alt={activeEvent.eventName || activeEvent.name}
                   className="absolute inset-0 w-full h-full object-cover opacity-60"
                   onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1600&q=80'
+                    e.target.src = '/HD1.png'
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-[#2B040B] via-[#4D0013]/90 to-transparent" />
@@ -777,7 +777,7 @@ function ProductsContent() {
                   alt={activeEvent.eventName || activeEvent.name}
                   className="absolute inset-0 w-full h-full object-cover opacity-60"
                   onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=80'
+                    e.target.src = '/HM1.png'
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#2B040B] via-[#4D0013]/85 to-transparent" />
