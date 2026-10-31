@@ -92,3 +92,7 @@ credentials.json
 # Local AI / Agent tooling caches
 .scubiee/
 .cursor/
+
+# Playwright
+test-results/
+playwright-report/

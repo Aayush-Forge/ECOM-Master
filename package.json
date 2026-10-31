@@ -7,7 +7,10 @@
         "dev:no-reload": "next dev --port 3000",
         "dev:webpack": "next dev --port 3000",
         "build": "next build",
-        "start": "next start"
+        "start": "next start",
+        "test:e2e": "playwright test",
+        "test:e2e:ui": "playwright test --ui",
+        "test:e2e:report": "playwright show-report"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.1.1",
@@ -71,6 +74,7 @@
         "zod": "^3.25.67"
     },
     "devDependencies": {
+        "@playwright/test": "^1.64.1",
         "autoprefixer": "^10.4.19",
         "globals": "^16.2.0",
         "postcss": "^8",

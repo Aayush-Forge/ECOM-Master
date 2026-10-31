@@ -166,9 +166,9 @@ export default function AdminAuditLogsPage() {
 
       {/* Filter Toolbar */}
       <div className="bg-white p-4 rounded-lg border border-stone-200 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
           {/* Search */}
-          <div className="relative">
+          <div className="relative sm:col-span-2 lg:col-span-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
             <Input
               placeholder="Search entity, action, user..."
@@ -179,7 +179,7 @@ export default function AdminAuditLogsPage() {
           </div>
 
           {/* Action Type Filter */}
-          <div>
+          <div className="lg:col-span-2">
             <Select value={actionFilter} onValueChange={setActionFilter}>
               <SelectTrigger className="w-full bg-white border-stone-200 text-sm h-9">
                 <SelectValue placeholder="Action type" />
@@ -201,7 +201,7 @@ export default function AdminAuditLogsPage() {
           </div>
 
           {/* User Filter */}
-          <div>
+          <div className="lg:col-span-2">
             <Select value={userFilter} onValueChange={setUserFilter}>
               <SelectTrigger className="w-full bg-white border-stone-200 text-sm h-9">
                 <SelectValue placeholder="Filter by User" />
@@ -218,7 +218,7 @@ export default function AdminAuditLogsPage() {
           </div>
 
           {/* Entity Type Filter */}
-          <div>
+          <div className="lg:col-span-2">
             <Select value={entityFilter} onValueChange={setEntityFilter}>
               <SelectTrigger className="w-full bg-white border-stone-200 text-sm h-9">
                 <SelectValue placeholder="Entity type" />

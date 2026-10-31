@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { AdminUsersController } from './admin-users.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit/audit-logs.service';
@@ -139,5 +141,27 @@ describe('AdminUsersController', () => {
     });
 
     expect(updated.role).toBe(ROLES.EDITOR);
+  });
+
+  it('should allow admin to reset a user password', async () => {
+    const result = await controller.resetUserPassword(
+      'usr_editor',
+      { password: 'NewSecurePassword123' },
+      {},
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.id).toBe('usr_editor');
+
+    const updatedUser = userDb.find((u) => u.id === 'usr_editor');
+    expect(updatedUser.passwordHash).toBeDefined();
+    const isMatch = await bcrypt.compare('NewSecurePassword123', updatedUser.passwordHash);
+    expect(isMatch).toBe(true);
+  });
+
+  it('should throw NotFoundException if user to reset does not exist', async () => {
+    await expect(
+      controller.resetUserPassword('non_existent_id', { password: 'NewPassword123' }, {}),
+    ).rejects.toThrow(NotFoundException);
   });
 });

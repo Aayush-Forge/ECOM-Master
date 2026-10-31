@@ -61,40 +61,44 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
 
   const dateRange = useMemo(() => {
     const now = new Date()
-    const end = now.toISOString().slice(0, 10)
+    const nowIso = now.toISOString()
 
     if (rangePreset === 'today') {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-      return { startDate: start, endDate: now.toISOString() }
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString()
+      return { startDate: start, endDate: nowIso }
     }
     if (rangePreset === '7d') {
-      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      return { startDate: start, endDate: end }
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      return { startDate: start, endDate: nowIso }
     }
     if (rangePreset === '30d') {
-      const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      return { startDate: start, endDate: end }
+      const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      return { startDate: start, endDate: nowIso }
     }
     if (rangePreset === 'this_month') {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-      return { startDate: start, endDate: end }
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString()
+      return { startDate: start, endDate: nowIso }
     }
     if (rangePreset === 'last_month') {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10)
-      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10)
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0).toISOString()
+      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).toISOString()
       return { startDate: start, endDate: lastDay }
     }
     if (rangePreset === 'ytd') {
-      const start = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)
-      return { startDate: start, endDate: end }
+      const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0).toISOString()
+      return { startDate: start, endDate: nowIso }
     }
     if (rangePreset === 'all') {
-      return { startDate: '2020-01-01', endDate: end }
+      return { startDate: '2020-01-01T00:00:00.000Z', endDate: nowIso }
     }
     if (rangePreset === 'custom') {
       return {
-        startDate: customStart || undefined,
-        endDate: customEnd || undefined,
+        startDate: customStart
+          ? (customStart.includes('T') ? customStart : customStart + 'T00:00:00.000Z')
+          : undefined,
+        endDate: customEnd
+          ? (customEnd.includes('T') ? customEnd : customEnd + 'T23:59:59.999Z')
+          : undefined,
       }
     }
     return { startDate: undefined, endDate: undefined }
@@ -368,7 +372,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {loading ? (
+            {(loading && !overview) ? (
               <Skeleton className="h-8 w-24 my-1" />
             ) : (
               <div className="text-2xl font-bold font-inter text-stone-900">
@@ -390,7 +394,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {loading ? (
+            {(loading && !overview) ? (
               <Skeleton className="h-8 w-24 my-1" />
             ) : (
               <div className="text-2xl font-bold font-inter text-stone-900">
@@ -412,7 +416,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {loading ? (
+            {(loading && !overview) ? (
               <Skeleton className="h-8 w-16 my-1" />
             ) : (
               <div className="text-2xl font-bold font-inter text-stone-900">
@@ -434,7 +438,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {loading ? (
+            {(loading && !overview) ? (
               <Skeleton className="h-8 w-20 my-1" />
             ) : (
               <div className="text-2xl font-bold font-inter text-stone-900">
@@ -456,7 +460,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {loading ? (
+            {(loading && !overview) ? (
               <Skeleton className="h-8 w-16 my-1" />
             ) : (
               <div className="text-2xl font-bold font-inter text-stone-900">
@@ -478,7 +482,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {loading ? (
+            {(loading && !overview) ? (
               <Skeleton className="h-8 w-20 my-1" />
             ) : (
               <div className="text-2xl font-bold font-inter text-stone-900">
@@ -513,7 +517,7 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
         </CardHeader>
 
         <CardContent className="pt-4">
-          {loading ? (
+          {(loading && !overview) ? (
             <Skeleton className="w-full h-72 rounded-lg" />
           ) : !overview?.timeSeries || overview.timeSeries.length === 0 ? (
             <div className="h-72 flex items-center justify-center text-stone-400 text-sm font-inter">
@@ -938,3 +942,4 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
     </div>
   )
 }
+
