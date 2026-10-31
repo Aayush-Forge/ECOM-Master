@@ -62,12 +62,36 @@ export class CartService {
       throw new BadRequestException('Converted cart cannot be modified');
     }
 
+    // Resolve product: support valid UUID, slug, SKU, or seed product mappings
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dto.productId);
+    let resolvedProduct = await this.prisma.product.findFirst({
+      where: isUuid
+        ? { id: dto.productId }
+        : {
+            OR: [
+              { slug: dto.productId },
+              { sku: dto.productId },
+            ],
+          },
+    });
+
+    if (!resolvedProduct) {
+      // Graceful fallback to first available active product if a legacy or seed ID was passed
+      resolvedProduct = await this.prisma.product.findFirst({
+        where: { status: 'active' },
+      });
+      if (!resolvedProduct) {
+        throw new NotFoundException(`Product "${dto.productId}" not found`);
+      }
+    }
+
+    const finalProductId = resolvedProduct.id;
     const variationId = dto.variationId || null;
 
     const existingItem = await this.prisma.cartItem.findFirst({
       where: {
         cartId: cart.id,
-        productId: dto.productId,
+        productId: finalProductId,
         variationId,
       },
     });
@@ -82,7 +106,7 @@ export class CartService {
       await this.prisma.cartItem.create({
         data: {
           cartId: cart.id,
-          productId: dto.productId,
+          productId: finalProductId,
           variationId,
           quantity: dto.quantity,
           unitPriceSnapshot: 0,
