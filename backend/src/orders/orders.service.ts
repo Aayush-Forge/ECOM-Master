@@ -901,6 +901,17 @@ export class OrdersService {
 
   async getOrderInvoice(id: string, format?: string): Promise<any> {
     const order = await this.getOrderOrMock(id);
+    const company = await this.prisma.companyProfile.findFirst().catch(() => null);
+    const seller = {
+      legalName: company?.legalName || 'Sridattam Vedic Wellness Pvt. Ltd.',
+      tradeName: company?.tradeName || 'Sridattam',
+      gstin: company?.gstin || '07AABCS1234F1Z8',
+      cin: company?.cin || 'U74999DL2026PTC123456',
+      address: company?.addressLine1 ? `${company.addressLine1}, ${company.city || ''}, ${company.state || ''} - ${company.pincode || ''}` : '42, Sacred Lotus Enclave, Mathura Road, New Delhi, 110001',
+      email: company?.email || 'care@sridattam.com',
+      phone: company?.phone || '+91 98765 43210',
+      website: company?.website || 'www.sridattam.com',
+    };
     const invoiceNumber = order.invoiceNumber || `INV-2026-${order.orderNumber.replace(/[^0-9]/g, '').slice(-5) || '10284'}`;
     const invoiceDate = order.placedAt ? new Date(order.placedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '24 Oct 2026';
     const shippingAddress = order.addresses?.find((a: any) => a.type === 'shipping') || order.addresses?.[0] || {
@@ -940,6 +951,7 @@ export class OrdersService {
 
     // Return printable HTML
     return this.renderInvoiceHtml({
+      seller,
       orderNumber: order.orderNumber,
       invoiceNumber,
       invoiceDate,
@@ -1054,10 +1066,10 @@ export class OrdersService {
         <h1 class="brand-title">SRIDATTAM</h1>
         <div class="brand-tag">Pure Vedic Aromas & Incense</div>
         <p style="margin: 6px 0 0 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
-          Sridattam Vedic Wellness Pvt. Ltd.<br>
-          42, Sacred Lotus Enclave, Mathura Road, New Delhi, 110001<br>
-          GSTIN: 07AABCS1234F1Z8 | CIN: U74999DL2026PTC123456<br>
-          Email: care@sridattam.com | Web: www.sridattam.com
+          ${data.seller?.legalName || 'Sridattam Vedic Wellness Pvt. Ltd.'}<br>
+          ${data.seller?.address || '42, Sacred Lotus Enclave, Mathura Road, New Delhi, 110001'}<br>
+          GSTIN: ${data.seller?.gstin || '07AABCS1234F1Z8'} | CIN: ${data.seller?.cin || 'U74999DL2026PTC123456'}<br>
+          Email: ${data.seller?.email || 'care@sridattam.com'} | Web: ${data.seller?.website || 'www.sridattam.com'}
         </p>
       </div>
       <div style="text-align: right;">

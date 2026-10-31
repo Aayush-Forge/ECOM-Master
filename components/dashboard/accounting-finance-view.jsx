@@ -173,6 +173,29 @@ const MONTHLY_TREND_DATA = [
 ]
 
 export default function AccountingFinanceView() {
+  const [loadingOrders, setLoadingOrders] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+    async function loadData() {
+      try {
+        const res = await fetch(`${backendUrl}/admin/accounting/orders`);
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted && Array.isArray(data) && data.length > 0) {
+            setOrders(data);
+          }
+        }
+      } catch (err) {
+        console.warn('Accounting orders load error:', err);
+      } finally {
+        if (mounted) setLoadingOrders(false);
+      }
+    }
+    loadData();
+    return () => { mounted = false; };
+  }, []);
   const [orders, setOrders] = useState(INITIAL_SAMPLE_ORDERS)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')

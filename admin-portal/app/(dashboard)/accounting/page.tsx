@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/services/api';
 
 interface OrderItem {
   name: string;
@@ -180,6 +181,25 @@ const MONTHLY_TREND_DATA = [
 ];
 
 export default function AccountingPage() {
+  const [loadingOrders, setLoadingOrders] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadData() {
+      try {
+        const data = await fetchWithAuth('/admin/accounting/orders');
+        if (mounted && Array.isArray(data) && data.length > 0) {
+          setOrders(data);
+        }
+      } catch (err) {
+        console.warn('Accounting orders load error:', err);
+      } finally {
+        if (mounted) setLoadingOrders(false);
+      }
+    }
+    loadData();
+    return () => { mounted = false; };
+  }, []);
   const [orders, setOrders] = useState<FinancialOrder[]>(INITIAL_SAMPLE_ORDERS);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");

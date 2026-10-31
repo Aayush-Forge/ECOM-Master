@@ -24,8 +24,8 @@ import { CartModule } from './cart/cart.module';
 import { CustomersModule } from './customers/customers.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ShippingModule } from './shipping/shipping.module';
-import { ShippingSlabsModule } from './shipping-slabs/shipping-slabs.module';
 import { CompanyProfileModule } from './company-profile/company-profile.module';
+import { AccountingModule } from './accounting/accounting.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -60,8 +60,8 @@ import { RolesGuard } from './auth/guards/roles.guard';
     CartModule,
     ReviewsModule,
     ShippingModule,
-    ShippingSlabsModule,
     CompanyProfileModule,
+    AccountingModule,
   ],
   controllers: [AppController],
   providers: [

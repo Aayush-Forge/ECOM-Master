@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { fetchWithAuth } from '../../services/api';
+import { fetchWithAuth } from '@/services/api';
 
 interface OrderItem {
   id: string;
