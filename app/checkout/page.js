@@ -779,9 +779,9 @@ function CheckoutPage() {
                           <span>Total</span>
                           <span className="text-saffron-600">₹{finalTotal.toFixed(0)}</span>
                         </div>
-                        {(displayDiscountDiff > 0 || clubbingDiscount > 0 || couponDiscount > 0) && (
+                        {grandSavings > 0 && (
                           <div className="bg-emerald-50 text-emerald-700 text-xs font-bold py-2.5 px-3 rounded-lg text-center mt-3 border border-emerald-100/60">
-                            Congratulations! You saved ₹{(displayDiscountDiff + clubbingDiscount + couponDiscount).toFixed(0)} ({Math.round(((displayDiscountDiff + clubbingDiscount + couponDiscount) / displayRegularSubtotal) * 100)}%) on this order!
+                            Congratulations! You saved ₹{grandSavings.toFixed(0)} ({displayRegularSubtotal > 0 ? Math.round((grandSavings / displayRegularSubtotal) * 100) : 0}%) on this order!
                           </div>
                         )}
                       </div>
