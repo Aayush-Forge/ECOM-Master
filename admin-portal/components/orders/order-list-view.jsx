@@ -1,3 +1,4 @@
+import { openAuthenticatedUrl } from '@/lib/utils';
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -250,7 +251,7 @@ export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn 
                           size="icon"
                           title="Print Tax Invoice"
                           className="h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`, '_blank')}
+                          onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`)}
                         >
                           <FileText className="h-4 w-4" />
                         </Button>
@@ -259,7 +260,7 @@ export function OrderListView({ basePath = '/orders', title = 'Orders', fetchFn 
                           size="icon"
                           title="Print Shipping Label (4x6)"
                           className="h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`, '_blank')}
+                          onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
                         >
                           <Printer className="h-4 w-4" />
                         </Button>

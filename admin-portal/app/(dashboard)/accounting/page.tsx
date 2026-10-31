@@ -1,3 +1,4 @@
+import { openAuthenticatedUrl } from '@/lib/utils';
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -198,7 +199,7 @@ export default function AccountingPage() {
     if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
     const url = `${API_BASE_URL}/admin/accounting/export-csv?${params.toString()}`;
-    window.open(url, '_blank');
+    openAuthenticatedUrl(url);
     showToast('Exporting financial ledger to CSV...');
   };
 
@@ -629,14 +630,14 @@ export default function AccountingPage() {
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               title="Print GST Tax Invoice"
-                              onClick={() => window.open(`${API_BASE_URL}/admin/orders/${order.dbId}/invoice`, '_blank')}
+                              onClick={() => openAuthenticatedUrl(`${API_BASE_URL}/admin/orders/${order.dbId}/invoice`)}
                               className="p-1.5 text-zinc-600 hover:text-rose-900 bg-white border border-zinc-200 hover:border-zinc-300 rounded-md shadow-2xs transition"
                             >
                               <FileText className="w-3.5 h-3.5" />
                             </button>
                             <button
                               title="Print Shipping Label (4x6)"
-                              onClick={() => window.open(`${API_BASE_URL}/admin/orders/${order.dbId}/shipping-label`, '_blank')}
+                              onClick={() => openAuthenticatedUrl(`${API_BASE_URL}/admin/orders/${order.dbId}/shipping-label`)}
                               className="p-1.5 text-zinc-600 hover:text-rose-900 bg-white border border-zinc-200 hover:border-zinc-300 rounded-md shadow-2xs transition"
                             >
                               <Printer className="w-3.5 h-3.5" />
@@ -972,13 +973,13 @@ export default function AccountingPage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.open(`${API_BASE_URL}/admin/orders/${selectedOrder.dbId}/shipping-label`, '_blank')}
+                  onClick={() => openAuthenticatedUrl(`${API_BASE_URL}/admin/orders/${selectedOrder.dbId}/shipping-label`)}
                   className="px-3.5 py-2 text-xs font-bold text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition inline-flex items-center gap-1.5"
                 >
                   <Printer className="w-3.5 h-3.5 text-zinc-600" /> Print Shipping Label
                 </button>
                 <button
-                  onClick={() => window.open(`${API_BASE_URL}/admin/orders/${selectedOrder.dbId}/invoice`, '_blank')}
+                  onClick={() => openAuthenticatedUrl(`${API_BASE_URL}/admin/orders/${selectedOrder.dbId}/invoice`)}
                   className="px-4 py-2 text-xs font-bold text-white bg-rose-900 hover:bg-rose-950 rounded-lg shadow-sm transition inline-flex items-center gap-1.5"
                 >
                   <FileText className="w-3.5 h-3.5" /> Print Tax Invoice

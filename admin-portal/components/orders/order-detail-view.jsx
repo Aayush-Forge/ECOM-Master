@@ -1,3 +1,4 @@
+import { openAuthenticatedUrl } from '@/lib/utils';
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -218,7 +219,7 @@ export default function OrderDetailView() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`, '_blank')}
+            onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`)}
             className="border-stone-300 text-stone-700 font-inter text-xs hover:bg-stone-50"
           >
             <FileText className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Tax Invoice
@@ -226,7 +227,7 @@ export default function OrderDetailView() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`, '_blank')}
+            onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
             className="border-stone-300 text-stone-700 font-inter text-xs hover:bg-stone-50"
           >
             <Printer className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Shipping Label
@@ -706,7 +707,7 @@ export default function OrderDetailView() {
                     variant="outline"
                     size="sm"
                     className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
-                    onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`, '_blank')}
+                    onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`)}
                   >
                     <FileText className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Tax Invoice
                   </Button>
@@ -714,7 +715,7 @@ export default function OrderDetailView() {
                     variant="outline"
                     size="sm"
                     className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
-                    onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`, '_blank')}
+                    onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
                   >
                     <Printer className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Shipping Label
                   </Button>
