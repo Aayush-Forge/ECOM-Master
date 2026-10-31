@@ -1,7 +1,9 @@
 'use client'
 
+import { use } from 'react'
 import OrderDetailView from '@/components/orders/order-detail-view'
 
 export default function OrderDetailPage({ params }) {
-  return <OrderDetailView orderId={params.id} />
+  const resolvedParams = params && typeof params.then === 'function' ? use(params) : params
+  return <OrderDetailView orderId={resolvedParams?.id} />
 }
