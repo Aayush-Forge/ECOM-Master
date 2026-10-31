@@ -2,20 +2,24 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
+  Post,
   Query,
   Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { RefundWebhookDto } from './dto/refund-webhook.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { AuditLog } from '../audit/decorators/audit-log.decorator';
 import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
-
+import { Public } from '../auth/decorators/public.decorator';
 import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
 
 @Controller('admin/orders')
@@ -60,5 +64,27 @@ export class OrdersController {
       body.trackingUrl,
       body.trackingNumber,
     );
+  }
+
+  @Public()
+  @Get(':id/invoice')
+  getOrderInvoice(@Param('id') id: string, @Query('format') format?: string) {
+    return this.ordersService.getOrderInvoice(id, format);
+  }
+
+  @Public()
+  @Get(':id/shipping-label')
+  getOrderShippingLabel(@Param('id') id: string, @Query('format') format?: string) {
+    return this.ordersService.getOrderShippingLabel(id, format);
+  }
+
+  @Public()
+  @Post('webhook/refund')
+  @HttpCode(HttpStatus.OK)
+  handleRefundWebhook(
+    @Body() dto: RefundWebhookDto,
+    @Headers('x-razorpay-signature') signature?: string,
+  ) {
+    return this.ordersService.handleRefundWebhook(dto, signature);
   }
 }

@@ -3,17 +3,10 @@ import { NextResponse } from 'next/server'
 export function middleware(request) {
   const { pathname } = request.nextUrl
 
-  // Strict isolation: block all admin and staff routes on the customer storefront
-  if (pathname.startsWith('/admin') || pathname.startsWith('/staff')) {
-    return new NextResponse(null, { status: 404 })
-  }
-
-  // Suspended customer auth routes: redirect to guest tracking or homepage
-  if (pathname.startsWith('/account')) {
-    return NextResponse.redirect(new URL('/track-order', request.url))
-  }
-  if (pathname === '/login' || pathname === '/register') {
-    return NextResponse.redirect(new URL('/', request.url))
+  // Redirect /admin or /admin/overview to the dedicated Admin Portal (port 3001)
+  if (pathname === '/admin' || pathname === '/admin/' || pathname === '/admin/overview') {
+    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001'
+    return NextResponse.redirect(new URL(adminUrl))
   }
 
   return NextResponse.next()

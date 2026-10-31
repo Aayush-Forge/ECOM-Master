@@ -1,14 +1,17 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import 'dotenv/config';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
+  private readonly logger = new Logger(PrismaService.name);
+
   constructor() {
     const connectionString =
       process.env.DATABASE_URL ||
-      'postgresql://postgres:postgres@localhost:5432/ecom_db?schema=public';
+      'postgresql://postgres:aayush1018@localhost:5432/ecom_db?schema=public';
     const pool = new Pool({
       connectionString,
       max: parseInt(process.env.DB_POOL_MAX || '25', 10),
@@ -20,8 +23,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await this.$connect();
-    await this.initializeSequences();
+    try {
+      await this.$connect();
+      this.logger.log('Prisma connected to PostgreSQL (ecom_db) successfully.');
+      await this.initializeSequences();
+    } catch (err: any) {
+      this.logger.warn(`Prisma onModuleInit failed: ${err.message}`);
+    }
   }
 
   private async initializeSequences() {
@@ -31,7 +39,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         CREATE SEQUENCE IF NOT EXISTS product_sku_seq START WITH 10001 INCREMENT BY 1;
       `);
     } catch (error) {
-      console.error('Failed to initialize database sequences:', error);
+      this.logger.error('Failed to initialize database sequences:', error);
     }
   }
 }

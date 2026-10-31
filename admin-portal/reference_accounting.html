@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accounting & Finance | CommerceOS</title>
+<style>
+:root{
+  --bg:#f5f7fb;--surface:#fff;--ink:#182230;--muted:#718096;--line:#e7ebf2;
+  --nav:#111b2d;--nav2:#1a2941;--blue:#356df3;--blue-soft:#edf3ff;
+  --green:#16845b;--green-soft:#e8f7f0;--amber:#a96608;--amber-soft:#fff4df;
+  --red:#bd4141;--red-soft:#fff0f0;--purple:#7653c8;--shadow:0 8px 28px rgba(26,39,64,.045);
+}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.sidebar{background:var(--nav);color:#d5deed;padding:24px 15px;display:flex;flex-direction:column;gap:28px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 10px;color:white;font-weight:750;font-size:17px;letter-spacing:-.4px}
+.brand-mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#6393ff,#3260e8);display:grid;place-items:center;color:white;font-weight:800}
+.workspace{padding:0 10px;color:#8495b1;font-size:11px;font-weight:750;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:-17px}
+.nav{display:grid;gap:5px}.nav a{color:#aebbd0;text-decoration:none;padding:11px 12px;border-radius:9px;display:flex;gap:12px;align-items:center;font-size:13px}
+.nav a .ico{width:19px;text-align:center;font-size:16px}.nav a.active{background:#253a5b;color:#fff;box-shadow:inset 3px 0 #6e99ff}.nav a:hover{background:var(--nav2);color:white}
+.side-bottom{margin-top:auto;border-top:1px solid #2a3850;padding:18px 9px 0;color:#8fa0ba;font-size:12px}.profile{display:flex;align-items:center;gap:10px;margin-top:16px;color:#e7edf8}.avatar{width:32px;height:32px;border-radius:50%;background:#314768;display:grid;place-items:center;font-weight:700}
+.main{min-width:0}.topbar{height:72px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 32px;gap:16px}
+.crumb{color:var(--muted);font-size:12px}.crumb strong{color:#344154;font-weight:650}.top-actions{display:flex;align-items:center;gap:10px}.live{font-size:12px;color:var(--green);display:flex;align-items:center;gap:7px}.dot{width:7px;height:7px;border-radius:50%;background:#20ad75}
+.content{padding:29px 32px 44px;max-width:1600px;margin:auto}.heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:24px}.eyebrow{color:var(--blue);font-weight:750;text-transform:uppercase;letter-spacing:1px;font-size:10px;margin-bottom:7px}
+h1{font-size:27px;letter-spacing:-.8px;margin:0 0 6px;font-weight:760}.sub{color:var(--muted);margin:0;font-size:13px}.actions{display:flex;gap:9px;flex-wrap:wrap}
+.btn{border:1px solid #dce2ec;background:white;color:#354256;padding:9px 13px;border-radius:8px;font-weight:650;font-size:12px;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{background:#f8faff}.btn.primary{background:var(--blue);border-color:var(--blue);color:white}.btn.primary:hover{background:#2558db}.btn.small{padding:6px 9px;font-size:11px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-bottom:20px}
+.metric{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px;box-shadow:var(--shadow);min-width:0}
+.metric-head{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:600}.metric-icon{width:33px;height:33px;border-radius:9px;display:grid;place-items:center;font-size:16px;background:var(--blue-soft);color:var(--blue)}
+.metric:nth-child(2) .metric-icon{background:var(--green-soft);color:var(--green)}.metric:nth-child(3) .metric-icon{background:var(--amber-soft);color:var(--amber)}.metric:nth-child(4) .metric-icon{background:#f2edff;color:var(--purple)}
+.value{font-size:25px;letter-spacing:-.7px;font-weight:760;margin:15px 0 7px;white-space:nowrap}.metric-foot{color:var(--muted);font-size:11px}.up{color:var(--green);font-weight:700}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:19px;overflow:hidden}
+.panel-head{padding:18px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+.panel-title{font-size:14px;font-weight:750;margin:0}.panel-sub{font-size:11px;color:var(--muted);margin-top:4px}.pill{font-size:10px;font-weight:700;border-radius:30px;padding:5px 9px;background:#f1f4f9;color:#5d6b80}
+.chart-wrap{padding:18px 20px 15px}.chart-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:13px}.legend{display:flex;gap:14px;align-items:center;color:var(--muted);font-size:11px}.legend span{display:flex;align-items:center;gap:6px}.swatch{width:8px;height:8px;border-radius:3px;background:var(--blue)}.swatch.gray{background:#c5d0e2}
+.chart{height:150px;position:relative;border-bottom:1px solid var(--line);background:repeating-linear-gradient(to bottom,transparent 0,transparent 36px,#edf0f6 37px,#edf0f6 38px)}
+.bars{height:100%;display:flex;align-items:flex-end;justify-content:space-around;gap:12px;padding:0 5px}.bar-group{height:100%;flex:1;display:flex;align-items:flex-end;justify-content:center;gap:4px;position:relative}.bar{width:min(20px,42%);border-radius:4px 4px 0 0;background:#c5d0e2;min-height:3px}.bar.blue{background:var(--blue)}.axis{display:flex;justify-content:space-around;color:#8b97a9;font-size:10px;padding:9px 0 0}
+.toolbar{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.field{border:1px solid #dfe5ee;background:white;border-radius:8px;padding:9px 10px;color:#435168;font-size:12px;outline:none;min-height:36px}.field:focus{border-color:#8ba8ff;box-shadow:0 0 0 3px #edf2ff}.search{width:220px}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th{background:#fafbfd;color:#778397;text-transform:uppercase;font-size:10px;letter-spacing:.55px;font-weight:750;text-align:left;padding:12px 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}td{padding:14px 16px;border-bottom:1px solid #eef1f6;font-size:12px}tbody tr:hover{background:#fafcff}tbody tr:last-child td{border-bottom:0}.orderid{color:var(--blue);font-weight:750}.customer{font-weight:650;color:#2e3a4d}.muted{color:var(--muted);font-size:11px;margin-top:3px}.amount{font-weight:750;font-variant-numeric:tabular-nums}.status{display:inline-flex;align-items:center;gap:5px;border-radius:30px;padding:5px 8px;font-size:10px;font-weight:750}.status.paid{background:var(--green-soft);color:var(--green)}.status.pending{background:var(--amber-soft);color:var(--amber)}.status.refund{background:var(--red-soft);color:var(--red)}.status .sdot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.table-foot{padding:13px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--muted);font-size:11px;border-top:1px solid var(--line)}.pagination{display:flex;gap:6px}.page{border:1px solid var(--line);border-radius:6px;background:white;padding:5px 9px;color:#536175;font-size:11px}.page.current{background:var(--blue-soft);border-color:#cddcff;color:var(--blue);font-weight:750}
+.lower-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.simple-row{display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid #eef1f6;gap:12px}.simple-row:last-child{border-bottom:0}.simple-label{display:flex;align-items:center;gap:10px}.mini-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:8px;background:#f1f4f9}.simple-name{font-size:12px;font-weight:650}.simple-desc{font-size:10px;color:var(--muted);margin-top:3px}.simple-amount{font-size:12px;font-weight:750;text-align:right}.total-row{background:#f8faff}
+.note{padding:13px 16px;border-radius:9px;background:#f0f5ff;color:#4d5e7d;font-size:11px;margin-bottom:18px;line-height:1.6}.note strong{color:#294c9b}
+.modal-backdrop{position:fixed;inset:0;background:#11182780;display:none;align-items:center;justify-content:center;padding:20px;z-index:10}.modal-backdrop.show{display:flex}.modal{background:white;border-radius:14px;max-width:720px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 80px #0003}.modal-head{padding:20px 23px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.modal-body{padding:22px 23px}.modal-foot{padding:15px 23px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}.close{border:0;background:#f2f4f8;border-radius:7px;width:30px;height:30px;font-size:18px}.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:20px}.detail-box{padding:12px;background:#f8faff;border:1px solid #edf0f6;border-radius:8px}.detail-box label{font-size:10px;color:var(--muted);display:block;margin-bottom:5px}.detail-box strong{font-size:12px;overflow-wrap:anywhere}.detail-table{width:100%;margin:15px 0}.detail-table td,.detail-table th{padding:10px}.toast{position:fixed;bottom:22px;right:22px;background:#17243a;color:white;padding:12px 17px;border-radius:9px;box-shadow:0 8px 30px #0002;display:none;z-index:20;font-size:12px}.toast.show{display:block}
+@media(max-width:1100px){.app{grid-template-columns:210px minmax(0,1fr)}.content{padding:24px 20px}.topbar{padding:0 20px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.lower-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.app{grid-template-columns:1fr}.sidebar{padding:12px;gap:14px}.brand{padding:0 4px}.workspace,.side-bottom{display:none}.nav{display:flex;overflow:auto;gap:4px}.nav a{white-space:nowrap;padding:9px 10px}.nav a .ico{display:none}.topbar{height:56px;padding:0 15px}.top-actions .live{display:none}.content{padding:20px 13px}.heading{display:block}.actions{margin-top:16px}.metrics{gap:9px}.metric{padding:13px}.value{font-size:21px}.metric-head{font-size:11px}.metric-icon{width:29px;height:29px}.search{width:100%}.toolbar{align-items:stretch}.filters{width:100%}.filters .field{flex:1;min-width:125px}.filters .search{flex-basis:100%}.detail-grid{grid-template-columns:1fr 1fr}h1{font-size:24px}}
+@media print{.sidebar,.topbar,.heading .actions,.toolbar,.table-foot,.lower-grid,.note,.panel.chart-panel{display:none!important}.app{display:block}.content{padding:0}.panel{box-shadow:none;border:0}.table-wrap{overflow:visible}body{background:white}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark">C</div><span>CommerceOS</span></div>
+  <div class="workspace">Workspace</div>
+  <nav class="nav">
+    <a href="#" data-nav="Overview"><span class="ico">▦</span>Overview</a>
+    <a href="#" data-nav="Orders"><span class="ico">▤</span>Orders</a>
+    <a href="#" data-nav="Products"><span class="ico">◇</span>Products</a>
+    <a href="#" data-nav="Inventory"><span class="ico">▧</span>Inventory</a>
+    <a href="#" data-nav="Customers"><span class="ico">♙</span>Customers</a>
+    <a href="#" data-nav="Accounting" class="active"><span class="ico">₹</span>Accounting & Finance</a>
+    <a href="#" data-nav="GST Reports"><span class="ico">▥</span>GST Reports</a>
+    <a href="#" data-nav="Marketing"><span class="ico">↗</span>Marketing</a>
+  </nav>
+  <div class="side-bottom">STORE ADMINISTRATION<div class="profile"><div class="avatar">AD</div><div><strong style="display:block;font-size:12px">Store Admin</strong><span>Administrator</span></div></div></div>
+</aside>
+<main class="main">
+  <header class="topbar"><div class="crumb">Finance / <strong>Accounting dashboard</strong></div><div class="top-actions"><span class="live"><span class="dot"></span> Demo data</span><button class="btn small" id="helpBtn">ⓘ Help</button></div></header>
+  <div class="content">
+    <section class="heading">
+      <div><div class="eyebrow">Finance workspace</div><h1>Accounting & Finance</h1><p class="sub">Track sales, reconcile payments, manage GST and export your financial records.</p></div>
+      <div class="actions"><button class="btn" id="exportBtn">↓ Export CSV</button><button class="btn" id="printBtn">▣ Print report</button><button class="btn primary" id="invoiceBtn">＋ Create invoice</button></div>
+    </section>
+    <div class="note"><strong>Prototype notice:</strong> This dashboard uses illustrative sample orders and calculations. Connect it to your order database, payment gateway and verified GST configuration before using it for real accounting or tax filing.</div>
+    <section class="metrics">
+      <div class="metric"><div class="metric-head">Gross order value <span class="metric-icon">₹</span></div><div class="value" id="grossMetric">₹48,560.00</div><div class="metric-foot"><span class="up">↑ 8.4%</span> vs previous period</div></div>
+      <div class="metric"><div class="metric-head">Payments collected <span class="metric-icon">↙</span></div><div class="value" id="collectedMetric">₹37,140.00</div><div class="metric-foot">Successful captured payments</div></div>
+      <div class="metric"><div class="metric-head">GST collected / payable* <span class="metric-icon">▤</span></div><div class="value" id="gstMetric">₹4,164.00</div><div class="metric-foot">Illustrative output GST on listed orders</div></div>
+      <div class="metric"><div class="metric-head">Refunds recorded <span class="metric-icon">↶</span></div><div class="value" id="refundMetric">₹1,180.00</div><div class="metric-foot">Review gateway settlement before filing</div></div>
+    </section>
+    <section class="panel chart-panel">
+      <div class="panel-head"><div><h2 class="panel-title">Sales & collections</h2><div class="panel-sub">Illustrative monthly performance · ₹</div></div><select class="field" id="chartRange"><option value="6">Last 6 months</option><option value="4">Last 4 months</option><option value="3">Last 3 months</option></select></div>
+      <div class="chart-wrap"><div class="chart-top"><div class="legend"><span><i class="swatch"></i> Order value</span><span><i class="swatch gray"></i> Collected</span></div><span class="pill">Sample trend</span></div><div class="chart"><div class="bars" id="bars"></div></div><div class="axis" id="axis"></div></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h2 class="panel-title">Order accounting ledger</h2><div class="panel-sub">Order-level sales, taxes, payment references and invoice status</div></div><span class="pill" id="orderCount">8 records</span></div>
+      <div class="toolbar"><div class="filters"><input id="searchInput" class="field search" placeholder="Search order, customer, payment ref…" aria-label="Search orders"><select class="field" id="statusFilter"><option value="all">All payment statuses</option><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Refunded">Refunded</option></select><select class="field" id="stateFilter"><option value="all">All supply states</option><option value="Karnataka">Karnataka</option><option value="Maharashtra">Maharashtra</option><option value="Tamil Nadu">Tamil Nadu</option><option value="Telangana">Telangana</option></select><input class="field" type="month" id="monthFilter" aria-label="Filter by month"></div><button class="btn small" id="resetBtn">↺ Reset filters</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Order / Invoice</th><th>Order date</th><th>Customer</th><th>Taxable value</th><th>GST split</th><th>Order total</th><th>Payment</th><th>Reference no.</th><th></th></tr></thead><tbody id="ledgerBody"></tbody></table></div>
+      <div class="table-foot"><span id="resultText">Showing 8 orders</span><div class="pagination"><button class="page current" id="pageOne">1</button><button class="page" id="nextBtn">Next →</button></div></div>
+    </section>
+    <div class="lower-grid">
+      <section class="panel"><div class="panel-head"><div><h2 class="panel-title">GST summary</h2><div class="panel-sub">Based on the currently filtered ledger</div></div><button class="btn small" id="gstExport">↓ Export</button></div>
+        <div id="gstRows"></div>
+      </section>
+      <section class="panel"><div class="panel-head"><div><h2 class="panel-title">Payment reconciliation</h2><div class="panel-sub">Check gateway references against settlements</div></div><span class="pill">Overview</span></div>
+        <div class="simple-row"><div class="simple-label"><div class="mini-icon">✓</div><div><div class="simple-name">Successful payments</div><div class="simple-desc">Marked as paid in sample ledger</div></div></div><div class="simple-amount" id="paidCount">5 orders</div></div>
+        <div class="simple-row"><div class="simple-label"><div class="mini-icon">◷</div><div><div class="simple-name">Pending payments</div><div class="simple-desc">Awaiting successful capture</div></div></div><div class="simple-amount" id="pendingCount">2 orders</div></div>
+        <div class="simple-row"><div class="simple-label"><div class="mini-icon">↶</div><div><div class="simple-name">Refunded orders</div><div class="simple-desc">Confirm actual refund transaction</div></div></div><div class="simple-amount" id="refundedCount">1 order</div></div>
+        <div class="simple-row total-row"><div><div class="simple-name">Unreconciled payment references</div><div class="simple-desc">Reference numbers are demo values</div></div><div class="simple-amount" style="color:var(--amber)">Review required</div></div>
+      </section>
+    </div>
+    <p class="sub" style="font-size:11px">* GST shown is an illustrative output-tax summary, not a final GST liability calculation. Actual liability can depend on credit notes, returns, input tax credit, place-of-supply rules, exemptions, payment adjustments and filing-period treatment.</p>
+  </div>
+</main>
+</div>
+<div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal"><div class="modal-head"><div><h2 class="panel-title" id="modalTitle">Order details</h2><div class="panel-sub" id="modalSub">Financial record</div></div><button class="close" id="closeModal" aria-label="Close">×</button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot"><button class="btn" id="modalExport">Export this order</button><button class="btn primary" id="modalPrint">Print details</button></div></div></div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const orders = [
+{id:"ORD-1048",invoice:"INV-2026-048",date:"2026-10-24",customer:"Ananya Rao",email:"ananya.rao@example.com",state:"Karnataka",type:"intra",items:[{name:"Premium Incense Sticks",qty:2,price:180,hsn:"33074100",rate:5},{name:"Dhoop Cones",qty:1,price:240,hsn:"33074100",rate:5}],shipping:49,status:"Paid",gateway:"Razorpay",ref:"pay_demo_8KQ241",refund:0},
+{id:"ORD-1047",invoice:"INV-2026-047",date:"2026-10-23",customer:"Rohan Mehta",email:"rohan.m@example.com",state:"Maharashtra",type:"inter",items:[{name:"Sambrani Kit",qty:2,price:320,hsn:"33074100",rate:5}],shipping:49,status:"Paid",gateway:"UPI",ref:"UPI-DEMO-731028",refund:0},
+{id:"ORD-1046",invoice:"INV-2026-046",date:"2026-10-22",customer:"Kavya Iyer",email:"kavya.iyer@example.com",state:"Tamil Nadu",type:"inter",items:[{name:"Dhoop Sticks",qty:3,price:150,hsn:"33074100",rate:5},{name:"Premium Incense Sticks",qty:1,price:180,hsn:"33074100",rate:5}],shipping:99,status:"Pending",gateway:"Razorpay",ref:"—",refund:0},
+{id:"ORD-1045",invoice:"INV-2026-045",date:"2026-10-21",customer:"Arjun Reddy",email:"arjun.r@example.com",state:"Telangana",type:"inter",items:[{name:"Sambrani Kit",qty:1,price:320,hsn:"33074100",rate:5},{name:"Dhoop Cones",qty:2,price:240,hsn:"33074100",rate:5}],shipping:49,status:"Paid",gateway:"Card",ref:"CARD-DEMO-92014",refund:0},
+{id:"ORD-1044",invoice:"INV-2026-044",date:"2026-10-20",customer:"Meera Shetty",email:"meera.s@example.com",state:"Karnataka",type:"intra",items:[{name:"Dhoop Sticks",qty:2,price:150,hsn:"33074100",rate:5}],shipping:49,status:"Refunded",gateway:"Razorpay",ref:"pay_demo_2MZ913",refund:180},
+{id:"ORD-1043",invoice:"INV-2026-043",date:"2026-10-18",customer:"Nikhil Shah",email:"nikhil.s@example.com",state:"Maharashtra",type:"inter",items:[{name:"Premium Incense Sticks",qty:4,price:180,hsn:"33074100",rate:5}],shipping:99,status:"Paid",gateway:"UPI",ref:"UPI-DEMO-621109",refund:0},
+{id:"ORD-1042",invoice:"INV-2026-042",date:"2026-10-16",customer:"Pooja Nair",email:"pooja.n@example.com",state:"Karnataka",type:"intra",items:[{name:"Sambrani Kit",qty:1,price:320,hsn:"33074100",rate:5},{name:"Dhoop Sticks",qty:1,price:150,hsn:"33074100",rate:5}],shipping:49,status:"Pending",gateway:"Razorpay",ref:"—",refund:0},
+{id:"ORD-1041",invoice:"INV-2026-041",date:"2026-10-14",customer:"Sanjay Kulkarni",email:"sanjay.k@example.com",state:"Maharashtra",type:"inter",items:[{name:"Dhoop Cones",qty:2,price:240,hsn:"33074100",rate:5}],shipping:49,status:"Paid",gateway:"Card",ref:"CARD-DEMO-71302",refund:0}
+];
+const monthly=[{m:"May",sales:28400,paid:25100},{m:"Jun",sales:32100,paid:29700},{m:"Jul",sales:30800,paid:28200},{m:"Aug",sales:39700,paid:36500},{m:"Sep",sales:42100,paid:38800},{m:"Oct",sales:48560,paid:37140}];
+const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const fmtDate=s=>new Date(s+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+function calc(o){
+ const taxable=o.items.reduce((s,i)=>s+i.qty*i.price,0);
+ const tax= o.items.reduce((s,i)=>s+i.qty*i.price*i.rate/100,0);
+ const shippingTaxable=o.shipping; // Demo assumption: shipping is shown separately and no shipping GST is added in this prototype.
+ const total=taxable+tax+shippingTaxable;
+ const intra=o.type==="intra";
+ return {taxable,tax,cgst:intra?tax/2:0,sgst:intra?tax/2:0,igst:intra?0:tax,shipping:shippingTaxable,total};
+}
+let filtered=[], selectedOrder=null;
+function getFiltered(){
+ const q=document.getElementById("searchInput").value.toLowerCase().trim(),status=document.getElementById("statusFilter").value,state=document.getElementById("stateFilter").value,month=document.getElementById("monthFilter").value;
+ return orders.filter(o=>{
+  const matchesQ=[o.id,o.invoice,o.customer,o.email,o.ref,o.gateway].join(" ").toLowerCase().includes(q);
+  return matchesQ&&(status==="all"||o.status===status)&&(state==="all"||o.state===state)&&(!month||o.date.startsWith(month));
+ });
+}
+function statusClass(s){return s==="Paid"?"paid":s==="Pending"?"pending":"refund"}
+function renderLedger(){
+ filtered=getFiltered();
+ const body=document.getElementById("ledgerBody");
+ body.innerHTML=filtered.map(o=>{const c=calc(o);return `<tr>
+ <td><span class="orderid">${o.id}</span><div class="muted">${o.invoice}</div></td><td>${fmtDate(o.date)}</td>
+ <td><span class="customer">${o.customer}</span><div class="muted">${o.state}</div></td>
+ <td class="amount">${money(c.taxable)}<div class="muted">${o.items.reduce((n,i)=>n+i.qty,0)} item units</div></td>
+ <td>${o.type==="intra"?`CGST ${money(c.cgst)}<div class="muted">SGST ${money(c.sgst)}</div>`:`IGST ${money(c.igst)}<div class="muted">Inter-state</div>`}</td>
+ <td class="amount">${money(c.total)}<div class="muted">Ship ${money(c.shipping)}</div></td>
+ <td><span class="status ${statusClass(o.status)}"><i class="sdot"></i>${o.status}</span></td>
+ <td>${o.ref==="—"?"<span class='muted'>Not captured</span>":o.ref}<div class="muted">${o.gateway}</div></td>
+ <td><button class="btn small viewBtn" data-id="${o.id}">View ↗</button></td></tr>`}).join("");
+ if(!filtered.length)body.innerHTML='<tr><td colspan="9" style="padding:32px;text-align:center;color:#718096">No orders match these filters.</td></tr>';
+ document.getElementById("orderCount").textContent=filtered.length+" records";
+ document.getElementById("resultText").textContent=`Showing ${filtered.length} of ${orders.length} sample orders`;
+ renderGst();renderCounts();
+ body.querySelectorAll(".viewBtn").forEach(b=>b.addEventListener("click",()=>openOrder(b.dataset.id)));
+}
+function renderGst(){
+ let intra=0,inter=0,taxable=0,shipping=0;
+ filtered.forEach(o=>{const c=calc(o);taxable+=c.taxable;if(o.type==="intra")intra+=c.tax;else inter+=c.tax;shipping+=c.shipping});
+ const total=intra+inter;
+ document.getElementById("gstRows").innerHTML=`
+ <div class="simple-row"><div class="simple-label"><div class="mini-icon">↔</div><div><div class="simple-name">Taxable goods value</div><div class="simple-desc">Before GST, excludes shipping</div></div></div><div class="simple-amount">${money(taxable)}</div></div>
+ <div class="simple-row"><div class="simple-label"><div class="mini-icon">⌂</div><div><div class="simple-name">CGST</div><div class="simple-desc">Intra-state sample supplies</div></div></div><div class="simple-amount">${money(intra/2)}</div></div>
+ <div class="simple-row"><div class="simple-label"><div class="mini-icon">⌂</div><div><div class="simple-name">SGST / UTGST</div><div class="simple-desc">Intra-state sample supplies</div></div></div><div class="simple-amount">${money(intra/2)}</div></div>
+ <div class="simple-row"><div class="simple-label"><div class="mini-icon">⇢</div><div><div class="simple-name">IGST</div><div class="simple-desc">Inter-state sample supplies</div></div></div><div class="simple-amount">${money(inter)}</div></div>
+ <div class="simple-row total-row"><div><div class="simple-name">Total illustrative output GST</div><div class="simple-desc">Before credits / adjustments</div></div><div class="simple-amount">${money(total)}</div></div>`;
+}
+function renderCounts(){
+ const paid=filtered.filter(o=>o.status==="Paid"),pending=filtered.filter(o=>o.status==="Pending"),refunded=filtered.filter(o=>o.status==="Refunded");
+ document.getElementById("paidCount").textContent=paid.length+" orders · "+money(paid.reduce((s,o)=>s+calc(o).total,0));
+ document.getElementById("pendingCount").textContent=pending.length+" orders · "+money(pending.reduce((s,o)=>s+calc(o).total,0));
+ document.getElementById("refundedCount").textContent=refunded.length+" orders · "+money(refunded.reduce((s,o)=>s+o.refund,0));
+ document.getElementById("grossMetric").textContent=money(orders.reduce((s,o)=>s+calc(o).total,0));
+ document.getElementById("collectedMetric").textContent=money(orders.filter(o=>o.status==="Paid").reduce((s,o)=>s+calc(o).total,0));
+ document.getElementById("gstMetric").textContent=money(orders.reduce((s,o)=>s+calc(o).tax,0));
+ document.getElementById("refundMetric").textContent=money(orders.reduce((s,o)=>s+o.refund,0));
+}
+function renderChart(){
+ const n=Number(document.getElementById("chartRange").value),data=monthly.slice(-n),max=Math.max(...data.map(x=>x.sales))*1.12;
+ document.getElementById("bars").innerHTML=data.map(x=>`<div class="bar-group" title="${x.m}: sales ${money(x.sales)}, collected ${money(x.paid)}"><div class="bar" style="height:${x.paid/max*100}%"></div><div class="bar blue" style="height:${x.sales/max*100}%"></div></div>`).join("");
+ document.getElementById("axis").innerHTML=data.map(x=>`<span>${x.m}</span>`).join("");
+}
+function openOrder(id){
+ const o=orders.find(x=>x.id===id);if(!o)return;selectedOrder=o;const c=calc(o);
+ document.getElementById("modalTitle").textContent=`${o.id} · ${o.invoice}`;document.getElementById("modalSub").textContent=`Order placed ${fmtDate(o.date)} · ${o.status}`;
+ document.getElementById("modalBody").innerHTML=`
+ <div class="detail-grid">
+ <div class="detail-box"><label>Customer</label><strong>${o.customer}</strong><div class="muted">${o.email}</div></div>
+ <div class="detail-box"><label>Place of supply (demo)</label><strong>${o.state}</strong><div class="muted">${o.type==="intra"?"Intra-state":"Inter-state"}</div></div>
+ <div class="detail-box"><label>Payment reference</label><strong>${o.ref}</strong><div class="muted">${o.gateway}</div></div></div>
+ <h3 class="panel-title">Items purchased</h3><table class="detail-table"><thead><tr><th>Product / HSN</th><th>Qty</th><th>Rate</th><th>Taxable amount</th><th>GST</th></tr></thead><tbody>${o.items.map(i=>`<tr><td>${i.name}<div class="muted">HSN ${i.hsn}</div></td><td>${i.qty}</td><td>${money(i.price)}</td><td>${money(i.qty*i.price)}</td><td>${i.rate}%</td></tr>`).join("")}</tbody></table>
+ <table class="detail-table"><tbody>
+ <tr><td>Taxable value</td><td style="text-align:right">${money(c.taxable)}</td></tr>
+ <tr><td>${o.type==="intra"?"CGST":"IGST"}</td><td style="text-align:right">${money(o.type==="intra"?c.cgst:c.igst)}</td></tr>
+ ${o.type==="intra"?`<tr><td>SGST</td><td style="text-align:right">${money(c.sgst)}</td></tr>`:""}
+ <tr><td>Shipping (demo tax treatment)</td><td style="text-align:right">${money(c.shipping)}</td></tr>
+ <tr><td><strong>Order total</strong></td><td style="text-align:right"><strong>${money(c.total)}</strong></td></tr>
+ ${o.refund?`<tr><td>Refund recorded (sample)</td><td style="text-align:right;color:#bd4141">${money(o.refund)}</td></tr>`:""}
+ </tbody></table><div class="note" style="margin:0">Sample record only. Verify the customer's billing address, GSTIN (if applicable), legal place of supply, HSN/rate, invoice sequence and payment settlement before issuing a statutory invoice.</div>`;
+ document.getElementById("modalBackdrop").classList.add("show");
+}
+function closeModal(){document.getElementById("modalBackdrop").classList.remove("show")}
+function csvEscape(v){return '"'+String(v??"").replaceAll('"','""')+'"'}
+function downloadCSV(rows,filename){
+ const headers=["Order ID","Invoice Number","Date","Customer","Customer Email","Supply State","Product Details","HSN","Taxable Value INR","CGST INR","SGST INR","IGST INR","Shipping INR","Order Total INR","Payment Status","Gateway","Payment Reference","Refund Recorded INR"];
+ const lines=[headers,...rows.map(o=>{const c=calc(o);return [o.id,o.invoice,o.date,o.customer,o.email,o.state,o.items.map(i=>`${i.name} x${i.qty}`).join("; "),[...new Set(o.items.map(i=>i.hsn))].join("; "),c.taxable,c.cgst,c.sgst,c.igst,c.shipping,c.total,o.status,o.gateway,o.ref,o.refund]} )].map(r=>r.map(csvEscape).join(","));
+ const blob=new Blob(["\uFEFF"+lines.join("\r\n")],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);toast("CSV report downloaded");
+}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2600)}
+["searchInput","statusFilter","stateFilter","monthFilter"].forEach(id=>document.getElementById(id).addEventListener("input",renderLedger));
+document.getElementById("resetBtn").addEventListener("click",()=>{document.getElementById("searchInput").value="";document.getElementById("statusFilter").value="all";document.getElementById("stateFilter").value="all";document.getElementById("monthFilter").value="";renderLedger()});
+document.getElementById("chartRange").addEventListener("change",renderChart);
+document.getElementById("exportBtn").addEventListener("click",()=>downloadCSV(filtered,"accounting-ledger.csv"));
+document.getElementById("gstExport").addEventListener("click",()=>downloadCSV(filtered,"gst-order-summary.csv"));
+document.getElementById("printBtn").addEventListener("click",()=>window.print());
+document.getElementById("invoiceBtn").addEventListener("click",()=>{toast("Select an order and open its details to review invoice data. Statutory invoice generation needs your seller GST details.");});
+document.getElementById("helpBtn").addEventListener("click",()=>toast("Use filters to review orders, View for tax/payment details, and Export CSV to download filtered records."));
+document.getElementById("closeModal").addEventListener("click",closeModal);
+document.getElementById("modalBackdrop").addEventListener("click",e=>{if(e.target.id==="modalBackdrop")closeModal()});
+document.getElementById("modalExport").addEventListener("click",()=>{if(selectedOrder)downloadCSV([selectedOrder],selectedOrder.id+"-accounting.csv")});
+document.getElementById("modalPrint").addEventListener("click",()=>window.print());
+document.querySelectorAll("[data-nav]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();if(a.dataset.nav!=="Accounting")toast(a.dataset.nav+" is a navigation placeholder in this prototype.");}));
+document.getElementById("nextBtn").addEventListener("click",()=>toast("All sample orders are shown on this prototype page."));
+renderChart();renderLedger();
+</script>
+</body>
+</html>

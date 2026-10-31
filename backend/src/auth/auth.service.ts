@@ -48,6 +48,11 @@ export class AuthService {
     return this.login({ email: dto.email, password: dto.password });
   }
 
+  // Alias for legacy registerUser
+  async registerUser(dto: any) {
+    return this.register(dto);
+  }
+
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -76,6 +81,11 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  // Alias for legacy loginUser
+  async loginUser(dto: any) {
+    return this.login(dto);
   }
 
   async refreshToken(refreshToken: string) {
@@ -197,4 +207,4 @@ export class AuthService {
 
     return { message: 'Password updated successfully' };
   }
-}
+}

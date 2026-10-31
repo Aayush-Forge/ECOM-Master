@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, ProductStatus, ProductType } from '@prisma/client';
 import { AuditLogsService } from '../audit/audit-logs.service';
 import { CacheService } from '../redis/cache.service.js';
+import { BACKEND_PRODUCTS_SEED } from './products.seed';
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: ['b', 'strong', 'i', 'em', 'ul', 'ol', 'li', 'p', 'br'],
@@ -628,8 +629,16 @@ export class ProductsService {
         where: whereClause,
       }),
     ]);
+    const mappedData = data.map((p) => this.transformProductResponse(p, isAdmin));
+    if (mappedData.length === 0 && !isAdmin && !filters?.search && !filters?.category) {
+      return {
+        data: BACKEND_PRODUCTS_SEED,
+        meta: { page: 1, per_page: perPage || 20, total: BACKEND_PRODUCTS_SEED.length },
+      };
+    }
+
     return {
-      data: data.map((p) => this.transformProductResponse(p, isAdmin)),
+      data: mappedData,
       meta: { page: page || 1, per_page: perPage || 20, total },
     };
   }
@@ -885,8 +894,23 @@ export class ProductsService {
       };
     });
 
+    const effectivePrice = Number(product.salePrice ?? product.basePrice);
+    const regularPrice = Number(product.compareAtPrice ?? product.basePrice);
+    const resolvedImages = Array.isArray(product.images) && product.images.length > 0
+      ? product.images.map((img: any) => typeof img === 'string' ? { src: this.formatImageUrl(img) } : img)
+      : [{ src: 'https://images.unsplash.com/photo-1766399654235-a6793895422d?auto=format&fit=crop&w=800&q=80' }];
+
     const result: any = {
       ...product,
+      name: product.title,
+      price: effectivePrice,
+      regular_price: regularPrice,
+      compareAt: regularPrice,
+      images: resolvedImages,
+      categories: product.category
+        ? [{ id: product.category.id, name: product.category.name, slug: product.category.slug }]
+        : [],
+      stock_status: product.stockQuantity > 0 ? 'instock' : 'outofstock',
       type: product.productType ?? (isVariable ? 'variable' : 'simple'),
       attributes: formattedAttributes,
       variationsData: formattedVariations,

@@ -37,10 +37,10 @@ import {
   Mail,
   Truck,
   LogOut,
-  Shield,
   Building2,
   Loader2,
   Sparkles,
+  Shield,
 } from 'lucide-react'
 
 const ICON_MAP = {

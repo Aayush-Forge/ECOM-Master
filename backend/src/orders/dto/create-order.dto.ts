@@ -25,6 +25,8 @@ export class OrderItemInputDto {
   variationId?: string;
 }
 
+export { OrderItemInputDto as OrderItemDto };
+
 export class OrderAddressInputDto {
   @IsString()
   @IsNotEmpty()
@@ -60,6 +62,10 @@ export class OrderAddressInputDto {
 }
 
 export class CreateOrderDto {
+  @IsString()
+  @IsOptional()
+  customerId?: string;
+
   @IsEmail()
   @IsOptional()
   email?: string;
@@ -92,4 +98,3 @@ export class CreateOrderDto {
   @IsString()
   cartToken?: string;
 }
-

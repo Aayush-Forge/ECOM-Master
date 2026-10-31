@@ -13,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react'
 
-const IS_DEV = process.env.NEXT_PUBLIC_DEV_MODE === 'true' && process.env.NODE_ENV !== 'production'
+const IS_DEV = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_DEV_MODE === 'true'
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 const QUICK_LOGIN_PRESETS = [

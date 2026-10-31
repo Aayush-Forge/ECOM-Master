@@ -47,7 +47,7 @@ describe('ClubbingService', () => {
 
       prisma.clubbingRule.create.mockResolvedValue({ id: 'rule-1', ...dto });
 
-      const result = await service.createRule(dto);
+      const result = await service.createRule(dto as any);
       expect(result.id).toBe('rule-1');
       expect(prisma.clubbingRule.create).toHaveBeenCalled();
     });

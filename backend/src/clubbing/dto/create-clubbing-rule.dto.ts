@@ -11,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import { ClubbingRuleType } from '@prisma/client';
+export { ClubbingRuleType };
 
 export class CreateClubbingRuleDto {
   @IsString()

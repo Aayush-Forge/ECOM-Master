@@ -11,6 +11,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
   ServiceUnavailableException,
   UploadedFile,
   UseGuards,
@@ -20,6 +21,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import 'multer';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
+import type { Response } from 'express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -29,10 +31,7 @@ import { ROLES, ROLE_RANKS } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { R2Service } from '../r2/r2.service';
-
 import { ProductsImportExportService } from './products-import-export.service';
-import type { Response } from 'express';
-import { Res } from '@nestjs/common';
 
 @Controller('')
 export class ProductsController {
@@ -63,7 +62,7 @@ export class ProductsController {
       },
     }),
   )
-  async uploadImage(@UploadedFile() file?: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file?: any) {
     if (!file || !file.buffer) {
       throw new BadRequestException('No image file provided.');
     }
@@ -153,7 +152,7 @@ export class ProductsController {
   @Roles(ROLES.EDITOR)
   @UseInterceptors(FileInterceptor('file'))
   async importCsv(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Body('updateExisting') updateExisting?: string,
   ) {
     if (!file || !file.buffer) {
@@ -172,7 +171,7 @@ export class ProductsController {
     return this.productsService.getNextSuggestedSku();
   }
 
-  @Post('admin/create-products')
+  @Post(['admin/create-products', 'admin/products', 'products'])
   @Roles(ROLES.EDITOR)
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
@@ -218,7 +217,7 @@ export class ProductsController {
     return this.productsService.findOne(id, true);
   }
 
-  @Patch('admin/update-products/:id')
+  @Patch(['admin/update-products/:id', 'products/:id'])
   @Roles(ROLES.EDITOR)
   update(
     @Param('id') id: string,
@@ -228,7 +227,7 @@ export class ProductsController {
     return this.productsService.update(id, updateProductDto, req?.user);
   }
 
-  @Delete('admin/delete-products/:id')
+  @Delete(['admin/delete-products/:id', 'products/:id'])
   @Roles(ROLES.EDITOR)
   remove(@Param('id') id: string, @Req() req: any) {
     return this.productsService.remove(id, req?.user);

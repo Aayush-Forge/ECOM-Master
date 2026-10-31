@@ -5,6 +5,7 @@ import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 import { ProductsImportExportService } from './products-import-export.service';
 import { R2Service } from '../r2/r2.service';
+import { JwtService } from '@nestjs/jwt';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
@@ -35,6 +36,7 @@ describe('ProductsController', () => {
         { provide: ProductsService, useValue: mockProductsService },
         { provide: ProductsImportExportService, useValue: mockProductsImportExportService },
         { provide: R2Service, useValue: mockR2Service },
+        { provide: JwtService, useValue: { verifyAsync: jest.fn() } },
       ],
     }).compile();
 

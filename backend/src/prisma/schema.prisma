@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -251,6 +248,7 @@ model CartItem {
 model Order {
   id                   String      @id @default(uuid()) @db.Uuid
   orderNumber          String      @unique @map("order_number")
+  invoiceNumber        String?     @map("invoice_number")
   customerId           String?     @map("customer_id") @db.Uuid
   status               OrderStatus
   subtotal             Decimal
@@ -258,6 +256,7 @@ model Order {
   taxTotal             Decimal     @map("tax_total")
   shippingTotal        Decimal     @map("shipping_total")
   grandTotal           Decimal     @map("grand_total")
+  shippingLabelStatus  String?     @default("pending") @map("shipping_label_status")
   couponCode           String?     @map("coupon_code")
   email                String?
   currency             String      @default("INR")
@@ -445,6 +444,20 @@ model NotificationLog {
   @@index([orderId])
   @@index([userId])
   @@map("notification_log")
+}
+
+model ShippingSlab {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String
+  minWeight         Float    @map("min_weight")
+  maxWeight         Float    @map("max_weight")
+  destinationRegion String   @map("destination_region")
+  rate              Float
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("shipping_slabs")
 }
 
 model AuditLog {

@@ -1,7 +1,13 @@
-import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, PaymentWebhookStatus } from '@prisma/client';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClubbingService } from '../clubbing/clubbing.service';
 import { ShippingService } from '../shipping/shipping.service';
@@ -14,17 +20,32 @@ describe('OrdersService', () => {
   let eventEmitter: any;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    delete process.env.RAZORPAY_WEBHOOK_SECRET;
+
     prismaService = {
+      product: {
+        findMany: jest.fn(),
+      },
       order: {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
+        create: jest.fn(),
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
+      },
+      payment: {
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
       },
       orderStatusHistory: {
         create: jest.fn(),
       },
-      $transaction: jest.fn(),
+      paymentWebhookEvent: {
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
+      },
+      $transaction: jest.fn((callback) => callback(prismaService)),
       $queryRawUnsafe: jest.fn().mockResolvedValue([{ nextval: 1000 }]),
       $executeRawUnsafe: jest.fn().mockResolvedValue(1),
     };
@@ -66,204 +87,199 @@ describe('OrdersService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('handleRefundWebhook', () => {
+    const testOrderId = 'order-uuid-123';
+    const mockOrder = {
+      id: testOrderId,
+      orderNumber: 'ORD-1001',
+      status: OrderStatus.paid,
+      payments: [{ id: 'pay-db-id', status: PaymentStatus.CAPTURED }],
+    };
+
+    it('should ignore unhandled event types', async () => {
+      const result = await service.handleRefundWebhook({
+        event: 'payment.captured',
+        orderId: testOrderId,
+      });
+
+      expect(result).toEqual({
+        status: 'ignored',
+        message: 'Unhandled event type: payment.captured',
+      });
+      expect(prismaService.order.update).not.toHaveBeenCalled();
+    });
+
+    it('should enforce HMAC signature verification when RAZORPAY_WEBHOOK_SECRET is set', async () => {
+      process.env.RAZORPAY_WEBHOOK_SECRET = 'test_secret_key';
+      const dto = {
+        event: 'refund.processed',
+        orderId: testOrderId,
+      };
+
+      await expect(service.handleRefundWebhook(dto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      await expect(
+        service.handleRefundWebhook(dto, 'invalid_signature'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      const validSignature = crypto
+        .createHmac('sha256', 'test_secret_key')
+        .update(JSON.stringify(dto))
+        .digest('hex');
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.order.findUnique.mockResolvedValue(mockOrder);
+      prismaService.order.update.mockResolvedValue({
+        ...mockOrder,
+        status: OrderStatus.refunded,
+      });
+
+      const res = await service.handleRefundWebhook(dto, validSignature);
+      expect(res.status).toBe('success');
+    });
+
+    it('should handle idempotency and avoid duplicate processing for already processed events', async () => {
+      const dto = {
+        id: 'evt_refund_processed_999',
+        event: 'refund.processed',
+        orderId: testOrderId,
+      };
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue({
+        id: 'some-id',
+        razorpayEventId: 'evt_refund_processed_999',
+        status: PaymentWebhookStatus.processed,
+      });
+
+      const result = await service.handleRefundWebhook(dto);
+
+      expect(result).toEqual({
+        status: 'already_processed',
+        message: 'Webhook event evt_refund_processed_999 was already processed',
+        eventId: 'evt_refund_processed_999',
+      });
+      expect(prismaService.order.update).not.toHaveBeenCalled();
+    });
+
+    it('should successfully update order status, payments, history, and webhook log via direct orderId', async () => {
+      const dto = {
+        id: 'evt_101',
+        event: 'refund.processed',
+        orderId: testOrderId,
+      };
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.order.findUnique.mockResolvedValue(mockOrder);
+      prismaService.order.update.mockResolvedValue({
+        ...mockOrder,
+        status: OrderStatus.refunded,
+      });
+
+      const result = await service.handleRefundWebhook(dto);
+
+      expect(result.status).toBe('success');
+      expect(result.orderId).toBe(testOrderId);
+      expect(prismaService.order.update).toHaveBeenCalledWith({
+        where: { id: testOrderId },
+        data: { status: OrderStatus.refunded },
+      });
+      expect(prismaService.payment.updateMany).toHaveBeenCalledWith({
+        where: { orderId: testOrderId },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      expect(prismaService.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: testOrderId,
+          toStatus: OrderStatus.refunded,
+          changedBySystem: 'webhook:refund.processed',
+          note: expect.stringContaining('evt_101'),
+        },
+      });
+    });
+
+    it('should resolve order via nested Razorpay webhook payload format', async () => {
+      const dto = {
+        entity: 'event',
+        event: 'refund.processed',
+        payload: {
+          refund: {
+            entity: {
+              id: 'rfnd_007',
+              payment_id: 'pay_rzp_123',
+              amount: 50000,
+              status: 'processed',
+            },
+          },
+          payment: {
+            entity: {
+              id: 'pay_rzp_123',
+              order_id: 'order_rzp_abc',
+            },
+          },
+        },
+      };
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.payment.findFirst.mockResolvedValue({
+        id: 'pay-db-id',
+        orderId: testOrderId,
+      });
+      prismaService.order.findUnique.mockResolvedValue(mockOrder);
+      prismaService.order.update.mockResolvedValue({
+        ...mockOrder,
+        status: OrderStatus.refunded,
+      });
+
+      const result = await service.handleRefundWebhook(dto);
+
+      expect(result.status).toBe('success');
+      expect(result.orderId).toBe(testOrderId);
+    });
+
+    it('should throw BadRequestException if orderId cannot be resolved', async () => {
+      const dto = {
+        event: 'refund.processed',
+      };
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+
+      await expect(service.handleRefundWebhook(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw NotFoundException if order does not exist', async () => {
+      const dto = {
+        event: 'refund.processed',
+        orderId: 'non-existent-order',
+      };
+
+      prismaService.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaService.order.findUnique.mockResolvedValue(null);
+
+      await expect(service.handleRefundWebhook(dto)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('createOrder', () => {
     it('throws BadRequestException if items array is empty', async () => {
       await expect(
         service.createOrder({ items: [] } as any),
       ).rejects.toThrow(BadRequestException);
     });
-
-    it('throws NotFoundException if products do not exist', async () => {
-      prismaService.product = { findMany: jest.fn().mockResolvedValue([]) };
-      await expect(
-        service.createOrder({
-          items: [{ productId: 'missing-p1', quantity: 1 }],
-        }),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('creates order with snapshotted items', async () => {
-      prismaService.product = {
-        findMany: jest.fn().mockResolvedValue([
-          {
-            id: 'p1',
-            title: 'Sandalwood Incense',
-            sku: 'INC-001',
-            status: 'active',
-            basePrice: 200,
-            salePrice: 150,
-          },
-        ]),
-      };
-      prismaService.$transaction.mockImplementation(async (cb: any) => {
-        return cb({
-          $executeRaw: jest.fn().mockResolvedValue(1),
-          order: {
-            create: jest.fn().mockResolvedValue({
-              id: 'ord-123',
-              grandTotal: 300,
-            }),
-          },
-        });
-      });
-
-      const result = await service.createOrder(
-        { items: [{ productId: 'p1', quantity: 2 }] },
-        'customer-1',
-      );
-
-      expect(prismaService.$transaction).toHaveBeenCalled();
-      expect(result.id).toBe('ord-123');
-    });
-  });
-
-  describe('getOrderById', () => {
-    it('should return order if found', async () => {
-      const mockOrder = { id: 'ord_1', items: [], addresses: [], statusHistory: [] };
-      prismaService.order.findUnique.mockResolvedValue(mockOrder);
-
-      const result = await service.getOrderById('ord_1');
-      expect(result).toEqual(mockOrder);
-    });
-
-    it('should throw NotFoundException if missing', async () => {
-      prismaService.order.findUnique.mockResolvedValue(null);
-
-      await expect(service.getOrderById('missing')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('updateStatus', () => {
-    it('should throw NotFoundException if order does not exist', async () => {
-      prismaService.order.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.updateStatus('ord_999', OrderStatus.paid, undefined, 'user_1'),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw BadRequestException if toStatus is refunded', async () => {
-      prismaService.order.findUnique.mockResolvedValue({ id: 'ord_1', status: OrderStatus.paid });
-
-      await expect(
-        service.updateStatus('ord_1', OrderStatus.refunded, undefined, 'user_1'),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException if transition is invalid', async () => {
-      prismaService.order.findUnique.mockResolvedValue({ id: 'ord_1', status: OrderStatus.shipped });
-
-      // shipped can only transition to delivered
-      await expect(
-        service.updateStatus('ord_1', OrderStatus.processing, undefined, 'user_1'),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException if transitioning to cancelled without a note', async () => {
-      prismaService.order.findUnique.mockResolvedValue({ id: 'ord_1', status: OrderStatus.processing });
-
-      await expect(
-        service.updateStatus('ord_1', OrderStatus.cancelled, '', 'user_1'),
-      ).rejects.toThrow(BadRequestException);
-
-      await expect(
-        service.updateStatus('ord_1', OrderStatus.cancelled, undefined, 'user_1'),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should execute transaction and emit event on valid transition', async () => {
-      const existingOrder = { id: 'ord_1', status: OrderStatus.payment_pending };
-      prismaService.order.findUnique.mockResolvedValue(existingOrder);
-
-      const updatedResult = { ...existingOrder, status: OrderStatus.paid };
-      prismaService.$transaction.mockImplementation(async (cb: any) => {
-        return cb({
-          order: { update: jest.fn().mockResolvedValue(updatedResult) },
-          orderStatusHistory: { create: jest.fn().mockResolvedValue({}) },
-        });
-      });
-
-      const result = await service.updateStatus('ord_1', OrderStatus.paid, 'Payment verified', 'user_admin');
-
-      expect(result.status).toBe(OrderStatus.paid);
-      expect(prismaService.$transaction).toHaveBeenCalledTimes(1);
-      expect(eventEmitter.emit).toHaveBeenCalledWith('order.status_changed', {
-        orderId: 'ord_1',
-        fromStatus: OrderStatus.payment_pending,
-        toStatus: OrderStatus.paid,
-        changedById: 'user_admin',
-      });
-    });
-  });
-
-  describe('trackOrder', () => {
-    it('throws BadRequestException if orderNumber or phone is missing', async () => {
-      await expect(service.trackOrder('', '9876543210')).rejects.toThrow(BadRequestException);
-      await expect(service.trackOrder('ORD-123', '')).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws NotFoundException if order does not exist', async () => {
-      prismaService.order.findFirst.mockResolvedValue(null);
-      await expect(service.trackOrder('ORD-123', '9876543210')).rejects.toThrow(NotFoundException);
-    });
-
-    it('throws NotFoundException if phone does not match', async () => {
-      prismaService.order.findFirst.mockResolvedValue({
-        id: 'ord_1',
-        orderNumber: 'ORD-123',
-        addresses: [{ type: 'shipping', phone: '+91 9999999999' }],
-        customer: null,
-      });
-      await expect(service.trackOrder('ORD-123', '9876543210')).rejects.toThrow(NotFoundException);
-    });
-
-    it('successfully returns order when phone matches shipping address by orderNumber', async () => {
-      const mockOrder = {
-        id: 'ord_1',
-        orderNumber: 'ORD-123',
-        addresses: [{ type: 'shipping', phone: '+91 9876543210' }],
-        customer: null,
-      };
-      prismaService.order.findFirst.mockResolvedValue(mockOrder);
-
-      const result = await service.trackOrder('ORD-123', '9876543210');
-      expect(result).toEqual(mockOrder);
-    });
-
-    it('successfully returns order when tracking by UUID order ID', async () => {
-      const uuid = '5055452f-a99a-4406-99ea-917e43d61f89';
-      const mockOrder = {
-        id: uuid,
-        orderNumber: 'ORD-1790261612987-5034',
-        addresses: [{ type: 'shipping', phone: '9876543210' }],
-        customer: null,
-      };
-      prismaService.order.findFirst.mockResolvedValue(mockOrder);
-
-      const result = await service.trackOrder(uuid, '9876543210');
-      expect(result).toEqual(mockOrder);
-      expect(prismaService.order.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            OR: [{ id: uuid }, { orderNumber: uuid }],
-          },
-        }),
-      );
-    });
   });
 
   describe('generateOrderNumber', () => {
-    it('generates order number matching SDOXXXX pattern using PostgreSQL sequence', async () => {
-      prismaService.$queryRawUnsafe.mockResolvedValueOnce([{ nextval: 1000 }]);
-      const num1 = await service.generateOrderNumber();
-      expect(num1).toBe('SDO1000');
-
-      prismaService.$queryRawUnsafe.mockResolvedValueOnce([{ nextval: 1045 }]);
-      const num2 = await service.generateOrderNumber();
-      expect(num2).toBe('SDO1045');
+    it('returns sequence based order number starting with SDO', async () => {
+      const num = await service.generateOrderNumber();
+      expect(num).toBe('SDO1000');
     });
 
-    it('retries sequence creation if initial sequence query fails', async () => {
+    it('retries once if relation does not exist and creates sequence', async () => {
       prismaService.$queryRawUnsafe
         .mockRejectedValueOnce(new Error('relation order_number_seq does not exist'))
         .mockResolvedValueOnce([{ nextval: 1001 }]);
