@@ -1,5 +1,6 @@
-import { openAuthenticatedUrl } from '@/lib/utils';
 "use client";
+
+import { openAuthenticatedUrl } from '@/lib/utils';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';

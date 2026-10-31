@@ -1,5 +1,6 @@
-import { openAuthenticatedUrl } from '@/lib/utils';
 'use client'
+
+import { openAuthenticatedUrl } from '@/lib/utils';
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation'
