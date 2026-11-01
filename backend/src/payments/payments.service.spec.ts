@@ -697,4 +697,138 @@ describe('PaymentsService', () => {
       expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
+
+  describe('recordPaymentFailure', () => {
+    it('should throw NotFoundException if order does not exist', async () => {
+      prismaService.order.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.recordPaymentFailure({
+          orderId: 'non-existent-order',
+          razorpayOrderId: 'order_rzp_123',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if payment record does not exist', async () => {
+      prismaService.order.findUnique.mockResolvedValue({ id: 'order_1' });
+      prismaService.payment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.recordPaymentFailure({
+          orderId: 'order_1',
+          razorpayOrderId: 'order_rzp_nonexistent',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should not overwrite if payment is already CAPTURED', async () => {
+      prismaService.order.findUnique.mockResolvedValue({ id: 'order_1', status: OrderStatus.paid });
+      prismaService.payment.findFirst.mockResolvedValue({
+        id: 'pmt_1',
+        orderId: 'order_1',
+        status: PaymentStatus.CAPTURED,
+      });
+
+      const res = await service.recordPaymentFailure({
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_123',
+        errorCode: 'BAD_REQUEST_ERROR',
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.status).toBe(PaymentStatus.CAPTURED);
+      expect(prismaService.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('should update payment to FAILED, create order status history note, and emit payment.failed with canRetry: true', async () => {
+      const order = { id: 'order_1', status: OrderStatus.payment_pending };
+      const payment = {
+        id: 'pmt_1',
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_123',
+        status: PaymentStatus.CREATED,
+      };
+
+      prismaService.order.findUnique.mockResolvedValue(order);
+      prismaService.payment.findFirst.mockResolvedValue(payment);
+      prismaService.payment.update.mockResolvedValue({
+        ...payment,
+        status: PaymentStatus.FAILED,
+        razorpayPaymentId: 'pay_failed_123',
+      });
+
+      const res = await service.recordPaymentFailure({
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_123',
+        razorpayPaymentId: 'pay_failed_123',
+        errorCode: 'BAD_REQUEST_ERROR',
+        errorDescription: 'Payment failed due to card decline',
+        source: 'gateway',
+        step: 'payment_authorization',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.paymentStatus).toBe(PaymentStatus.FAILED);
+      expect(res.orderStatus).toBe(OrderStatus.payment_pending);
+      expect(res.canRetry).toBe(true);
+
+      expect(prismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pmt_1' },
+        data: {
+          status: PaymentStatus.FAILED,
+          razorpayPaymentId: 'pay_failed_123',
+        },
+      });
+
+      expect(prismaService.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: 'order_1',
+          fromStatus: OrderStatus.payment_pending,
+          toStatus: OrderStatus.payment_pending,
+          changedBySystem: 'Razorpay Client',
+          note: expect.stringContaining('Payment failed due to card decline'),
+        },
+      });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith('payment.failed', {
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_123',
+        razorpayPaymentId: 'pay_failed_123',
+        reason: 'Payment failed due to card decline',
+        canRetry: true,
+      });
+    });
+
+    it('should record modal dismiss properly with default summary', async () => {
+      const order = { id: 'order_1', status: OrderStatus.payment_pending };
+      const payment = {
+        id: 'pmt_1',
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_123',
+        status: PaymentStatus.CREATED,
+      };
+
+      prismaService.order.findUnique.mockResolvedValue(order);
+      prismaService.payment.findFirst.mockResolvedValue(payment);
+
+      const res = await service.recordPaymentFailure({
+        orderId: 'order_1',
+        razorpayOrderId: 'order_rzp_123',
+        errorCode: 'MODAL_DISMISSED',
+      });
+
+      expect(res.success).toBe(true);
+      expect(prismaService.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: 'order_1',
+          fromStatus: OrderStatus.payment_pending,
+          toStatus: OrderStatus.payment_pending,
+          changedBySystem: 'Razorpay Client',
+          note: expect.stringContaining('Customer closed payment window'),
+        },
+      });
+    });
+  });
+
 });

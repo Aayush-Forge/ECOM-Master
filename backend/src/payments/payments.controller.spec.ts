@@ -10,6 +10,7 @@ describe('PaymentsController', () => {
     const mockPaymentsService = {
       createSession: jest.fn(),
       verifyPayment: jest.fn(),
+      recordPaymentFailure: jest.fn(),
       handleWebhook: jest.fn(),
     };
 
@@ -81,6 +82,27 @@ describe('PaymentsController', () => {
 
     expect(paymentsService.getPaymentByOrderId).toHaveBeenCalledWith('ord_1');
     expect(result).toEqual(mockPmt);
+  });
+
+  it('should delegate recordFailure to paymentsService', async () => {
+    const mockDto = {
+      orderId: 'f477218f-a073-4e86-9d5d-4c78c6776a76',
+      razorpayOrderId: 'order_123',
+      errorCode: 'PAYMENT_FAILED',
+      errorDescription: 'Card was declined',
+    };
+    const mockResult = {
+      success: true,
+      orderId: mockDto.orderId,
+      paymentStatus: 'FAILED',
+      canRetry: true,
+    };
+    (paymentsService.recordPaymentFailure as jest.Mock).mockResolvedValue(mockResult);
+
+    const result = await controller.recordFailure(mockDto);
+
+    expect(paymentsService.recordPaymentFailure).toHaveBeenCalledWith(mockDto);
+    expect(result).toEqual(mockResult);
   });
 
   it('should delegate handleWebhook to paymentsService', async () => {
