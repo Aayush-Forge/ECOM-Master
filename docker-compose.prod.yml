@@ -120,6 +120,9 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+      # Used only in IP mode (admin on :8081, API on :8082); nothing listens there in domain mode.
+      - "8081:8081"
+      - "8082:8082"
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
       ADMIN_DOMAIN: ${ADMIN_DOMAIN:?set ADMIN_DOMAIN in .env}

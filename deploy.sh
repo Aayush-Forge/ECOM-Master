@@ -75,7 +75,7 @@ fi
 REQUIRED=(SITE_DOMAIN ADMIN_DOMAIN API_DOMAIN FRONTEND_URL ADMIN_URL BACKEND_PUBLIC_URL
   POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB REDIS_PASSWORD JWT_SECRET JWT_REFRESH_SECRET REVALIDATE_SECRET
   R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME R2_PUBLIC_BASE_URL
-  RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET)
+  RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET)
 MISSING=()
 for key in "${REQUIRED[@]}"; do
   if ! grep -qE "^${key}=[^[:space:]]" .env; then
@@ -87,6 +87,9 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 echo -e "${GREEN}✓ .env has all required values.${NC}"
+if ! grep -qE "^RAZORPAY_WEBHOOK_SECRET=[^[:space:]]" .env; then
+  echo -e "${YELLOW}Note: RAZORPAY_WEBHOOK_SECRET is empty, so Razorpay webhooks will be rejected. Payments still confirm via the browser callback; add the webhook once the site has a domain with HTTPS.${NC}"
+fi
 
 # 4. Build and start. Database migrations run automatically when the backend starts.
 echo -e "${YELLOW}[4/5] Building and starting containers (first build can take 5-10 minutes)...${NC}"
@@ -112,5 +115,8 @@ echo -e "\n${GREEN}Deployment is up.${NC}"
 echo -e "  Storefront:   ${BLUE}$(env_value FRONTEND_URL)${NC}"
 echo -e "  Admin portal: ${BLUE}$(env_value ADMIN_URL)${NC}"
 echo -e "  API health:   ${BLUE}$(env_value BACKEND_PUBLIC_URL)/health${NC}"
-echo -e "\nHTTPS certificates are issued on first visit once DNS points at this server."
+case "$(env_value SITE_DOMAIN)" in
+  :*) echo -e "\n${YELLOW}IP mode: plain HTTP, no HTTPS. Use a domain before taking real customers.${NC}" ;;
+  *)  echo -e "\nHTTPS certificates are issued on first visit once DNS points at this server." ;;
+esac
 echo -e "Logs: $COMPOSE logs -f"

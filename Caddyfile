@@ -1,5 +1,6 @@
-# Domains come from SITE_DOMAIN / ADMIN_DOMAIN / API_DOMAIN in .env (passed in by docker-compose.prod.yml).
-# Caddy obtains and renews HTTPS certificates automatically once DNS points at this server.
+# Addresses come from SITE_DOMAIN / ADMIN_DOMAIN / API_DOMAIN in .env (passed in by docker-compose.prod.yml).
+# Domain names get automatic HTTPS once DNS points at this server.
+# Port-only addresses (IP mode: :80, :8081, :8082) are served over plain HTTP.
 
 {$SITE_DOMAIN} {
 	encode zstd gzip
