@@ -15,6 +15,7 @@ import {
 import { PaymentsService } from './payments.service.js';
 import { CreatePaymentSessionDto } from './dto/create-payment-session.dto.js';
 import { VerifyPaymentDto } from './dto/verify-payment.dto.js';
+import { RecordPaymentFailureDto } from './dto/record-payment-failure.dto.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { ROLES } from '../auth/roles.constants.js';
@@ -35,6 +36,12 @@ export class PaymentsController {
   @Public()
   verify(@Body() dto: VerifyPaymentDto) {
     return this.paymentsService.verifyPayment(dto);
+  }
+
+  @Post('payments/fail')
+  @Public()
+  recordFailure(@Body() dto: RecordPaymentFailureDto) {
+    return this.paymentsService.recordPaymentFailure(dto);
   }
 
   @Post('payments/webhook')

@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { RazorpayService } from './razorpay.service.js';
 import { RAZORPAY_CONFIG } from './razorpay.config.js';
 import { VerifyPaymentDto } from './dto/verify-payment.dto.js';
+import { RecordPaymentFailureDto } from './dto/record-payment-failure.dto.js';
 
 @Injectable()
 export class PaymentsService implements OnModuleInit {
@@ -224,6 +225,97 @@ export class PaymentsService implements OnModuleInit {
       success: true,
       orderId,
       status: OrderStatus.paid,
+    };
+  }
+
+  async recordPaymentFailure(dto: RecordPaymentFailureDto) {
+    const {
+      orderId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      errorCode,
+      errorDescription,
+      source,
+      step,
+      reason,
+    } = dto;
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        orderId,
+        razorpayOrderId,
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment record not found for this order');
+    }
+
+    if (payment.status === PaymentStatus.CAPTURED || order.status === OrderStatus.paid) {
+      return {
+        success: false,
+        message: 'Payment already captured for this order',
+        status: payment.status,
+      };
+    }
+
+    const failureSummary =
+      errorDescription ||
+      reason ||
+      (errorCode === 'MODAL_DISMISSED' ? 'Customer closed payment window' : 'Payment attempt failed');
+
+    const noteDetails = [
+      failureSummary,
+      errorCode ? `Code: ${errorCode}` : null,
+      razorpayPaymentId ? `Payment ID: ${razorpayPaymentId}` : null,
+      source ? `Source: ${source}` : null,
+      step ? `Step: ${step}` : null,
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.FAILED,
+          razorpayPaymentId: razorpayPaymentId || payment.razorpayPaymentId,
+        },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: order.status,
+          changedBySystem: 'Razorpay Client',
+          note: `Payment attempt failed: ${noteDetails}`,
+        },
+      });
+    });
+
+    this.eventEmitter.emit('payment.failed', {
+      orderId: order.id,
+      razorpayOrderId,
+      razorpayPaymentId,
+      reason: failureSummary,
+      canRetry: true,
+    });
+
+    return {
+      success: true,
+      orderId: order.id,
+      paymentStatus: PaymentStatus.FAILED,
+      orderStatus: order.status,
+      canRetry: true,
     };
   }
 

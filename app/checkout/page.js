@@ -25,7 +25,7 @@ import { toast } from 'sonner'
 import { getActiveClubbings, calculateClubbingDiscount } from '@/lib/api/clubbings'
 import { isValidPhoneNumber } from 'libphonenumber-js'
 import { createOrder, calculateCheckoutPricing } from '@/lib/api/orders'
-import { createPaymentSession, verifyPaymentSession } from '@/lib/api/payments'
+import { createPaymentSession, verifyPaymentSession, recordPaymentFailure } from '@/lib/api/payments'
 import { calculateCartDiscount, getAllDiscounts } from '@/lib/api/discounts'
 
 const INDIAN_STATES = [
@@ -65,6 +65,7 @@ function CheckoutPage() {
   const [initDone, setInitDone] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [stage, setStage] = useState('')
+  const [pendingOrder, setPendingOrder] = useState(null)
   const [mockPaymentModal, setMockPaymentModal] = useState(null)
   const [selectedMethod, setSelectedMethod] = useState('upi')
   const [mockPaying, setMockPaying] = useState(false)
@@ -318,21 +319,26 @@ function CheckoutPage() {
         quantity: Number(i.quantity || 1),
       }))
 
-      const order = await createOrder({
-        items,
-        email: form.email ? form.email.trim() : undefined,
-        shippingAddress: address,
-        billingAddress: address,
-        couponCode: appliedCoupon || (couponCode && couponCode.trim() ? couponCode.trim() : undefined),
-        cartId: !isBuyNow && cartId ? cartId : undefined,
-        cartToken: !isBuyNow && cartToken ? cartToken : undefined,
-      })
-
+      let order = pendingOrder
       if (!order || !order.id) {
-        toast.error('Could not create order. Please try again.')
-        setSubmitting(false)
-        setStage('')
-        return
+        order = await createOrder({
+          items,
+          email: form.email ? form.email.trim() : undefined,
+          shippingAddress: address,
+          billingAddress: address,
+          couponCode: appliedCoupon || (couponCode && couponCode.trim() ? couponCode.trim() : undefined),
+          cartId: !isBuyNow && cartId ? cartId : undefined,
+          cartToken: !isBuyNow && cartToken ? cartToken : undefined,
+        })
+
+        if (!order || !order.id) {
+          toast.error('Could not create order. Please try again.')
+          setSubmitting(false)
+          setStage('')
+          return
+        }
+
+        setPendingOrder(order)
       }
 
       try {
@@ -386,7 +392,14 @@ function CheckoutPage() {
               razorpaySignature: resp.razorpay_signature,
             })
             if (!v || !v.success) {
-              toast.error('Payment verification failed')
+              await recordPaymentFailure({
+                orderId: order.id,
+                razorpayOrderId: resp.razorpay_order_id,
+                razorpayPaymentId: resp.razorpay_payment_id,
+                errorCode: 'VERIFICATION_FAILED',
+                errorDescription: 'Payment verification failed on server',
+              })
+              toast.error('Payment verification failed. You can try again.')
               setSubmitting(false)
               setStage('')
               return
@@ -396,14 +409,28 @@ function CheckoutPage() {
             router.push(`/order-confirmation?orderId=${order.id}&orderNumber=${order.orderNumber || ''}`)
           } catch (e) {
             console.error(e)
-            toast.error('Could not verify payment. Please contact support.')
+            await recordPaymentFailure({
+              orderId: order.id,
+              razorpayOrderId: resp.razorpay_order_id,
+              razorpayPaymentId: resp.razorpay_payment_id,
+              errorCode: 'VERIFY_ERROR',
+              errorDescription: e?.message || 'Error verifying payment signature',
+            })
+            toast.error('Could not verify payment. Please try again.')
             setSubmitting(false)
             setStage('')
           }
         },
         modal: {
-          ondismiss: () => {
-            toast.info('Payment cancelled. Your order is pending payment.')
+          ondismiss: async () => {
+            await recordPaymentFailure({
+              orderId: order.id,
+              razorpayOrderId: session.razorpayOrderId,
+              errorCode: 'MODAL_DISMISSED',
+              errorDescription: 'Customer dismissed payment window',
+              source: 'client_modal',
+            })
+            toast.info('Payment was cancelled. You can retry payment when ready.')
             setSubmitting(false)
             setStage('')
           },
@@ -411,8 +438,19 @@ function CheckoutPage() {
       }
 
       const rzpInstance = new window.Razorpay(options)
-      rzpInstance.on('payment.failed', (e) => {
-        toast.error(e?.error?.description || 'Payment failed. Please try again.')
+      rzpInstance.on('payment.failed', async (e) => {
+        const error = e?.error || {}
+        await recordPaymentFailure({
+          orderId: order.id,
+          razorpayOrderId: error?.metadata?.order_id || session.razorpayOrderId,
+          razorpayPaymentId: error?.metadata?.payment_id,
+          errorCode: error?.code || 'PAYMENT_FAILED',
+          errorDescription: error?.description || 'Payment failed',
+          source: error?.source,
+          step: error?.step,
+          reason: error?.reason,
+        })
+        toast.error(error?.description || 'Payment failed. Please try another method or retry.')
         setSubmitting(false)
         setStage('')
       })
@@ -441,18 +479,41 @@ function CheckoutPage() {
         toast.success('Payment completed successfully!')
         router.push(`/order-confirmation?orderId=${mockPaymentModal.order.id}&orderNumber=${mockPaymentModal.order.orderNumber || ''}`)
       } else {
-        toast.error('Payment verification failed.')
+        await recordPaymentFailure({
+          orderId: mockPaymentModal.order.id,
+          razorpayOrderId: mockPaymentModal.session.razorpayOrderId,
+          errorCode: 'MOCK_VERIFY_FAILED',
+          errorDescription: 'Mock payment verification failed',
+          source: 'mock_gateway',
+        })
+        toast.error('Payment verification failed. You can try again.')
         setMockPaying(false)
       }
     } catch (e) {
       console.error(e)
+      await recordPaymentFailure({
+        orderId: mockPaymentModal.order.id,
+        razorpayOrderId: mockPaymentModal.session.razorpayOrderId,
+        errorCode: 'MOCK_PROCESSING_ERROR',
+        errorDescription: e?.message || 'Mock payment processing exception',
+        source: 'mock_gateway',
+      })
       toast.error('Payment processing failed. Please try again.')
       setMockPaying(false)
     }
   }
 
-  const handleCancelMockPayment = () => {
-    toast.info('Payment was cancelled. Your order remains pending.')
+  const handleCancelMockPayment = async () => {
+    if (mockPaymentModal?.order?.id && mockPaymentModal?.session?.razorpayOrderId) {
+      await recordPaymentFailure({
+        orderId: mockPaymentModal.order.id,
+        razorpayOrderId: mockPaymentModal.session.razorpayOrderId,
+        errorCode: 'MOCK_CANCELLED',
+        errorDescription: 'Customer cancelled test payment modal',
+        source: 'mock_gateway',
+      })
+    }
+    toast.info('Payment was cancelled. You can retry payment when ready.')
     setMockPaymentModal(null)
   }
 
