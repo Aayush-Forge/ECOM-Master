@@ -9,7 +9,15 @@ const BACKEND_URL =
 function getAuthToken() {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem('auth_session');
+    let raw = localStorage.getItem('auth_session');
+    if (!raw) {
+      const match = document.cookie.match(/(?:^|;\s*)sd_auth_session=([^;]+)/);
+      if (match) {
+        try {
+          raw = decodeURIComponent(match[1]);
+        } catch {}
+      }
+    }
     if (!raw) return null;
     const session = JSON.parse(raw);
     return session.access_token || session.token || null;
@@ -18,8 +26,8 @@ function getAuthToken() {
   }
 }
 
-function getAuthHeaders() {
-  const token = getAuthToken();
+function getAuthHeaders(extraToken = null) {
+  const token = extraToken || getAuthToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -27,10 +35,57 @@ function getAuthHeaders() {
   return headers;
 }
 
+async function refreshAuthToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    let raw = localStorage.getItem('auth_session');
+    if (!raw) {
+      const match = document.cookie.match(/(?:^|;\s*)sd_auth_session=([^;]+)/);
+      if (match) {
+        try {
+          raw = decodeURIComponent(match[1]);
+        } catch {}
+      }
+    }
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session?.refreshToken && !session?.refresh_token) return null;
+    const refreshToken = session.refreshToken || session.refresh_token;
+
+    const res = await fetch(`${BACKEND_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.access_token) return null;
+
+    session.access_token = data.access_token;
+    localStorage.setItem('auth_session', JSON.stringify(session));
+    window.dispatchEvent(new Event('auth-change'));
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAllDiscounts() {
-  const res = await fetch(`${BACKEND_URL}/clubbing-rules`, {
-    headers: getAuthHeaders(),
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/clubbing-rules`, {
+    headers,
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      res = await fetch(`${BACKEND_URL}/clubbing-rules`, {
+        headers: getAuthHeaders(newToken),
+      });
+    }
+  }
+
   if (!res.ok) {
     throw new Error(`Failed to fetch discount rules (${res.status})`);
   }
@@ -46,9 +101,20 @@ export function getDiscountByIdSync(id) {
 }
 
 export async function getDiscountById(id) {
-  const res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
-    headers: getAuthHeaders(),
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
+    headers,
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
+        headers: getAuthHeaders(newToken),
+      });
+    }
+  }
+
   if (!res.ok) {
     if (res.status === 404) return null;
     throw new Error(`Failed to fetch discount rule (${res.status})`);
@@ -73,11 +139,23 @@ export async function createDiscount(data) {
     isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
   };
 
-  const res = await fetch(`${BACKEND_URL}/clubbing-rules`, {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/clubbing-rules`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers,
     body: JSON.stringify(payload),
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      res = await fetch(`${BACKEND_URL}/clubbing-rules`, {
+        method: 'POST',
+        headers: getAuthHeaders(newToken),
+        body: JSON.stringify(payload),
+      });
+    }
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -107,11 +185,23 @@ export async function updateDiscount(id, data) {
     isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined,
   };
 
-  const res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
     method: 'PATCH',
-    headers: getAuthHeaders(),
+    headers,
     body: JSON.stringify(payload),
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(newToken),
+        body: JSON.stringify(payload),
+      });
+    }
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -125,10 +215,21 @@ export async function updateDiscount(id, data) {
 }
 
 export async function deleteDiscount(id) {
-  const res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers,
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      res = await fetch(`${BACKEND_URL}/clubbing-rules/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(newToken),
+      });
+    }
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -142,11 +243,23 @@ export async function deleteDiscount(id) {
 }
 
 export async function bulkDeleteDiscounts(ids) {
-  const res = await fetch(`${BACKEND_URL}/clubbing-rules/bulk-delete`, {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/clubbing-rules/bulk-delete`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers,
     body: JSON.stringify({ ids }),
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      res = await fetch(`${BACKEND_URL}/clubbing-rules/bulk-delete`, {
+        method: 'POST',
+        headers: getAuthHeaders(newToken),
+        body: JSON.stringify({ ids }),
+      });
+    }
+  }
 
   if (!res.ok) {
     throw new Error(`Failed to delete discounts (${res.status})`);
@@ -156,11 +269,23 @@ export async function bulkDeleteDiscounts(ids) {
 }
 
 export async function bulkUpdateDiscountsStatus(ids, isActive) {
-  const res = await fetch(`${BACKEND_URL}/clubbing-rules/bulk-status`, {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/clubbing-rules/bulk-status`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers,
     body: JSON.stringify({ ids, isActive }),
   });
+
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      res = await fetch(`${BACKEND_URL}/clubbing-rules/bulk-status`, {
+        method: 'POST',
+        headers: getAuthHeaders(newToken),
+        body: JSON.stringify({ ids, isActive }),
+      });
+    }
+  }
 
   if (!res.ok) {
     throw new Error(`Failed to update discounts status (${res.status})`);

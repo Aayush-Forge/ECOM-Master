@@ -297,9 +297,9 @@ export default function ProductsListView({ basePath = '/products' }) {
                 </TableRow>
               ) : (
                 filteredProducts.map((product) => {
-                  const stockCount = product.stock !== undefined ? product.stock : 10
-                  const isOutOfStock = stockCount === 0
-                  const isLowStock = stockCount > 0 && stockCount <= 5
+                  const isOutOfStock = product.stock_status
+                    ? product.stock_status === 'outofstock'
+                    : (product.stock === 0 || product.stockQuantity === 0)
 
                   return (
                     <TableRow key={product.id} className="hover:bg-stone-50/50">
@@ -307,7 +307,12 @@ export default function ProductsListView({ basePath = '/products' }) {
                         <Link href={`${basePath}/${product.id}/edit`} className="block group">
                           <div className="h-10 w-10 rounded-md overflow-hidden bg-stone-100 border border-stone-200 relative shrink-0 transition-transform group-hover:scale-105">
                             <img
-                              src={product.imageUrl || 'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300'}
+                              src={
+                                (typeof product.imageUrl === 'string' && product.imageUrl)
+                                  ? product.imageUrl
+                                  : (product.imageUrl?.src || product.images?.[0]?.src || (typeof product.images?.[0] === 'string' ? product.images[0] : '')) ||
+                                    'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300'
+                              }
                               alt={product.title}
                               className="h-full w-full object-cover"
                             />
@@ -344,16 +349,12 @@ export default function ProductsListView({ basePath = '/products' }) {
                       </TableCell>
                       <TableCell>
                         {isOutOfStock ? (
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 font-inter text-xs flex items-center gap-1 w-fit">
-                            <AlertTriangle className="w-3 h-3 text-red-600" /> Out of Stock
-                          </Badge>
-                        ) : isLowStock ? (
-                          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 font-inter text-xs flex items-center gap-1 w-fit">
-                            <AlertTriangle className="w-3 h-3 text-amber-600" /> Low Stock ({stockCount})
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-inter text-xs flex items-center gap-1.5 w-fit">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-600" /> Out of Stock
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 font-inter text-xs">
-                            In Stock ({stockCount})
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-inter text-xs flex items-center gap-1.5 w-fit">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> In Stock
                           </Badge>
                         )}
                       </TableCell>

@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { toast } from 'sonner';
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -35,4 +36,15 @@ export function openAuthenticatedUrl(baseUrl) {
   const separator = baseUrl.includes('?') ? '&' : '?';
   const fullUrl = `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
   window.open(fullUrl, '_blank');
+}
+
+/**
+ * Opens document view in a new tab with automatic native print / Save as PDF prompt.
+ * Bypasses fragile raster canvas tools to deliver vector-sharp, single-page A4 PDFs.
+ */
+export function downloadAuthenticatedDocument(baseUrl) {
+  if (typeof window === 'undefined') return;
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  const fullUrl = `${baseUrl}${separator}print=true`;
+  openAuthenticatedUrl(fullUrl);
 }

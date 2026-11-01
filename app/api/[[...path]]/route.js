@@ -269,7 +269,7 @@ async function handleRoute(request, { params }) {
         })
       }
 
-      return err('Invalid coupon code. Try WELCOME10, DIWALI2026, or FESTIVE100.', 404)
+      return err('Invalid or expired coupon code.', 404)
     }
 
     // ---- PRODUCTS LIST ----

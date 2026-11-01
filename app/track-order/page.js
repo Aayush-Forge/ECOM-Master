@@ -17,7 +17,8 @@ import {
   Calendar,
   RotateCcw,
   Phone,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
@@ -173,6 +174,7 @@ function TrackOrderContent() {
 
   const shippingAddr = order?.addresses?.find((a) => a.type === 'shipping') || order?.addresses?.[0] || order?.shippingAddress
   const isTerminalCancelledOrRefunded = ['cancelled', 'refunded'].includes(order?.status?.toLowerCase())
+  const canDownloadInvoice = Boolean(order?.id && order?.status && !['payment_pending', 'cancelled'].includes(order.status.toLowerCase()))
   const currentStepRank = STATUS_PROGRESS_RANK[order?.status?.toLowerCase()] ?? 0
   const progressPercent = Math.round((currentStepRank / (STATUS_PROGRESS_STEPS.length - 1)) * 100)
 
@@ -283,9 +285,22 @@ function TrackOrderContent() {
                     })}
                   </p>
                 </div>
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5 sm:self-center">
                   <span className="text-xs text-stone-500 font-inter hidden sm:inline">Status:</span>
                   {getStatusBadge(order.status)}
+                  {canDownloadInvoice && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+                        window.open(`${backendUrl}/orders/${order.id}/invoice?download=true`, '_blank');
+                      }}
+                      className="border-stone-300 text-stone-700 hover:bg-stone-50 font-inter text-xs font-semibold shadow-2xs h-8"
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Download Tax Invoice (PDF)
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -488,6 +503,21 @@ function TrackOrderContent() {
                         ₹{Number(order.grandTotal || 0).toLocaleString('en-IN')}
                       </span>
                     </div>
+                    {canDownloadInvoice && (
+                      <div className="pt-2 border-t border-stone-200/80">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+                            window.open(`${backendUrl}/orders/${order.id}/invoice?download=true`, '_blank');
+                          }}
+                          className="w-full border-stone-300 text-stone-700 hover:bg-stone-100 font-inter text-xs font-semibold"
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1.5 text-[#FF6B00]" /> Download Tax Invoice (PDF)
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -14,6 +14,15 @@ export interface CartItemDiscountInput {
   price: number;
 }
 
+export interface CartDiscountCalculationResult {
+  discountTotal: number;
+  bundleDiscount: number;
+  couponDiscount: number;
+  appliedRuleId: string | null;
+  appliedCouponCode: string | null;
+  couponError?: string | null;
+}
+
 @Injectable()
 export class ClubbingService implements OnModuleInit {
   private readonly logger = new Logger(ClubbingService.name);
@@ -42,7 +51,7 @@ export class ClubbingService implements OnModuleInit {
           description:
             'Exclusive Diwali festive clubbing collection. Hand-selected premium incense and sacred dhoop at special celebratory prices.',
           type: ClubbingRuleType.custom_product_clubbing,
-          code: 'diwali',
+          code: null,
           requiredQuantity: 1,
           bannerImageDesktop: '/HD1.png',
           bannerImageMobile: '/HM1.png',
@@ -147,7 +156,7 @@ export class ClubbingService implements OnModuleInit {
     };
 
     if (!publicOnly) {
-      base.code = r.code || r.id;
+      base.code = r.code || '';
       base.usageLimit = r.usageLimit;
       base.usageCount = r.usageCount;
     }
@@ -252,10 +261,16 @@ export class ClubbingService implements OnModuleInit {
     }
 
     const eventName = String(dto.eventName || dto.name || '').trim();
-    let code = (dto.code || eventName.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/[\s-]+/g, '-')) || `clb-${Date.now()}`;
-    const existingCode = await this.prisma.clubbingRule.findUnique({ where: { code } });
-    if (existingCode) {
-      code = `${code}-${Date.now().toString().slice(-4)}`;
+    const rawCode = dto.code !== undefined && dto.code !== null && String(dto.code).trim() !== ''
+      ? String(dto.code).trim().toUpperCase()
+      : null;
+
+    let code: string | null = rawCode;
+    if (code) {
+      const existingCode = await this.prisma.clubbingRule.findUnique({ where: { code } });
+      if (existingCode) {
+        throw new BadRequestException(`Coupon code "${code}" is already in use.`);
+      }
     }
 
     const desktopImg = dto.bannerImageDesktop || dto.bannerImage || null;
@@ -276,8 +291,8 @@ export class ClubbingService implements OnModuleInit {
         type: dto.type || ClubbingRuleType.custom_product_clubbing,
         code,
         requiredQuantity: Number(dto.requiredQuantity) || 1,
-        fixedPrice: dto.fixedPrice !== undefined && dto.fixedPrice !== null ? Number(dto.fixedPrice) : null,
-        percentageOff: dto.percentageOff !== undefined && dto.percentageOff !== null ? Number(dto.percentageOff) : null,
+        fixedPrice: dto.fixedPrice !== undefined && dto.fixedPrice !== null && dto.fixedPrice !== '' ? Number(dto.fixedPrice) : null,
+        percentageOff: dto.percentageOff !== undefined && dto.percentageOff !== null && dto.percentageOff !== '' ? Number(dto.percentageOff) : null,
         applicableCategoryId: dto.applicableCategoryId || null,
         bannerImageDesktop: desktopImg,
         bannerImageMobile: mobileImg,
@@ -288,6 +303,7 @@ export class ClubbingService implements OnModuleInit {
         heroCtaText: dto.heroCtaText || 'Shop Festive Deals',
         startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
         endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        usageLimit: dto.usageLimit !== undefined && dto.usageLimit !== null && dto.usageLimit !== '' ? Number(dto.usageLimit) : null,
         isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : true,
         products: {
           create: clubbingProducts
@@ -316,11 +332,24 @@ export class ClubbingService implements OnModuleInit {
     if (dto.eventName !== undefined) updateData.eventName = String(dto.eventName).trim();
     if (dto.tagline !== undefined) updateData.tagline = dto.tagline;
     if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.code !== undefined) updateData.code = dto.code;
+    if (dto.code !== undefined) {
+      if (dto.code === null || String(dto.code).trim() === '') {
+        updateData.code = null;
+      } else {
+        const cleanCode = String(dto.code).trim().toUpperCase();
+        const existingCodeMatch = await this.prisma.clubbingRule.findFirst({
+          where: { code: cleanCode, NOT: { id: existing.id } },
+        });
+        if (existingCodeMatch) {
+          throw new BadRequestException(`Coupon code "${cleanCode}" is already in use.`);
+        }
+        updateData.code = cleanCode;
+      }
+    }
     if (dto.type !== undefined) updateData.type = dto.type;
     if (dto.requiredQuantity !== undefined) updateData.requiredQuantity = Number(dto.requiredQuantity);
-    if (dto.fixedPrice !== undefined) updateData.fixedPrice = dto.fixedPrice !== null ? Number(dto.fixedPrice) : null;
-    if (dto.percentageOff !== undefined) updateData.percentageOff = dto.percentageOff !== null ? Number(dto.percentageOff) : null;
+    if (dto.fixedPrice !== undefined) updateData.fixedPrice = dto.fixedPrice !== null && dto.fixedPrice !== '' ? Number(dto.fixedPrice) : null;
+    if (dto.percentageOff !== undefined) updateData.percentageOff = dto.percentageOff !== null && dto.percentageOff !== '' ? Number(dto.percentageOff) : null;
     if (dto.applicableCategoryId !== undefined) updateData.applicableCategoryId = dto.applicableCategoryId || null;
     if (dto.bannerImageDesktop !== undefined) updateData.bannerImageDesktop = dto.bannerImageDesktop;
     if (dto.bannerImageMobile !== undefined) updateData.bannerImageMobile = dto.bannerImageMobile;
@@ -331,6 +360,9 @@ export class ClubbingService implements OnModuleInit {
     if (dto.heroCtaText !== undefined) updateData.heroCtaText = dto.heroCtaText;
     if (dto.startsAt !== undefined) updateData.startsAt = dto.startsAt ? new Date(dto.startsAt) : null;
     if (dto.endsAt !== undefined) updateData.endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
+    if (dto.usageLimit !== undefined) {
+      updateData.usageLimit = dto.usageLimit !== null && dto.usageLimit !== '' ? Number(dto.usageLimit) : null;
+    }
     if (dto.isActive !== undefined) updateData.isActive = Boolean(dto.isActive);
 
     const clubbingProducts = dto.clubbingProducts || (Array.isArray(dto.applicableProductIds) ? dto.applicableProductIds.map((pId: string, idx: number) => ({ productId: pId, sortOrder: idx })) : null);
@@ -411,35 +443,128 @@ export class ClubbingService implements OnModuleInit {
     return { success: true, count: ids.length, isActive };
   }
 
-  async calculateCartDiscount(cartItems: CartItemDiscountInput[], couponCode?: string) {
+  async calculateCartDiscount(
+    cartItems: CartItemDiscountInput[],
+    couponCode?: string,
+  ): Promise<CartDiscountCalculationResult> {
     let discountTotal = 0;
+    let bundleDiscount = 0;
+    let couponDiscount = 0;
     let appliedRuleId: string | null = null;
     let appliedCouponCode: string | null = null;
+    let couponError: string | null = null;
 
     if (!Array.isArray(cartItems) || cartItems.length === 0) {
-      return { discountTotal: 0, appliedRuleId: null, appliedCouponCode: null };
+      return {
+        discountTotal: 0,
+        bundleDiscount: 0,
+        couponDiscount: 0,
+        appliedRuleId: null,
+        appliedCouponCode: null,
+        couponError: null,
+      };
     }
 
+    // 1. Fetch categories for cart products
+    const productIds = Array.from(new Set(cartItems.map((it) => it.productId).filter(Boolean)));
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, categoryId: true },
+    });
+    const categoryMap = new Map<string, string>(products.map((p) => [p.id, p.categoryId]));
+
+    // 2. Fetch all active rules
     const activeRules = await this.getActiveRules(false);
+
+    // 3. Separate automatic bundle rules vs coupon rule
+    const normalizedCouponCode =
+      couponCode && typeof couponCode === 'string' && couponCode.trim() !== ''
+        ? couponCode.trim().toLowerCase()
+        : null;
+
+    let matchedCouponRule: any = null;
+
+    if (normalizedCouponCode) {
+      matchedCouponRule = activeRules.find((r) => {
+        const codeMatch = r.code && String(r.code).toLowerCase() === normalizedCouponCode;
+        const nameMatch = r.name && String(r.name).toLowerCase() === normalizedCouponCode;
+        return codeMatch || nameMatch;
+      });
+
+      if (!matchedCouponRule) {
+        const ruleInDb = await this.prisma.clubbingRule.findFirst({
+          where: {
+            OR: [
+              { code: { equals: normalizedCouponCode, mode: 'insensitive' as any } },
+              { name: { equals: normalizedCouponCode, mode: 'insensitive' as any } },
+            ],
+          },
+        });
+
+        if (!ruleInDb) {
+          couponError = 'Invalid coupon code';
+        } else if (!ruleInDb.isActive) {
+          couponError = 'This coupon is no longer active';
+        } else if (ruleInDb.startsAt && new Date(ruleInDb.startsAt) > new Date()) {
+          couponError = 'This coupon is not active yet';
+        } else if (ruleInDb.endsAt && new Date(ruleInDb.endsAt) < new Date()) {
+          couponError = 'This coupon has expired';
+        } else if (ruleInDb.usageLimit !== null && ruleInDb.usageCount >= ruleInDb.usageLimit) {
+          couponError = 'Coupon usage limit has been reached';
+        } else {
+          couponError = 'Coupon is not applicable to current cart';
+        }
+      } else {
+        if (
+          matchedCouponRule.usageLimit !== null &&
+          matchedCouponRule.usageLimit !== undefined &&
+          matchedCouponRule.usageCount >= matchedCouponRule.usageLimit
+        ) {
+          couponError = 'Coupon usage limit has been reached';
+          matchedCouponRule = null;
+        }
+      }
+    }
+
+    // Working items representation to calculate bundle discounts first and then stack coupon discounts
+    const workingItems = cartItems.map((it) => ({
+      productId: it.productId,
+      quantity: Number(it.quantity) || 1,
+      originalUnitPrice: Number(it.price) || 0,
+      currentUnitPrice: Number(it.price) || 0,
+      bundleSavings: 0,
+    }));
+
     const consumedProductIds = new Set<string>();
 
+    // 4. STEP 1: Apply Automatic Rules (Rules without an explicit promo coupon code, or custom_product_clubbing)
     for (const rule of activeRules) {
-      if (rule.code && couponCode && rule.code.toLowerCase() === couponCode.trim().toLowerCase()) {
-        appliedCouponCode = rule.code;
+      if (rule === matchedCouponRule) continue;
+      // If a rule has a code and is not custom_product_clubbing, it requires that code
+      if (rule.code && rule.type !== ClubbingRuleType.custom_product_clubbing) {
+        continue;
       }
 
       const productsList = rule.products || rule.clubbingProducts || [];
+      const hasSpecificProducts = Array.isArray(productsList) && productsList.length > 0;
       const eligibleProductIds = new Set(
-        productsList.map((p: any) => p.productId || p.id).filter(Boolean)
+        productsList.map((p: any) => p.productId || p.id).filter(Boolean),
       );
 
-      const qualifyingItems = cartItems.filter(
-        (it) => eligibleProductIds.has(it.productId) && !consumedProductIds.has(it.productId),
-      );
+      const qualifyingItems = workingItems.filter((it) => {
+        if (consumedProductIds.has(it.productId)) return false;
+        if (hasSpecificProducts) {
+          return eligibleProductIds.has(it.productId);
+        }
+        if (rule.applicableCategoryId && rule.applicableCategoryId !== 'all') {
+          return categoryMap.get(it.productId) === rule.applicableCategoryId;
+        }
+        return true;
+      });
 
       if (qualifyingItems.length === 0) continue;
 
-      const totalQualifyingQty = qualifyingItems.reduce((acc, it) => acc + (it.quantity || 1), 0);
+      const totalQualifyingQty = qualifyingItems.reduce((acc, it) => acc + it.quantity, 0);
       const reqQty = Number(rule.requiredQuantity) || 1;
       const ruleType = String(rule.type || '').toLowerCase();
 
@@ -447,35 +572,45 @@ export class ClubbingService implements OnModuleInit {
         if (totalQualifyingQty >= reqQty && rule.fixedPrice !== null && rule.fixedPrice !== undefined) {
           const bundles = Math.floor(totalQualifyingQty / reqQty);
           const bundledQty = bundles * reqQty;
-          const totalVal = qualifyingItems.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+          const totalVal = qualifyingItems.reduce((sum, it) => sum + it.currentUnitPrice * it.quantity, 0);
           const avgUnitPrice = totalVal / totalQualifyingQty;
           const originalBundledAmount = avgUnitPrice * bundledQty;
           const discountedBundledAmount = Number(rule.fixedPrice) * bundles;
           const saving = Math.max(0, originalBundledAmount - discountedBundledAmount);
 
           if (saving > 0) {
-            discountTotal += saving;
+            bundleDiscount += saving;
             appliedRuleId = rule.id;
-            qualifyingItems.forEach((it) => consumedProductIds.add(it.productId));
+            const savingPerUnit = saving / bundledQty;
+            qualifyingItems.forEach((it) => {
+              consumedProductIds.add(it.productId);
+              it.currentUnitPrice = Math.max(0, it.currentUnitPrice - savingPerUnit);
+              it.bundleSavings += savingPerUnit * it.quantity;
+            });
           }
         }
       } else if (ruleType === 'percentage_off_bundle' || ruleType === 'percentage_off') {
         if (totalQualifyingQty >= reqQty && rule.percentageOff !== null && rule.percentageOff !== undefined) {
           const bundles = Math.floor(totalQualifyingQty / reqQty);
           const bundledQty = bundles * reqQty;
-          const totalVal = qualifyingItems.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+          const totalVal = qualifyingItems.reduce((sum, it) => sum + it.currentUnitPrice * it.quantity, 0);
           const avgUnitPrice = totalVal / totalQualifyingQty;
           const originalBundledAmount = avgUnitPrice * bundledQty;
           const saving = originalBundledAmount * (Number(rule.percentageOff) / 100);
 
           if (saving > 0) {
-            discountTotal += saving;
+            bundleDiscount += saving;
             appliedRuleId = rule.id;
-            qualifyingItems.forEach((it) => consumedProductIds.add(it.productId));
+            const savingPerUnit = saving / bundledQty;
+            qualifyingItems.forEach((it) => {
+              consumedProductIds.add(it.productId);
+              it.currentUnitPrice = Math.max(0, it.currentUnitPrice - savingPerUnit);
+              it.bundleSavings += savingPerUnit * it.quantity;
+            });
           }
         }
       } else {
-        // custom_product_clubbing or specific product price override
+        // custom_product_clubbing
         let customSavings = 0;
         const eligibleMap = new Map<string, any>();
         for (const p of productsList) {
@@ -485,25 +620,106 @@ export class ClubbingService implements OnModuleInit {
         if (totalQualifyingQty >= reqQty) {
           for (const item of qualifyingItems) {
             const cp = eligibleMap.get(item.productId);
-            if (cp && cp.clubbingPrice && Number(cp.clubbingPrice) < item.price) {
-              const diff = item.price - Number(cp.clubbingPrice);
-              customSavings += diff * (item.quantity || 1);
+            if (cp && cp.clubbingPrice && Number(cp.clubbingPrice) < item.currentUnitPrice) {
+              const diff = item.currentUnitPrice - Number(cp.clubbingPrice);
+              const itemSave = diff * item.quantity;
+              customSavings += itemSave;
+              item.currentUnitPrice = Number(cp.clubbingPrice);
+              item.bundleSavings += itemSave;
+              consumedProductIds.add(item.productId);
             }
           }
         }
 
         if (customSavings > 0) {
-          discountTotal += customSavings;
+          bundleDiscount += customSavings;
           appliedRuleId = rule.id;
-          qualifyingItems.forEach((it) => consumedProductIds.add(it.productId));
         }
       }
     }
 
+    // 5. STEP 2: Apply Matched Coupon Code Rule
+    if (matchedCouponRule) {
+      const productsList = matchedCouponRule.products || matchedCouponRule.clubbingProducts || [];
+      const hasSpecificProducts = Array.isArray(productsList) && productsList.length > 0;
+      const eligibleProductIds = new Set(
+        productsList.map((p: any) => p.productId || p.id).filter(Boolean),
+      );
+
+      const qualifyingItems = workingItems.filter((it) => {
+        if (hasSpecificProducts) {
+          return eligibleProductIds.has(it.productId);
+        }
+        if (matchedCouponRule.applicableCategoryId && matchedCouponRule.applicableCategoryId !== 'all') {
+          return categoryMap.get(it.productId) === matchedCouponRule.applicableCategoryId;
+        }
+        return true; // storewide coupon
+      });
+
+      const totalQualifyingQty = qualifyingItems.reduce((acc, it) => acc + it.quantity, 0);
+      const reqQty = Number(matchedCouponRule.requiredQuantity) || 1;
+      const ruleType = String(matchedCouponRule.type || '').toLowerCase();
+
+      if (qualifyingItems.length === 0 || totalQualifyingQty < reqQty) {
+        couponError = `Coupon requires at least ${reqQty} qualifying item(s) in your cart`;
+      } else {
+        let couponSavings = 0;
+
+        if (ruleType === 'percentage_off_bundle' || ruleType === 'percentage_off') {
+          if (matchedCouponRule.percentageOff !== null && matchedCouponRule.percentageOff !== undefined) {
+            const pct = Number(matchedCouponRule.percentageOff);
+            // Apply percentage discount on effective price of qualifying items (including bundled items)
+            couponSavings = qualifyingItems.reduce(
+              (sum, it) => sum + it.currentUnitPrice * it.quantity * (pct / 100),
+              0,
+            );
+          }
+        } else if (ruleType === 'fixed_price_bundle' || ruleType === 'fixed_price') {
+          if (matchedCouponRule.fixedPrice !== null && matchedCouponRule.fixedPrice !== undefined) {
+            const bundles = Math.floor(totalQualifyingQty / reqQty);
+            const bundledQty = bundles * reqQty;
+            const totalVal = qualifyingItems.reduce(
+              (sum, it) => sum + it.currentUnitPrice * it.quantity,
+              0,
+            );
+            const avgUnitPrice = totalVal / totalQualifyingQty;
+            const originalBundledAmount = avgUnitPrice * bundledQty;
+            const discountedBundledAmount = Number(matchedCouponRule.fixedPrice) * bundles;
+            couponSavings = Math.max(0, originalBundledAmount - discountedBundledAmount);
+          }
+        } else {
+          // custom_product_clubbing
+          const eligibleMap = new Map<string, any>();
+          for (const p of productsList) {
+            eligibleMap.set(p.productId || p.id, p);
+          }
+          for (const item of qualifyingItems) {
+            const cp = eligibleMap.get(item.productId);
+            if (cp && cp.clubbingPrice && Number(cp.clubbingPrice) < item.currentUnitPrice) {
+              couponSavings += (item.currentUnitPrice - Number(cp.clubbingPrice)) * item.quantity;
+            }
+          }
+        }
+
+        if (couponSavings > 0) {
+          couponDiscount = couponSavings;
+          appliedCouponCode = matchedCouponRule.code || matchedCouponRule.name;
+          couponError = null;
+        } else {
+          couponError = 'Coupon does not provide an additional discount on current cart';
+        }
+      }
+    }
+
+    discountTotal = bundleDiscount + couponDiscount;
+
     return {
       discountTotal: Math.round(discountTotal * 100) / 100,
+      bundleDiscount: Math.round(bundleDiscount * 100) / 100,
+      couponDiscount: Math.round(couponDiscount * 100) / 100,
       appliedRuleId,
       appliedCouponCode,
+      couponError,
     };
   }
 }

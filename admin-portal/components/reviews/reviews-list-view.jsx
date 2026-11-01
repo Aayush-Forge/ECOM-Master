@@ -285,7 +285,7 @@ export default function ReviewsListView() {
                       <div className="w-11 h-11 rounded-lg bg-stone-100 border border-stone-200 shrink-0 overflow-hidden flex items-center justify-center">
                         {p.images?.[0] ? (
                           <img
-                            src={p.images[0]}
+                            src={typeof p.images[0] === 'string' ? p.images[0] : (p.images[0]?.src || p.imageUrl)}
                             alt={p.title}
                             className="w-full h-full object-cover"
                           />
@@ -360,7 +360,7 @@ export default function ReviewsListView() {
                   <div className="w-12 h-12 rounded-lg bg-white border border-stone-200 shrink-0 overflow-hidden flex items-center justify-center shadow-2xs">
                     {selectedProduct.images?.[0] ? (
                       <img
-                        src={selectedProduct.images[0]}
+                        src={typeof selectedProduct.images[0] === 'string' ? selectedProduct.images[0] : (selectedProduct.images[0]?.src || selectedProduct.imageUrl)}
                         alt={selectedProduct.title}
                         className="w-full h-full object-cover"
                       />

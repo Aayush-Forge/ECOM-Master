@@ -162,8 +162,11 @@ export class ClubbingController {
     );
     return {
       discountTotal: result.discountTotal,
+      bundleDiscount: result.bundleDiscount,
+      couponDiscount: result.couponDiscount,
       appliedCouponCode: result.appliedCouponCode,
       appliedRuleId: result.appliedRuleId,
+      couponError: result.couponError,
     };
   }
 }

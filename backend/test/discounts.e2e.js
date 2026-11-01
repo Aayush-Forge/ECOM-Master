@@ -76,6 +76,7 @@ async function run() {
     // 2. Order 1 with coupon: Should succeed and atomically increment usage_count to 1
     console.log('\n--- Test 2: Apply Coupon First Time (Usage 0 -> 1) ---');
     const orderPayload = {
+      email: 'test@sridattam.com',
       items: [
         {
           productId: product.id,

@@ -40,11 +40,14 @@ export interface PricingCalculationResult {
   items: ComputedPricingItem[];
   subtotal: number;
   discountTotal: number;
+  bundleDiscount?: number;
+  couponDiscount?: number;
   shippingTotal: number;
   taxTotal: number;
   grandTotal: number;
   appliedCouponCode?: string | null;
   appliedRuleId?: string | null;
+  couponError?: string | null;
   shippingTemplateName?: string | null;
   shippingCarrier?: string | null;
   shippingSnapshot?: any;
@@ -291,8 +294,11 @@ export class PricingService {
     }
 
     let discountTotal = 0;
+    let bundleDiscount = 0;
+    let couponDiscount = 0;
     let appliedCouponCode: string | null = null;
     let appliedRuleId: string | null = null;
+    let couponError: string | null = null;
 
     try {
       const discountRes = await this.clubbingService.calculateCartDiscount(
@@ -300,8 +306,15 @@ export class PricingService {
         options.couponCode || undefined,
       );
       discountTotal = Number(discountRes?.discountTotal || 0);
+      bundleDiscount = Number(discountRes?.bundleDiscount || 0);
+      couponDiscount = Number(discountRes?.couponDiscount || 0);
       appliedCouponCode = discountRes?.appliedCouponCode || null;
       appliedRuleId = discountRes?.appliedRuleId || null;
+      couponError = discountRes?.couponError || null;
+
+      if (options.couponCode && throwOnError && !appliedCouponCode) {
+        throw new BadRequestException(couponError || 'Coupon is invalid or usage limit reached');
+      }
     } catch (err) {
       if (throwOnError) {
         throw err;
@@ -323,6 +336,9 @@ export class PricingService {
       items: computedItems,
       subtotal,
       discountTotal,
+      bundleDiscount,
+      couponDiscount,
+      couponError,
       shippingTotal,
       taxTotal,
       grandTotal,

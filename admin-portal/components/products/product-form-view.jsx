@@ -91,11 +91,8 @@ const productSchema = z
     price: optionalNumber('Price', 2),
     salePrice: optionalNumber('Sale price', 2),
     compareAtPrice: optionalNumber('Compare-at price', 2),
-    stockQuantity: z.coerce
-      .number({ invalid_type_error: 'Stock quantity must be a number.' })
-      .int('Stock quantity must be an integer.')
-      .min(0, 'Stock quantity cannot be negative.')
-      .default(50),
+    stockStatus: z.enum(['instock', 'outofstock']).default('instock'),
+    stockQuantity: z.coerce.number().optional().default(100),
     status: z.enum(['draft', 'active', 'archived']).default('active'),
     category: z.string().trim().min(1, 'Category is required.'),
     shortDescription: z
@@ -193,7 +190,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
       price: '',
       salePrice: '',
       compareAtPrice: '',
-      stockQuantity: 50,
+      stockStatus: 'instock',
+      stockQuantity: 100,
       status: 'active',
       category: '',
       shippingTemplateId: 'default',
@@ -260,7 +258,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                   const combo = attrs.map((a) => a.option || a.value).join(' / ')
                   const regP = v.regularPrice ?? v.regular_price ?? v.price ?? ''
                   const saleP = v.salePrice ?? v.sale_price ?? ''
-                  const stock = v.stockQuantity ?? v.stock_quantity ?? 50
+                  const stockNum = v.stockQuantity ?? v.stock_quantity ?? 100
+                  const vStockStatus = (v.stock_status === 'outofstock' || Number(stockNum) === 0) ? 'outofstock' : 'instock'
                   const img = typeof v.image === 'string' ? v.image : (v.image?.src || '')
                   const active = v.isActive !== false
 
@@ -271,7 +270,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                       attributes: attrs.map((a) => ({ name: a.name, option: a.option || a.value })),
                       price: regP !== null && regP !== undefined ? String(regP) : '',
                       salePrice: saleP !== null && saleP !== undefined ? String(saleP) : '',
-                      stockQuantity: stock,
+                      stockStatus: vStockStatus,
+                      stockQuantity: vStockStatus === 'outofstock' ? 0 : 100,
                       weight: v.weight !== null && v.weight !== undefined ? String(v.weight) : '',
                       length: v.length !== null && v.length !== undefined ? String(v.length) : '',
                       width: v.width !== null && v.width !== undefined ? String(v.width) : '',
@@ -285,6 +285,10 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
             }
           }
 
+          const isProdInStock = product.stock_status
+            ? product.stock_status !== 'outofstock'
+            : (product.stockQuantity ?? product.stock ?? 100) > 0
+
           form.reset({
             title: product.title || '',
             slug: product.slug || '',
@@ -292,7 +296,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
             price: product.basePrice ?? product.price ?? '',
             salePrice: product.salePrice ?? '',
             compareAtPrice: product.compareAtPrice ?? '',
-            stockQuantity: product.stockQuantity ?? product.stock ?? 50,
+            stockStatus: isProdInStock ? 'instock' : 'outofstock',
+            stockQuantity: isProdInStock ? 100 : 0,
             status: product.status || 'active',
             category: product.categoryId || product.categoryDetails?.id || product.category || '',
             shortDescription: product.shortDescription || '',
@@ -301,12 +306,10 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
             length: product.length ?? '',
             width: product.width ?? '',
             height: product.height ?? '',
-            images:
-              Array.isArray(product.images) && product.images.length > 0
-                ? product.images
-                : product.imageUrl
-                  ? [product.imageUrl]
-                  : [],
+            images: (Array.isArray(product.images) && product.images.length > 0
+              ? product.images
+              : (product.imageUrl ? [product.imageUrl] : [])
+            ).map((img) => typeof img === 'string' ? img : (img?.src || img?.url || '')).filter(Boolean),
             metaTitle: product.metaTitle || '',
             metaDescription: product.metaDescription || '',
           })
@@ -375,7 +378,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
     }, [])
 
     const basePrice = form.getValues('price') || 0
-    const baseStock = form.getValues('stockQuantity') ?? 50
+    const baseStockStatus = form.getValues('stockStatus') || 'instock'
     const parentSku = form.getValues('sku') || 'SME'
     const primaryImg = (form.getValues('images') || [])[0] || ''
 
@@ -400,7 +403,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
           attributes: combo,
           price: basePrice,
           salePrice: '',
-          stockQuantity: baseStock,
+          stockStatus: baseStockStatus,
+          stockQuantity: baseStockStatus === 'outofstock' ? 0 : 100,
           weight: form.getValues('weight') ? String(form.getValues('weight')) : '',
           length: form.getValues('length') ? String(form.getValues('length')) : '',
           width: form.getValues('width') ? String(form.getValues('width')) : '',
@@ -417,23 +421,32 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
     if (validPrices.length > 0) {
       form.setValue('price', Math.min(...validPrices), { shouldValidate: true })
     }
-    const totalStock = newVars.filter((v) => v.isActive !== false).reduce((acc, v) => acc + (Number(v.stockQuantity) || 0), 0)
-    form.setValue('stockQuantity', totalStock, { shouldValidate: true })
+    const hasAnyInStock = newVars.filter((v) => v.isActive !== false).some((v) => v.stockStatus !== 'outofstock')
+    form.setValue('stockStatus', hasAnyInStock ? 'instock' : 'outofstock', { shouldValidate: true })
+    form.setValue('stockQuantity', hasAnyInStock ? 100 : 0)
     toast.success(`Generated ${newVars.length} variation(s)`)
   }
 
   const handleVariationChange = (idx, field, value) => {
     setVariations((prev) => {
       const next = [...prev]
-      next[idx] = { ...next[idx], [field]: value }
-      if (field === 'price') {
-        const prices = next.filter((v) => v.isActive !== false).map((v) => Number(v.price)).filter((p) => p > 0)
-        if (prices.length > 0) {
-          form.setValue('price', Math.min(...prices), { shouldValidate: true })
+      if (field === 'stockStatus') {
+        next[idx] = {
+          ...next[idx],
+          stockStatus: value,
+          stockQuantity: value === 'outofstock' ? 0 : 100,
         }
-      } else if (field === 'stockQuantity') {
-        const total = next.filter((v) => v.isActive !== false).reduce((acc, v) => acc + (Number(v.stockQuantity) || 0), 0)
-        form.setValue('stockQuantity', total, { shouldValidate: true })
+        const hasAnyInStock = next.filter((v) => v.isActive !== false).some((v) => v.stockStatus !== 'outofstock')
+        form.setValue('stockStatus', hasAnyInStock ? 'instock' : 'outofstock', { shouldValidate: true })
+        form.setValue('stockQuantity', hasAnyInStock ? 100 : 0)
+      } else {
+        next[idx] = { ...next[idx], [field]: value }
+        if (field === 'price') {
+          const prices = next.filter((v) => v.isActive !== false).map((v) => Number(v.price)).filter((p) => p > 0)
+          if (prices.length > 0) {
+            form.setValue('price', Math.min(...prices), { shouldValidate: true })
+          }
+        }
       }
       return next
     })
@@ -475,9 +488,15 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
   }
 
   const handleBulkStock = () => {
-    const s = form.getValues('stockQuantity') ?? 50
-    setVariations((prev) => prev.map((v) => ({ ...v, stockQuantity: s })))
-    toast.success(`Applied ${s} stock units to all variations`)
+    const s = form.getValues('stockStatus') || 'instock'
+    setVariations((prev) =>
+      prev.map((v) => ({
+        ...v,
+        stockStatus: s,
+        stockQuantity: s === 'outofstock' ? 0 : 100,
+      }))
+    )
+    toast.success(`Applied "${s === 'instock' ? 'In Stock' : 'Out of Stock'}" status to all variations`)
   }
 
   const handleBulkDimensions = () => {
@@ -517,7 +536,9 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
 
     setSubmitting(true)
     try {
-      const cleanImages = (values.images || []).filter((url) => Boolean(url && url.trim()))
+      const cleanImages = (values.images || [])
+        .map((img) => (typeof img === 'string' ? img : (img?.src || img?.url || '')))
+        .filter((url) => Boolean(url && url.trim()))
       const customFields = { ...(loadedCustomFields || {}) }
       delete customFields.type
       delete customFields.attributes
@@ -571,7 +592,8 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
           }, [])
 
           const baseP = Number(values.price) || 100
-          const baseS = Number(values.stockQuantity) ?? 50
+          const baseStatus = values.stockStatus ?? 'instock'
+          const baseS = baseStatus === 'outofstock' ? 0 : 100
           const parentSku = values.sku || 'SME'
           const primaryImg = cleanImages[0] || ''
 
@@ -584,6 +606,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
               attributes: combo,
               price: baseP,
               salePrice: '',
+              stockStatus: baseStatus,
               stockQuantity: baseS,
               image: primaryImg,
               isActive: true,
@@ -604,11 +627,12 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
           .filter((a) => a.name && a.options.length > 0)
 
         const formattedVariations = currentVariations.map((v) => {
+          const isVariantOut = v.stockStatus === 'outofstock' || Number(v.stockQuantity) === 0
           const varObj = {
             sku: v.sku?.trim() ? v.sku.trim() : undefined,
             regularPrice: Number(v.price ?? values.price ?? 0),
             salePrice: v.salePrice !== undefined && v.salePrice !== null && v.salePrice !== '' ? Number(v.salePrice) : undefined,
-            stockQuantity: Number(v.stockQuantity ?? 0),
+            stockQuantity: isVariantOut ? 0 : 100,
             weight: v.weight !== undefined && v.weight !== '' ? Number(v.weight) : (values.weight ? Number(values.weight) : undefined),
             length: v.length !== undefined && v.length !== '' ? Number(v.length) : (values.length ? Number(values.length) : undefined),
             width: v.width !== undefined && v.width !== '' ? Number(v.width) : (values.width ? Number(values.width) : undefined),
@@ -629,6 +653,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
         delete payload.price
         delete payload.basePrice
         delete payload.stockQuantity
+        delete payload.stockStatus
 
         payload = {
           ...payload,
@@ -645,8 +670,9 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
           ...payload,
           productType: 'simple',
           basePrice: Number(values.price || 0),
-          stockQuantity: Number(values.stockQuantity ?? 50),
+          stockQuantity: values.stockStatus === 'outofstock' ? 0 : 100,
         }
+        delete payload.stockStatus
         delete payload.attributes
         delete payload.variations
         if (isEdit && productVersion !== undefined) {
@@ -999,20 +1025,31 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
 
                   <FormField
                     control={form.control}
-                    name="stockQuantity"
+                    name="stockStatus"
                     render={({ field }) => (
                       <FormItem className="space-y-1">
-                        <FormLabel className="text-xs font-semibold text-stone-700">Stock Units</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1"
-                            placeholder="50"
-                            className="h-9 text-xs font-mono font-medium"
-                            {...field}
-                          />
-                        </FormControl>
+                        <FormLabel className="text-xs font-semibold text-stone-700">Stock Availability</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white h-9 text-xs font-medium">
+                              <SelectValue placeholder="Stock status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="instock" className="text-xs">
+                              <span className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                In Stock
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="outofstock" className="text-xs">
+                              <span className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-red-500" />
+                                Out of Stock
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage className="text-[11px] text-red-600 font-medium" />
                       </FormItem>
                     )}
@@ -1317,7 +1354,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                     <div className="space-y-2">
                       <div className="group relative rounded-lg border border-stone-200 overflow-hidden bg-stone-100 aspect-square flex items-center justify-center shadow-xs">
                         <img
-                          src={images[0]}
+                          src={typeof images[0] === 'string' ? images[0] : (images[0]?.src || images[0]?.url || '')}
                           alt="Primary Cover"
                           className="w-full h-full object-cover"
                         />
@@ -1358,7 +1395,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                                   className="group relative rounded-md border border-stone-200 overflow-hidden bg-stone-100 aspect-square flex items-center justify-center"
                                 >
                                   <img
-                                    src={imgUrl}
+                                    src={typeof imgUrl === 'string' ? imgUrl : (imgUrl?.src || imgUrl?.url || '')}
                                     alt={`Product view ${actualIdx + 1}`}
                                     className="w-full h-full object-cover"
                                   />
@@ -1550,7 +1587,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                               onClick={handleBulkStock}
                               className="text-[#FF6B00] hover:underline font-medium cursor-pointer"
                             >
-                              Apply base stock to all
+                              Apply base stock status to all
                             </button>
                             <span className="text-stone-300">•</span>
                             <button
@@ -1573,7 +1610,7 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                                 <th className="py-2.5 px-3 min-w-[130px]">SKU</th>
                                 <th className="py-2.5 px-3 w-24">Price (₹)</th>
                                 <th className="py-2.5 px-3 w-24">Sale Price (₹)</th>
-                                <th className="py-2.5 px-3 w-20">Stock</th>
+                                <th className="py-2.5 px-3 min-w-[125px]">Stock Status</th>
                                 <th className="py-2.5 px-3 w-20">Weight (g)</th>
                                 <th className="py-2.5 px-3 min-w-[170px]">Dimensions (L × W × H cm)</th>
                                 <th className="py-2.5 px-3 w-36">Image</th>
@@ -1633,15 +1670,18 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                                       />
                                     </td>
                                     <td className="py-2 px-3">
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={v.stockQuantity ?? ''}
-                                        onChange={(e) => handleVariationChange(vIdx, 'stockQuantity', e.target.value)}
-                                        className="h-8 text-xs font-mono"
-                                        placeholder="Stock"
-                                      />
+                                      <select
+                                        value={v.stockStatus ?? (v.stockQuantity === 0 ? 'outofstock' : 'instock')}
+                                        onChange={(e) => handleVariationChange(vIdx, 'stockStatus', e.target.value)}
+                                        className={`h-8 text-[11px] rounded border px-2 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-stone-400 ${
+                                          (v.stockStatus === 'outofstock' || v.stockQuantity === 0)
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        }`}
+                                      >
+                                        <option value="instock">In Stock</option>
+                                        <option value="outofstock">Out of Stock</option>
+                                      </select>
                                     </td>
                                     <td className="py-2 px-3">
                                       <Input
@@ -1700,11 +1740,14 @@ export default function ProductFormView({ basePath = '/products', isEdit = false
                                         </SelectTrigger>
                                         <SelectContent>
                                           <SelectItem value="default">Default Cover</SelectItem>
-                                          {images.filter(Boolean).map((imgUrl, i) => (
-                                            <SelectItem key={i} value={imgUrl}>
-                                              Photo #{i + 1}
-                                            </SelectItem>
-                                          ))}
+                                          {images.filter(Boolean).map((imgUrl, i) => {
+                                            const resolvedUrl = typeof imgUrl === 'string' ? imgUrl : (imgUrl?.src || imgUrl?.url || '')
+                                            return (
+                                              <SelectItem key={i} value={resolvedUrl}>
+                                                Photo #{i + 1}
+                                              </SelectItem>
+                                            )
+                                          })}
                                         </SelectContent>
                                       </Select>
                                     </td>

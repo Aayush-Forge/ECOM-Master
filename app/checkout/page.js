@@ -186,13 +186,18 @@ function CheckoutPage() {
     try {
       const res = await calculateCartDiscount(displayItems, code)
       if (!res.appliedCouponCode) {
-        setCouponError('Coupon code is not applicable to the items in your order.')
-        toast.error('Coupon code is not applicable.')
+        const errorMsg = res.couponError || 'Coupon code is not applicable to the items in your order.'
+        setCouponError(errorMsg)
+        toast.error(errorMsg)
         return
       }
 
       setAppliedCoupon(res.appliedCouponCode)
-      setCouponDiscount(res.discountTotal)
+      const cDiscount = res.couponDiscount ?? (res.discountTotal - (res.bundleDiscount || 0))
+      setCouponDiscount(cDiscount)
+      if (typeof res.bundleDiscount === 'number') {
+        setAutoDiscount(res.bundleDiscount)
+      }
       toast.success(`Coupon "${res.appliedCouponCode}" applied!`)
     } catch (err) {
       const msg = err.message || 'Invalid or expired coupon code.'
@@ -209,7 +214,7 @@ function CheckoutPage() {
   }, [])
 
   const clubbingResult = calculateClubbingDiscount(displayItems, activeClubbings)
-  const clubbingDiscount = clubbingResult.discount || 0
+  const clubbingDiscount = autoDiscount > 0 ? autoDiscount : (clubbingResult.discount || 0)
 
   const handleRemoveCoupon = async () => {
     setAppliedCoupon(null)
@@ -705,35 +710,14 @@ function CheckoutPage() {
                             {validatingCoupon ? '...' : 'Apply'}
                           </Button>
                         </div>
-                        {/* Quick-Apply Active Offers */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          <span className="text-[10px] text-stone-500 font-medium">Active Offers:</span>
-                          {[
-                            { code: 'WELCOME10', label: '10% OFF' },
-                            { code: 'DIWALI2026', label: '₹200 OFF' },
-                            { code: 'FESTIVE100', label: '₹100 OFF' }
-                          ].map((offer) => (
-                            <button
-                              key={offer.code}
-                              type="button"
-                              onClick={() => {
-                                setCouponCode(offer.code)
-                                setCouponError('')
-                              }}
-                              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-[#D7A65B]/40 bg-[#FFF9EE] text-[#6B1024] hover:bg-[#D7A65B]/20 transition-colors cursor-pointer"
-                              title={`Apply ${offer.code}`}
-                            >
-                              {offer.code} ({offer.label})
-                            </button>
-                          ))}
-                        </div>
+
                         {couponError && <p className="text-xs text-rose-600 font-medium">{couponError}</p>}
                       </div>
                     ) : (
                       <div className="bg-emerald-50/50 border border-emerald-200/60 rounded-xl p-3 flex justify-between items-center text-xs text-emerald-800">
                         <div>
                           <p className="font-semibold text-emerald-700">Coupon applied: {appliedCoupon}</p>
-                          <p className="text-[10px] text-emerald-600">₹{totalDiscount.toFixed(0)} discount applied to order</p>
+                          <p className="text-[10px] text-emerald-600">₹{couponDiscount.toFixed(0)} coupon discount applied to order</p>
                         </div>
                         <Button
                           onClick={handleRemoveCoupon}

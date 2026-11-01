@@ -74,6 +74,29 @@ async function refreshAuthToken() {
 function normalizeProduct(p) {
   if (!p) return null;
   const isVariable = p.productType === 'variable' || p.type === 'variable';
+
+  const rawImages = Array.isArray(p.images) ? p.images : (p.images ? [p.images] : []);
+  const normalizedImages = rawImages
+    .map((img) => (typeof img === 'string' ? img : (img?.src || img?.url || '')))
+    .filter((url) => typeof url === 'string' && url.trim().length > 0);
+
+  const fallbackImage = 'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300';
+  const primaryImageUrl =
+    normalizedImages[0] ||
+    (typeof p.imageUrl === 'string' ? p.imageUrl : (p.imageUrl?.src || p.imageUrl?.url || '')) ||
+    (typeof p.image === 'string' ? p.image : (p.image?.src || p.image?.url || '')) ||
+    (p.sku ? `https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev/products/${p.sku}.png` : '') ||
+    fallbackImage;
+
+  const normalizedVariations = (Array.isArray(p.variationsData) ? p.variationsData : (Array.isArray(p.variations) ? p.variations : []))
+    .map((v) => {
+      const varImg = typeof v.image === 'string' ? v.image : (v.image?.src || v.image?.url || v.imageUrl || '');
+      return {
+        ...v,
+        image: varImg,
+        imageUrl: varImg,
+      };
+    });
   return {
     ...p,
     productType: isVariable ? 'variable' : 'simple',
@@ -91,12 +114,13 @@ function normalizeProduct(p) {
     stockQuantity: p.stockQuantity ?? 0,
     category: p.category?.name || (typeof p.category === 'string' ? p.category : ''),
     categoryDetails: typeof p.category === 'object' ? p.category : null,
-    images: Array.isArray(p.images) ? p.images : (p.images ? [p.images] : []),
-    imageUrl:
-      p.images?.[0] ||
-      'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300',
+    images: normalizedImages.length > 0 ? normalizedImages : [primaryImageUrl],
+    imageUrl: primaryImageUrl,
+
+
+
     attributes: Array.isArray(p.attributes) ? p.attributes : [],
-    variationsData: Array.isArray(p.variationsData) ? p.variationsData : [],
+    variationsData: normalizedVariations,
     metaTitle: p.metaTitle || '',
     metaDescription: p.metaDescription || '',
     metaKeywords: p.metaKeywords || '',
@@ -238,11 +262,9 @@ export async function createProduct(data) {
         ? Number(data.height)
         : undefined,
     categoryId: data.categoryId || data.category,
-    images: Array.isArray(data.images)
-      ? data.images.filter((url) => Boolean(url && url.trim()))
-      : data.imageUrl
-        ? [data.imageUrl]
-        : [],
+    images: (Array.isArray(data.images) ? data.images : (data.imageUrl ? [data.imageUrl] : []))
+      .map((img) => (typeof img === 'string' ? img : (img?.src || img?.url || '')))
+      .filter((url) => typeof url === 'string' && url.trim().length > 0),
     status: data.status || 'active',
     shippingTemplateId: data.shippingTemplateId || null,
     productType: isVariable ? 'variable' : 'simple',
@@ -265,7 +287,7 @@ export async function createProduct(data) {
         ? Number(data.stockQuantity)
         : data.stock !== undefined
           ? Number(data.stock)
-          : 50;
+          : 100;
   }
 
   const res = await fetch(`${BACKEND_URL}/admin/create-products`, {
@@ -320,14 +342,11 @@ export async function updateProduct(id, data) {
   else if (data.category !== undefined) payload.categoryId = data.category;
   if (data.status !== undefined) payload.status = data.status;
   if (data.shippingTemplateId !== undefined) payload.shippingTemplateId = data.shippingTemplateId || null;
-  if (data.images !== undefined) {
-    payload.images = Array.isArray(data.images)
-      ? data.images.filter((url) => Boolean(url && url.trim()))
-      : data.imageUrl
-        ? [data.imageUrl]
-        : [];
-  } else if (data.imageUrl !== undefined) {
-    payload.images = [data.imageUrl];
+  if (data.images !== undefined || data.imageUrl !== undefined) {
+    const rawImgs = data.images !== undefined ? data.images : [data.imageUrl];
+    payload.images = (Array.isArray(rawImgs) ? rawImgs : [rawImgs])
+      .map((img) => (typeof img === 'string' ? img : (img?.src || img?.url || '')))
+      .filter((url) => typeof url === 'string' && url.trim().length > 0);
   }
   if (data.customFields !== undefined) payload.customFields = data.customFields;
   if (data.productType !== undefined) payload.productType = data.productType;
@@ -350,6 +369,7 @@ export async function updateProduct(id, data) {
     else if (data.price !== undefined) payload.basePrice = Number(data.price);
     if (data.stockQuantity !== undefined) payload.stockQuantity = Number(data.stockQuantity);
     else if (data.stock !== undefined) payload.stockQuantity = Number(data.stock);
+    else if (data.stockStatus !== undefined) payload.stockQuantity = data.stockStatus === 'outofstock' ? 0 : 100;
     if (data.version !== undefined) payload.version = data.version;
   }
 

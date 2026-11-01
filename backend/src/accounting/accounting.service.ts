@@ -18,10 +18,31 @@ export class AccountingService {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    if (query.startDate) {
-      const from = new Date(query.startDate);
-      const to = query.endDate ? new Date(query.endDate) : new Date();
-      to.setHours(23, 59, 59, 999);
+    if (query.startDate || query.endDate) {
+      let from: Date | undefined;
+      let to: Date | undefined;
+
+      if (query.startDate) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(query.startDate)) {
+          const [y, m, d] = query.startDate.split('-').map(Number);
+          from = new Date(y, m - 1, d, 0, 0, 0, 0);
+        } else {
+          from = new Date(query.startDate);
+        }
+      }
+
+      if (query.endDate) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(query.endDate)) {
+          const [y, m, d] = query.endDate.split('-').map(Number);
+          to = new Date(y, m - 1, d, 23, 59, 59, 999);
+        } else {
+          to = new Date(query.endDate);
+          to.setHours(23, 59, 59, 999);
+        }
+      } else {
+        to = new Date();
+      }
+
       return { fromDate: from, toDate: to };
     }
 

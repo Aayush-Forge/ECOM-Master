@@ -884,6 +884,7 @@ export class ProductsService {
         width: v.width !== undefined && v.width !== null ? String(v.width) : null,
         height: v.height !== undefined && v.height !== null ? String(v.height) : null,
         image: this.resolveImageObject(v.image),
+        imageUrl: typeof v.image === 'string' ? this.formatImageUrl(v.image) : (v.image?.src ? this.formatImageUrl(v.image.src) : null),
         attributes: Array.isArray(v.attributes)
           ? v.attributes.map((a: any) => ({
               name: a.name,
@@ -903,6 +904,7 @@ export class ProductsService {
     const result: any = {
       ...product,
       name: product.title,
+      imageUrl: resolvedImages.length > 0 ? (typeof resolvedImages[0] === 'string' ? resolvedImages[0] : (resolvedImages[0]?.src || '')) : '',
       price: effectivePrice,
       regular_price: regularPrice,
       compareAt: regularPrice,

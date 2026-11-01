@@ -303,10 +303,13 @@ export class CartService {
       items: responseItems,
       subtotal: pricingResult.subtotal,
       discountTotal: pricingResult.discountTotal,
+      bundleDiscount: pricingResult.bundleDiscount ?? 0,
+      couponDiscount: pricingResult.couponDiscount ?? 0,
       shippingTotal: pricingResult.shippingTotal,
       taxTotal: pricingResult.taxTotal,
       grandTotal: pricingResult.grandTotal,
       appliedCouponCode: pricingResult.appliedCouponCode || null,
+      couponError: pricingResult.couponError || null,
       createdAt: cart.createdAt,
       updatedAt: cart.updatedAt,
     };

@@ -1,5 +1,6 @@
 'use client'
 
+import { openAuthenticatedUrl, downloadAuthenticatedDocument } from '@/lib/utils'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import {
@@ -33,6 +34,9 @@ import {
   CheckCircle2,
   Truck,
   Box,
+  FileText,
+  Printer,
+  Download,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -674,12 +678,12 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
                           <Badge
                             variant="outline"
                             className={`text-[10px] px-1.5 py-0 ${
-                              p.stockQuantity <= 5
+                              p.stockQuantity <= 0
                                 ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                : 'bg-stone-100 text-stone-700 border-stone-200'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             }`}
                           >
-                            {p.stockQuantity} left
+                            {p.stockQuantity <= 0 ? 'Out of Stock' : 'In Stock'}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -844,10 +848,10 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
                             className={`font-semibold text-xs px-2 py-0.5 ${
                               p.stockQuantity === 0
                                 ? 'bg-rose-600 text-white'
-                                : 'bg-amber-100 text-amber-900 border-amber-200'
+                                : 'bg-emerald-600 text-white'
                             }`}
                           >
-                            {p.stockQuantity === 0 ? 'Out of Stock' : `${p.stockQuantity} left`}
+                            {p.stockQuantity <= 0 ? 'Out of Stock' : 'In Stock'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -922,14 +926,52 @@ export default function DashboardOverviewView({ ordersBasePath = '/orders' }) {
                       </TableCell>
                       <TableCell className="text-center">{getOrderStatusBadge(o.status)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[11px] border-stone-200 px-2"
-                        >
-                          <Link href={`${ordersBasePath}/${o.id}`}>View</Link>
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Print / View Tax Invoice"
+                            className="h-7 w-7 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                            onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${o.id}/invoice`)}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Download Tax Invoice (PDF)"
+                            className="h-7 w-7 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50"
+                            onClick={() => downloadAuthenticatedDocument(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${o.id}/invoice`)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Print / View Shipping Label"
+                            className="h-7 w-7 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                            onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${o.id}/shipping-label`)}
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Download Shipping Label (PDF)"
+                            className="h-7 w-7 text-sky-700 hover:text-sky-900 hover:bg-sky-50"
+                            onClick={() => downloadAuthenticatedDocument(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${o.id}/shipping-label`)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[11px] border-stone-200 px-2"
+                          >
+                            <Link href={`${ordersBasePath}/${o.id}`}>View</Link>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

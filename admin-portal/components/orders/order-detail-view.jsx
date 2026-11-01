@@ -1,6 +1,6 @@
 'use client'
 
-import { openAuthenticatedUrl } from '@/lib/utils';
+import { openAuthenticatedUrl, downloadAuthenticatedDocument } from '@/lib/utils';
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation'
@@ -28,7 +28,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { ArrowLeft, Truck, Package, CreditCard, RefreshCw, AlertCircle, History, FileText, Printer } from 'lucide-react'
+import { ArrowLeft, Truck, Package, CreditCard, RefreshCw, AlertCircle, History, FileText, Printer, Download } from 'lucide-react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -228,10 +228,26 @@ export default function OrderDetailView() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => downloadAuthenticatedDocument(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`)}
+            className="border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 font-inter text-xs"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5 text-emerald-700" /> Download Invoice (PDF)
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
             className="border-stone-300 text-stone-700 font-inter text-xs hover:bg-stone-50"
           >
             <Printer className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Shipping Label
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadAuthenticatedDocument(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
+            className="border-sky-300 text-sky-800 bg-sky-50 hover:bg-sky-100 font-inter text-xs"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5 text-sky-700" /> Download Label (PDF)
           </Button>
           <Button variant="outline" size="sm" asChild className="border-stone-300 text-stone-700 font-inter text-xs">
             <Link href={`${STOREFRONT_URL}/track-order?orderId=${order.id}`} target="_blank" rel="noopener noreferrer">
@@ -704,22 +720,42 @@ export default function OrderDetailView() {
                 <Separator className="my-2 bg-stone-200" />
 
                 <div className="pt-1 flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
-                    onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`)}
-                  >
-                    <FileText className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Tax Invoice
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
-                    onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
-                  >
-                    <Printer className="w-3.5 h-3.5 mr-1.5 text-stone-600" /> Print Shipping Label
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
+                      onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`)}
+                    >
+                      <FileText className="w-3.5 h-3.5 mr-1 text-stone-600" /> View Invoice
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-300"
+                      onClick={() => downloadAuthenticatedDocument(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/invoice`)}
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1 text-emerald-700" /> Download
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center text-xs font-semibold text-stone-800 border-stone-300 hover:bg-stone-50"
+                      onClick={() => openAuthenticatedUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
+                    >
+                      <Printer className="w-3.5 h-3.5 mr-1 text-stone-600" /> View Label
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center text-xs font-semibold text-sky-800 bg-sky-50 hover:bg-sky-100 border-sky-300"
+                      onClick={() => downloadAuthenticatedDocument(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/admin/orders/${order.id}/shipping-label`)}
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1 text-sky-700" /> Download
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>

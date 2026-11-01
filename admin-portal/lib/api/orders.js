@@ -100,12 +100,12 @@ function normalizeOrder(order) {
         item.lineTotal ?? (item.unitPriceSnapshot ?? item.unitPrice ?? 0) * (item.quantity ?? 1),
       ),
       imageUrl:
-        item.product?.images?.[0] ||
+        (typeof item.product?.images?.[0] === 'string' ? item.product.images[0] : (item.product?.images?.[0]?.src || item.product?.imageUrl)) ||
         item.imageUrl ||
         'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300',
       image: {
         src:
-          item.product?.images?.[0] ||
+          (typeof item.product?.images?.[0] === 'string' ? item.product.images[0] : (item.product?.images?.[0]?.src || item.product?.imageUrl)) ||
           item.imageUrl ||
           'https://images.unsplash.com/photo-1589301773859-b1b4e3b4b1b4?w=300',
       },

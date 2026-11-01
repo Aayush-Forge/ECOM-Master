@@ -1216,37 +1216,41 @@ export class OrdersService {
   <meta charset="UTF-8">
   <title>Tax Invoice - ${data.invoiceNumber}</title>
   <style>
-    @page { size: A4 portrait; margin: 10mm 12mm; }
+    @page {
+      size: A4 portrait;
+      margin: 8mm 10mm;
+    }
     * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    html, body {
       margin: 0;
-      padding: 16px 10px;
+      padding: 0;
       background: #f1f5f9;
       color: #0f172a;
-      font-size: 10px;
-      line-height: 1.4;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 9.5px;
+      line-height: 1.35;
+      -webkit-font-smoothing: antialiased;
     }
     .action-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       max-width: 820px;
-      margin: 0 auto 14px auto;
+      margin: 12px auto 10px auto;
       background: #ffffff;
-      padding: 10px 18px;
+      padding: 8px 16px;
       border-radius: 8px;
       border: 1px solid #e2e8f0;
       box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-    .action-info { font-size: 12px; color: #334155; }
+    .action-info { font-size: 11.5px; color: #334155; }
     .action-info strong { color: #0f172a; font-weight: 700; }
-    .action-buttons { display: flex; gap: 10px; }
+    .action-buttons { display: flex; gap: 8px; }
     .btn {
       display: inline-flex;
       align-items: center;
-      padding: 8px 16px;
-      font-size: 11.5px;
+      padding: 7px 14px;
+      font-size: 11px;
       font-weight: 600;
       border-radius: 6px;
       cursor: pointer;
@@ -1261,44 +1265,60 @@ export class OrdersService {
     .sheet {
       width: 100%;
       max-width: 820px;
-      margin: 0 auto;
+      margin: 0 auto 16px auto;
       background: #ffffff;
-      padding: 28px 32px;
+      padding: 18px 22px;
       border: 1px solid #e2e8f0;
       box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
       border-radius: 4px;
     }
-    .header-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .header-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
     .header-table td { vertical-align: top; }
-    .brand-title { font-size: 22px; font-weight: 900; letter-spacing: 0.05em; color: #6b1024; line-height: 1.1; margin: 0; }
-    .brand-tagline { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; font-weight: 600; margin-top: 2px; }
-    .doc-badge { display: inline-block; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
-    .invoice-title { font-size: 18px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin: 0; letter-spacing: 0.02em; }
-    .meta-box { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-bottom: 14px; background: #f8fafc; }
-    .meta-box td { border: 1px solid #cbd5e1; padding: 6px 10px; font-size: 9.5px; }
-    .meta-label { color: #64748b; font-size: 8.5px; text-transform: uppercase; font-weight: 600; }
-    .meta-val { font-weight: 700; color: #0f172a; font-size: 10.5px; margin-top: 2px; }
-    .address-grid { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-bottom: 14px; }
-    .address-grid td { width: 50%; border: 1px solid #cbd5e1; padding: 10px 12px; vertical-align: top; }
-    .address-header { font-size: 9px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: #6b1024; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 6px; }
-    .address-name { font-size: 11.5px; font-weight: 700; color: #0f172a; }
-    .items-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin-bottom: 14px; }
-    .items-table th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.04em; }
-    .summary-grid { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .brand-title { font-size: 20px; font-weight: 900; letter-spacing: 0.05em; color: #6b1024; line-height: 1.1; margin: 0; }
+    .brand-tagline { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; font-weight: 600; margin-top: 1px; }
+    .doc-badge { display: inline-block; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 2px 7px; border-radius: 4px; font-size: 8px; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; }
+    .invoice-title { font-size: 16px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin: 0; letter-spacing: 0.02em; }
+    .meta-box { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-bottom: 8px; background: #f8fafc; }
+    .meta-box td { border: 1px solid #cbd5e1; padding: 5px 8px; font-size: 9px; }
+    .meta-label { color: #64748b; font-size: 8px; text-transform: uppercase; font-weight: 600; }
+    .meta-val { font-weight: 700; color: #0f172a; font-size: 10px; margin-top: 1px; }
+    .address-grid { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-bottom: 8px; }
+    .address-grid td { width: 50%; border: 1px solid #cbd5e1; padding: 8px 10px; vertical-align: top; }
+    .address-header { font-size: 8.5px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: #6b1024; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 4px; }
+    .address-name { font-size: 10.5px; font-weight: 700; color: #0f172a; }
+    .items-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin-bottom: 8px; }
+    .items-table th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 5px 6px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.04em; }
+    .summary-grid { width: 100%; border-collapse: collapse; margin-bottom: 8px; page-break-inside: avoid; }
     .summary-grid td { vertical-align: top; }
-    .words-box { border: 1px solid #cbd5e1; background: #f8fafc; padding: 10px 12px; border-radius: 4px; }
+    .words-box { border: 1px solid #cbd5e1; background: #f8fafc; padding: 8px 10px; border-radius: 4px; }
     .totals-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; }
-    .totals-table td { border: 1px solid #cbd5e1; padding: 6px 10px; font-size: 10px; }
-    .declaration-table { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-top: 14px; }
-    .declaration-table td { border: 1px solid #cbd5e1; padding: 10px 12px; vertical-align: top; }
-    .footer-note { margin-top: 16px; padding-top: 8px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 8.5px; color: #94a3b8; }
+    .totals-table td { border: 1px solid #cbd5e1; padding: 5px 8px; font-size: 9.5px; }
+    .declaration-table { width: 100%; border: 1px solid #cbd5e1; border-collapse: collapse; margin-top: 8px; page-break-inside: avoid; }
+    .declaration-table td { border: 1px solid #cbd5e1; padding: 8px 10px; vertical-align: top; }
+    .footer-note { margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 8px; color: #94a3b8; }
     @media print {
-      body { background: #ffffff; padding: 0; }
-      .sheet { border: none; padding: 0; max-width: 100%; box-shadow: none; }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .sheet {
+        border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+      }
       .action-bar { display: none !important; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+      thead { display: table-header-group; }
+      .declaration-table, .summary-grid { page-break-inside: avoid; }
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <div class="no-print action-bar">
@@ -1306,13 +1326,12 @@ export class OrdersService {
       Tax Invoice: <strong>${data.invoiceNumber}</strong> &nbsp;•&nbsp; Order: <strong>#${data.orderNumber}</strong>
     </div>
     <div class="action-buttons">
-      <button id="btn-download-pdf" class="btn btn-primary" onclick="downloadPDF()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download PDF
-      </button>
-      <button class="btn btn-secondary" onclick="window.print()">
+      <button class="btn btn-primary" onclick="window.print()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Print / Save as PDF
+      </button>
+      <button class="btn btn-secondary" onclick="window.close()">
+        ✕ Close
       </button>
     </div>
   </div>
@@ -1501,53 +1520,12 @@ export class OrdersService {
   </div>
 
   <script>
-    function downloadPDF() {
-      var btn = document.getElementById('btn-download-pdf');
-      var originalHtml = btn ? btn.innerHTML : '';
-      if (btn) {
-        btn.innerHTML = '⏳ Generating PDF...';
-        btn.disabled = true;
-      }
-
-      var element = document.getElementById('printable-sheet');
-      var filename = 'Tax-Invoice-' + '${data.invoiceNumber}' + '.pdf';
-
-      var opt = {
-        margin: [10, 12, 10, 12],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      if (window.html2pdf) {
-        window.html2pdf().set(opt).from(element).save().then(function() {
-          if (btn) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-          }
-        }).catch(function(err) {
-          console.warn('PDF direct generation fallback to print:', err);
-          if (btn) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-          }
-          window.print();
-        });
-      } else {
-        window.print();
-        if (btn) {
-          btn.innerHTML = originalHtml;
-          btn.disabled = false;
-        }
-      }
-    }
-
-    // Auto-trigger download if format=pdf or download=true
     window.addEventListener('DOMContentLoaded', function() {
       var params = new URLSearchParams(window.location.search);
-      if (params.get('download') === 'true' || params.get('format') === 'pdf') {
-        setTimeout(downloadPDF, 700);
+      if (params.get('print') === 'true' || params.get('download') === 'true' || params.get('format') === 'pdf') {
+        setTimeout(function() {
+          window.print();
+        }, 350);
       }
     });
   </script>
@@ -1839,53 +1817,12 @@ export class OrdersService {
   </div>
 
   <script>
-    function downloadPDF() {
-      var btn = document.getElementById('btn-download-pdf');
-      var originalHtml = btn ? btn.innerHTML : '';
-      if (btn) {
-        btn.innerHTML = '⏳ Generating PDF...';
-        btn.disabled = true;
-      }
-
-      var element = document.getElementById('printable-sheet');
-      var filename = 'Shipping-Label-' + '${data.orderNumber}' + '.pdf';
-
-      var opt = {
-        margin: [8, 10, 8, 10],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      if (window.html2pdf) {
-        window.html2pdf().set(opt).from(element).save().then(function() {
-          if (btn) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-          }
-        }).catch(function(err) {
-          console.warn('PDF direct generation fallback to print:', err);
-          if (btn) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-          }
-          window.print();
-        });
-      } else {
-        window.print();
-        if (btn) {
-          btn.innerHTML = originalHtml;
-          btn.disabled = false;
-        }
-      }
-    }
-
-    // Auto-trigger download if format=pdf or download=true
     window.addEventListener('DOMContentLoaded', function() {
       var params = new URLSearchParams(window.location.search);
-      if (params.get('download') === 'true' || params.get('format') === 'pdf') {
-        setTimeout(downloadPDF, 700);
+      if (params.get('print') === 'true' || params.get('download') === 'true' || params.get('format') === 'pdf') {
+        setTimeout(function() {
+          window.print();
+        }, 350);
       }
     });
   </script>
