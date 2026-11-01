@@ -1,0 +1,146 @@
+# Production stack — run on the VPS with:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Only Caddy (ports 80/443) is reachable from the internet; postgres, redis and the
+# three apps stay on the internal network. All values come from ./.env
+# (see production.env.example). Missing required values stop compose with an error.
+
+name: sridattam
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    image: ${IMAGE_REGISTRY:-sridattam}/backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:?set REVALIDATE_SECRET in .env}
+      FRONTEND_URL: ${FRONTEND_URL:?set FRONTEND_URL in .env}
+      ADMIN_URL: ${ADMIN_URL:?set ADMIN_URL in .env}
+      STOREFRONT_URL: ${FRONTEND_URL}
+      STOREFRONT_INTERNAL_URL: http://storefront:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    networks:
+      - internal
+
+  storefront:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_BACKEND_URL: ${BACKEND_PUBLIC_URL:?set BACKEND_PUBLIC_URL in .env}
+        NEXT_PUBLIC_SITE_URL: ${FRONTEND_URL:?set FRONTEND_URL in .env}
+        NEXT_PUBLIC_ADMIN_URL: ${ADMIN_URL:?set ADMIN_URL in .env}
+        NEXT_PUBLIC_DEV_MODE: "false"
+        NEXT_PUBLIC_RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:?set RAZORPAY_KEY_ID in .env}
+    image: ${IMAGE_REGISTRY:-sridattam}/storefront:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      INTERNAL_BACKEND_URL: http://backend:5000
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:?set REVALIDATE_SECRET in .env}
+      CORS_ORIGINS: ${FRONTEND_URL}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+
+  admin-portal:
+    build:
+      context: ./admin-portal
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${BACKEND_PUBLIC_URL:?set BACKEND_PUBLIC_URL in .env}
+        NEXT_PUBLIC_BACKEND_URL: ${BACKEND_PUBLIC_URL:?set BACKEND_PUBLIC_URL in .env}
+        NEXT_PUBLIC_STOREFRONT_URL: ${FRONTEND_URL:?set FRONTEND_URL in .env}
+    image: ${IMAGE_REGISTRY:-sridattam}/admin-portal:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?set ADMIN_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - storefront
+      - admin-portal
+      - backend
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge

@@ -2,8 +2,9 @@ FROM node:20-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY package*.json ./
+COPY prisma.config.ts ./
 COPY src/prisma ./src/prisma
-RUN npm install
+RUN npm ci
 RUN npx prisma generate --schema=./src/prisma/schema.prisma
 
 FROM base AS development
@@ -18,4 +19,4 @@ RUN npm run build
 EXPOSE 5000
 ENV PORT=5000
 ENV NODE_ENV=production
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=./src/prisma/schema.prisma && node dist/src/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=./src/prisma/schema.prisma && node dist/main"]

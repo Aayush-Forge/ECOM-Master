@@ -1,0 +1,23 @@
+# Domains come from SITE_DOMAIN / ADMIN_DOMAIN / API_DOMAIN in .env (passed in by docker-compose.prod.yml).
+# Caddy obtains and renews HTTPS certificates automatically once DNS points at this server.
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy storefront:3000 {
+		# Next.js streams responses; flush immediately instead of buffering.
+		flush_interval -1
+	}
+}
+
+{$ADMIN_DOMAIN} {
+	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
+	reverse_proxy admin-portal:3001 {
+		flush_interval -1
+	}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy backend:5000
+}
