@@ -32,6 +32,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { R2Service } from '../r2/r2.service';
 import { ProductsImportExportService } from './products-import-export.service';
+import { GetProductsQueryDto } from './dto/get-products-query.dto';
 
 @Controller('')
 export class ProductsController {
@@ -182,18 +183,20 @@ export class ProductsController {
   @Get(['all-products', 'products'])
   findAll(
     @Req() req: any,
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
-    @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
-    @Query('admin') admin?: string,
-    @Query('search') search?: string,
-    @Query('category') category?: string,
-    @Query('status') status?: string,
+    @Query() query: GetProductsQueryDto,
   ) {
     const userRole = req?.user?.role;
     const isEditorOrAbove = userRole && ((ROLE_RANKS[userRole] ?? 0) >= ROLE_RANKS[ROLES.EDITOR]);
-    const hasAdminQuery = admin === 'true' || admin === '1';
+    const hasAdminQuery = query.admin === 'true' || query.admin === '1';
     const isAdmin = Boolean(isEditorOrAbove && hasAdminQuery);
-    return this.productsService.findAll(page, perPage, isAdmin, { search, category, status });
+    const page = typeof query?.getEffectivePage === 'function' ? query.getEffectivePage() : (query?.page ?? 1);
+    const perPage = typeof query?.getEffectiveLimit === 'function' ? query.getEffectiveLimit(20) : (query?.limit ?? query?.per_page ?? query?.perPage ?? 20);
+    return this.productsService.findAll(
+      page,
+      perPage,
+      isAdmin,
+      { search: query?.search, category: query?.category, status: query?.status },
+    );
   }
 
   @Public()

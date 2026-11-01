@@ -30,15 +30,17 @@ export class OrdersController {
   @Get()
   @Roles(ROLES.READ_ONLY)
   getAllOrders(@Query() query: GetOrdersQueryDto) {
+    const effectivePage = typeof query?.getEffectivePage === 'function' ? query.getEffectivePage() : (query?.page ?? 1);
+    const effectiveLimit = typeof query?.getEffectiveLimit === 'function' ? query.getEffectiveLimit(20) : (query?.limit ?? query?.per_page ?? query?.perPage ?? 20);
     return this.ordersService.getAllOrders(
-      query.status,
-      query.page,
-      query.per_page,
-      query.search,
-      query.dateFrom,
-      query.dateTo,
-      query.sortBy,
-      query.sortOrder,
+      query?.status,
+      effectivePage,
+      effectiveLimit,
+      query?.search,
+      query?.dateFrom,
+      query?.dateTo,
+      query?.sortBy,
+      query?.sortOrder,
     );
   }
 

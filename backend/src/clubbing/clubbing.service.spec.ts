@@ -13,11 +13,15 @@ describe('ClubbingService', () => {
       clubbingRule: {
         create: jest.fn(),
         findMany: jest.fn(),
-        findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue(null),
         delete: jest.fn(),
       },
       clubbingRuleProduct: {
         deleteMany: jest.fn(),
+      },
+      product: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
 
@@ -80,6 +84,11 @@ describe('ClubbingService', () => {
 
   describe('calculateCartDiscount', () => {
     it('calculates fixed price bundle discount correctly', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        { id: 'p1', categoryId: 'cat1' },
+        { id: 'p2', categoryId: 'cat1' },
+      ]);
+
       prisma.clubbingRule.findMany.mockResolvedValue([
         {
           id: 'rule-1',
@@ -100,9 +109,21 @@ describe('ClubbingService', () => {
       const res = await service.calculateCartDiscount(cartItems);
       // original = 1000, fixedPrice = 800 => discount = 200
       expect(res.discountTotal).toBe(200);
+      expect(res.bundleDiscount).toBe(200);
+      expect(res.couponDiscount).toBe(0);
+      expect(res.appliedRuleId).toBe('rule-1');
+      expect(res.couponError).toBeNull();
+      expect(prisma.product.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['p1', 'p2'] } },
+        select: { id: true, categoryId: true },
+      });
     });
 
     it('calculates percentage off bundle discount correctly', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        { id: 'p1', categoryId: 'cat1' },
+      ]);
+
       prisma.clubbingRule.findMany.mockResolvedValue([
         {
           id: 'rule-2',
@@ -120,6 +141,14 @@ describe('ClubbingService', () => {
       const res = await service.calculateCartDiscount(cartItems);
       // original = 300, 20% = 60
       expect(res.discountTotal).toBe(60);
+      expect(res.bundleDiscount).toBe(60);
+      expect(res.couponDiscount).toBe(0);
+      expect(res.appliedRuleId).toBe('rule-2');
+      expect(res.couponError).toBeNull();
+      expect(prisma.product.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['p1'] } },
+        select: { id: true, categoryId: true },
+      });
     });
   });
 

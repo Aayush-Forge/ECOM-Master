@@ -11,6 +11,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/roles.constants';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { FindReviewsQueryDto, GetTopReviewsQueryDto } from './dto/find-reviews-query.dto';
 import { ReviewsService } from './reviews.service';
 
 @Controller('reviews')
@@ -25,8 +26,8 @@ export class ReviewsController {
 
   @Public()
   @Get('top')
-  getTopReviews(@Query('limit') limit?: string) {
-    const take = limit ? parseInt(limit, 10) : 10;
+  getTopReviews(@Query() query: GetTopReviewsQueryDto) {
+    const take = typeof query?.getEffectiveLimit === 'function' ? query.getEffectiveLimit(10) : (query?.limit ?? query?.per_page ?? query?.perPage ?? 10);
     return this.reviewsService.getTopReviews(take);
   }
 
@@ -38,23 +39,20 @@ export class ReviewsController {
 
   @Public()
   @Get()
-  findAll(
-    @Query('productId') productId?: string,
-    @Query('search') search?: string,
-    @Query('stars') stars?: string,
-    @Query('page') page?: string,
-    @Query('perPage') perPage?: string,
-  ) {
-    if (productId && !search && !stars && !page && !perPage) {
-      return this.reviewsService.findByProduct(productId);
+  findAll(@Query() query: FindReviewsQueryDto) {
+    if (query?.productId && !query?.search && !query?.stars && !query?.page && !query?.limit && !query?.perPage && !query?.per_page) {
+      return this.reviewsService.findByProduct(query.productId);
     }
 
+    const page = typeof query?.getEffectivePage === 'function' ? query.getEffectivePage() : (query?.page ?? 1);
+    const perPage = typeof query?.getEffectiveLimit === 'function' ? query.getEffectiveLimit(20) : (query?.limit ?? query?.per_page ?? query?.perPage ?? 20);
+
     return this.reviewsService.findAll({
-      productId,
-      search,
-      stars: stars ? parseInt(stars, 10) : undefined,
-      page: page ? parseInt(page, 10) : 1,
-      perPage: perPage ? parseInt(perPage, 10) : 20,
+      productId: query?.productId,
+      search: query?.search,
+      stars: query?.stars,
+      page,
+      perPage,
     });
   }
 

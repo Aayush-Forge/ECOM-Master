@@ -1,7 +1,7 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
-export class GetEmailLogsQueryDto {
+export class GetEmailLogsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(['sent', 'failed'])
   status?: 'sent' | 'failed';
@@ -15,19 +15,6 @@ export class GetEmailLogsQueryDto {
   @IsString()
   @MaxLength(100)
   search?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  perPage?: number = 20;
 
   @IsOptional()
   @IsIn(['newest', 'oldest'])

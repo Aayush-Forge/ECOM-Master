@@ -869,15 +869,16 @@ export default function HomeClientContent({ initialProducts = [], initialCategor
 
       {/* SECTION 6 — BRAND STORY IMMERSIVE BANNER */}
       <section className="relative py-24 flex items-center justify-center overflow-hidden bg-transparent text-[#6B1024] border-y border-stone-150 z-10">
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 pointer-events-none" style={{ pointerEvents: 'none' }}>
           <Image 
             src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1600&q=80" 
             alt="Warm atmosphere" 
             fill 
             sizes="100vw"
-            className="object-cover opacity-5 scale-105" 
+            style={{ pointerEvents: 'none' }}
+            className="object-cover opacity-5 scale-105 pointer-events-none" 
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/80 to-white/90" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/80 to-white/90 pointer-events-none" style={{ pointerEvents: 'none' }} />
         </div>
         
         <div className="container relative z-10 max-w-3xl text-center px-4 space-y-6">

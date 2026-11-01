@@ -44,15 +44,6 @@ const QUICK_LOGIN_PRESETS = [
     badge: 'bg-teal-600 text-white',
     button: 'bg-teal-600 hover:bg-teal-500 text-white',
   },
-  {
-    label: 'Customer',
-    email: 'customer@sridattam.com',
-    role: 'customer',
-    description: 'Storefront — Order history, Profile, Addresses',
-    color: 'border-amber-500/50 bg-amber-950/20 hover:border-amber-400',
-    badge: 'bg-amber-600 text-white',
-    button: 'bg-amber-600 hover:bg-amber-400 text-slate-950 font-bold',
-  },
 ]
 
 function LoginForm() {
@@ -172,13 +163,7 @@ function LoginForm() {
           </form>
 
           <div className="pt-2 text-center text-sm text-stone-600 font-inter border-t border-stone-100">
-            <span>New here? </span>
-            <Link
-              href={redirectParam ? `/register?redirect=${encodeURIComponent(redirectParam)}` : '/register'}
-              className="font-semibold text-saffron hover:underline"
-            >
-              Create an account
-            </Link>
+            <span>Storefront is guest-checkout only. Login is reserved for staff and administration.</span>
           </div>
         </div>
 

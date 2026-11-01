@@ -76,6 +76,10 @@ echo -e "${GREEN}✓ Detected VPS IP: ${SERVER_IP}${NC}"
 echo -e "${YELLOW}[4/7] Configuring environment variables...${NC}"
 
 if [ ! -f "$PROJECT_DIR/.env" ]; then
+  if [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_ACCESS_KEY_ID" ]; then
+    echo -e "${RED}ERROR: Required Cloudflare R2 environment variables (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY) are missing. Please set them in your environment before deploying.${NC}" >&2
+    exit 1
+  fi
   cat <<EOF > "$PROJECT_DIR/.env"
 # Sridattam Platform Configuration
 POSTGRES_USER=sridattam_admin
@@ -89,11 +93,11 @@ FRONTEND_URL=http://${SERVER_IP}:3000
 ADMIN_URL=http://${SERVER_IP}:3001
 
 # Cloudflare R2 Object Storage
-R2_ACCOUNT_ID=8297543f989a371e60d225f84de5548b
-R2_ACCESS_KEY_ID=196749a619271bfe47720d90f373ebce
-R2_SECRET_ACCESS_KEY=d99b25a7df049e93750190476de031bb34e727c435bffc22cfa365a4aa66e54a
-R2_BUCKET_NAME=sridattam-product-media
-R2_PUBLIC_BASE_URL=https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev
+R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+R2_BUCKET_NAME=${R2_BUCKET_NAME:-sridattam-product-media}
+R2_PUBLIC_BASE_URL=${R2_PUBLIC_BASE_URL:-https://pub-78b25314ac78421fb5abe572bdbf3407.r2.dev}
 
 # Security & Secrets
 JWT_SECRET=sridattam-dev-jwt-access-secret-key-2026
@@ -116,6 +120,10 @@ INTERNAL_ALERT_EMAILS="admin@sridattam.com"
 EOF
   echo -e "${GREEN}✓ Created .env file.${NC}"
 else
+  if ! grep -q "^R2_SECRET_ACCESS_KEY=[^[:space:]]" "$PROJECT_DIR/.env" 2>/dev/null; then
+    echo -e "${RED}ERROR: R2_SECRET_ACCESS_KEY is missing or empty in $PROJECT_DIR/.env.${NC}" >&2
+    exit 1
+  fi
   # Ensure BACKEND_PUBLIC_URL, FRONTEND_URL, and ADMIN_URL match server IP if previously localhost
   if grep -q "localhost" "$PROJECT_DIR/.env" && [ "$SERVER_IP" != "localhost" ]; then
     sed -i "s|FRONTEND_URL=http://localhost:3000|FRONTEND_URL=http://${SERVER_IP}:3000|g" "$PROJECT_DIR/.env"

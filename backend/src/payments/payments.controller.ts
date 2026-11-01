@@ -16,13 +16,13 @@ import { PaymentsService } from './payments.service.js';
 import { CreatePaymentSessionDto } from './dto/create-payment-session.dto.js';
 import { VerifyPaymentDto } from './dto/verify-payment.dto.js';
 import { RecordPaymentFailureDto } from './dto/record-payment-failure.dto.js';
+import { GetPaymentsQueryDto } from './dto/get-payments-query.dto.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { ROLES } from '../auth/roles.constants.js';
 import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('')
-@UsePipes(new ValidationPipe({ whitelist: true }))
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
@@ -71,13 +71,31 @@ export class PaymentsController {
   @Get('admin/payments')
   @Roles(ROLES.READ_ONLY)
   getAllPayments(
-    @Query('status') status?: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
-    @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
-    @Query('sort_by') sortBy?: string,
-    @Query('sort_order') sortOrder?: string,
+    @Query() query: GetPaymentsQueryDto,
+    page?: number,
+    perPage?: number,
+    sortBy?: string,
+    sortOrder?: string,
   ) {
-    return this.paymentsService.getAllPayments(status, page, perPage, sortBy, sortOrder);
+    if (typeof query === 'string' || page !== undefined) {
+      return this.paymentsService.getAllPayments(
+        typeof query === 'string' ? query : undefined,
+        page,
+        perPage,
+        sortBy,
+        sortOrder,
+      );
+    }
+    const q = query ?? new GetPaymentsQueryDto();
+    const effectivePage = typeof q.getEffectivePage === 'function' ? q.getEffectivePage() : (q.page ?? 1);
+    const effectiveLimit = typeof q.getEffectiveLimit === 'function' ? q.getEffectiveLimit(20) : (q.limit ?? q.per_page ?? q.perPage ?? 20);
+    return this.paymentsService.getAllPayments(
+      q.status,
+      effectivePage,
+      effectiveLimit,
+      q.sortBy ?? q.sort_by,
+      q.sortOrder ?? q.sort_order,
+    );
   }
 
   @Get('admin/payments/order/:orderId')

@@ -196,9 +196,8 @@ Built on **Next.js 14 App Router** with SSR (Server-Side Rendering) for optimal 
 * **`/products/[slug]`**: Dynamic product detail page with image gallery zoom, variant selectors, inventory counters, and customer review submission.
 * **`/categories/[slug]`**: Filtered category landing pages with structured SEO meta tags and breadcrumbs.
 * **`/cart`**: Slide-over drawer and dedicated cart page with real-time promo code entry.
-* **`/checkout`**: High-conversion one-page checkout integrating Razorpay Checkout Modal.
-* **`/orders/[id]`**: Customer order tracking timeline and invoice review.
-* **`/account`**: Customer address book, profile editor, and past order history.
+* **`/checkout`**: High-conversion one-page pure guest checkout integrating Razorpay Checkout Modal.
+* **`/track-order`**: Guest order tracking by order number and phone/email.
 
 ---
 

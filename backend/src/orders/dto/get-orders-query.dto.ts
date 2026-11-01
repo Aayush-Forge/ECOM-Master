@@ -1,18 +1,10 @@
 import { IsDateString, IsOptional, IsString } from 'class-validator';
-import { Type } from 'class-transformer';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
-export class GetOrdersQueryDto {
+export class GetOrdersQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  per_page?: number;
 
   @IsOptional()
   @IsString()

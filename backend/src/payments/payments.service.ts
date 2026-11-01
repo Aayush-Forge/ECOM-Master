@@ -854,7 +854,9 @@ export class PaymentsService implements OnModuleInit {
     sortBy?: string,
     sortOrder?: string,
   ) {
-    const skip = (page - 1) * perPage;
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePerPage = Math.min(100, Math.max(1, Number(perPage) || 20));
+    const skip = (safePage - 1) * safePerPage;
     const where: any = {};
 
     if (status && status !== 'all') {
@@ -893,7 +895,7 @@ export class PaymentsService implements OnModuleInit {
         },
         orderBy,
         skip,
-        take: perPage,
+        take: safePerPage,
       }),
       this.prisma.payment.count({ where }),
     ]);
@@ -904,9 +906,9 @@ export class PaymentsService implements OnModuleInit {
       data: sanitizedData,
       meta: {
         total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
+        page: safePage,
+        perPage: safePerPage,
+        totalPages: Math.ceil(total / safePerPage),
       },
     };
   }

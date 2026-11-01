@@ -13,12 +13,12 @@ function AboutPage() {
       {/* SECTION 1 - HERO */}
       <section className="relative bg-transparent text-[#6B1024] py-24 overflow-hidden border-b border-stone-150">
         <div className="absolute inset-0 bg-mandala opacity-5 pointer-events-none" />
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 pointer-events-none">
           <Image 
             src="https://images.unsplash.com/photo-1777732339789-5dc3483ed951?auto=format&fit=crop&w=1600&q=80" 
             alt="" 
             fill 
-            className="object-cover opacity-5 mix-blend-overlay" 
+            className="object-cover opacity-5 mix-blend-overlay pointer-events-none" 
             unoptimized 
           />
         </div>

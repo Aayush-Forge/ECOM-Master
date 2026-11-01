@@ -38,6 +38,7 @@ export const ROLE_NAV_ITEMS = {
     { label: 'Orders', href: '/orders', icon: 'ClipboardList', group: 'Operations' },
     { label: 'Payments', href: '/payments', icon: 'CreditCard', group: 'Operations' },
     { label: 'Shipping', href: '/shipping', icon: 'Truck', group: 'Operations' },
+    { label: 'Invoices & Labels', href: '/invoices-labels', icon: 'ScrollText', group: 'Operations' },
     { label: 'Clubbing Module', href: '/clubbings', icon: 'Sparkles', group: 'Catalog' },
     { label: 'Products', href: '/products', icon: 'Package', group: 'Catalog' },
     { label: 'Categories', href: '/categories', icon: 'FolderTree', group: 'Catalog' },
@@ -55,6 +56,7 @@ export const ROLE_NAV_ITEMS = {
     { label: 'Dashboard', href: '/overview', icon: 'LayoutDashboard', group: 'Overview' },
     { label: 'Orders', href: '/orders', icon: 'ClipboardList', group: 'Operations' },
     { label: 'Payments', href: '/payments', icon: 'CreditCard', group: 'Operations' },
+    { label: 'Invoices & Labels', href: '/invoices-labels', icon: 'ScrollText', group: 'Operations' },
     { label: 'Clubbing Module', href: '/clubbings', icon: 'Sparkles', group: 'Catalog' },
     { label: 'Products', href: '/products', icon: 'Package', group: 'Catalog' },
     { label: 'Categories', href: '/categories', icon: 'FolderTree', group: 'Catalog' },
@@ -64,6 +66,7 @@ export const ROLE_NAV_ITEMS = {
   read_only: [
     { label: 'Orders', href: '/orders', icon: 'ClipboardList', group: 'Operations' },
     { label: 'Payments', href: '/payments', icon: 'CreditCard', group: 'Operations' },
+    { label: 'Invoices & Labels', href: '/invoices-labels', icon: 'ScrollText', group: 'Operations' },
   ],
 };
 
@@ -73,14 +76,15 @@ export const ROLE_ALLOWED_ROUTE_PREFIXES = {
     '/overview',
     '/orders',
     '/payments',
+    '/invoices-labels',
     '/clubbings',
     '/products',
     '/categories',
     '/discounts',
     '/reviews',
   ],
-  read_only: ['/orders', '/payments'],
-  employee: ['/orders', '/payments'],
+  read_only: ['/orders', '/payments', '/invoices-labels'],
+  employee: ['/orders', '/payments', '/invoices-labels'],
 };
 
 export function getRedirectForRole(role, pathname) {

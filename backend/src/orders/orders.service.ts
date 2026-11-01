@@ -260,7 +260,9 @@ export class OrdersService {
     sortBy?: string,
     sortOrder?: string,
   ) {
-    const skip = (page - 1) * perPage;
+    const safePage = Math.max(1, page || 1);
+    const safePerPage = Math.min(100, Math.max(1, perPage || 20));
+    const skip = (safePage - 1) * safePerPage;
     const where: any = {};
 
     if (status && status !== 'all') {

@@ -595,16 +595,21 @@ export class ProductsService {
 
     const whereClause = whereConditions.length > 0 ? { AND: whereConditions } : {};
 
+    const safePage = Math.max(1, page || 1);
+    const safePerPage = Math.min(100, Math.max(1, perPage || 20));
+    const skip = (safePage - 1) * safePerPage;
+    const take = safePerPage;
+
     if (!isAdmin && this.cacheService) {
-      const cacheKey = `cache:products:list:p${page || 1}:l${perPage || 20}:s${filters?.search || ''}:c${filters?.category || ''}`;
+      const cacheKey = `cache:products:list:p${safePage}:l${safePerPage}:s${filters?.search || ''}:c${filters?.category || ''}`;
       return this.cacheService.getOrSet(cacheKey, 300, async () => {
         const [data, total] = await this.prismaService.$transaction([
           this.prismaService.product.findMany({
             where: whereClause,
             include: { category: true, shippingTemplate: true },
             orderBy: { createdAt: 'desc' },
-            skip: ((page || 1) - 1) * (perPage || 20),
-            take: perPage || 20,
+            skip,
+            take,
           }),
           this.prismaService.product.count({
             where: whereClause,
@@ -612,7 +617,7 @@ export class ProductsService {
         ]);
         return {
           data: data.map((p) => this.transformProductResponse(p, false)),
-          meta: { page: page || 1, per_page: perPage || 20, total },
+          meta: { page: safePage, per_page: safePerPage, total },
         };
       });
     }
@@ -622,8 +627,8 @@ export class ProductsService {
         where: whereClause,
         include: { category: true, shippingTemplate: true },
         orderBy: { createdAt: 'desc' },
-        skip: ((page || 1) - 1) * (perPage || 20),
-        take: perPage || 20,
+        skip,
+        take,
       }),
       this.prismaService.product.count({
         where: whereClause,

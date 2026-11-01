@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
+import { SiteStatusService } from '../site-status/site-status.service';
 
 describe('CartController', () => {
   let controller: CartController;
@@ -11,10 +12,17 @@ describe('CartController', () => {
     removeItem: jest.fn(),
   };
 
+  const siteStatusService = {
+    getStatus: jest.fn().mockResolvedValue({ isMaintenance: false }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CartController],
-      providers: [{ provide: CartService, useValue: cartService }],
+      providers: [
+        { provide: CartService, useValue: cartService },
+        { provide: SiteStatusService, useValue: siteStatusService },
+      ],
     }).compile();
 
     controller = module.get<CartController>(CartController);

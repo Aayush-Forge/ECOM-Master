@@ -70,34 +70,6 @@ export class CustomerOrdersController {
     return this.ordersService.trackOrder(orderNumber, phone || '', email);
   }
 
-  @Get('me')
-  @Roles(ROLES.CUSTOMER)
-  getMyOrders(
-    @Req() req: { user: { userId: string } },
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
-    @Query('per_page', new ParseIntPipe({ optional: true })) perPage?: number,
-  ) {
-    return this.ordersService.getMyOrders(req.user.userId, page, perPage);
-  }
-
-  @Get('me/by-number/:orderNumber')
-  @Roles(ROLES.CUSTOMER)
-  getMyOrderByNumber(
-    @Req() req: { user: { userId: string } },
-    @Param('orderNumber') orderNumber: string,
-  ) {
-    return this.ordersService.getMyOrderByNumber(req.user.userId, orderNumber);
-  }
-
-  @Get('me/:id')
-  @Roles(ROLES.CUSTOMER)
-  getMyOrderById(
-    @Req() req: { user: { userId: string } },
-    @Param('id', new ParseUUIDPipe({ optional: true })) id: string,
-  ) {
-    return this.ordersService.getMyOrderById(req.user.userId, id);
-  }
-
   @Get(':id')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
