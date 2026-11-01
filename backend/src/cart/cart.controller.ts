@@ -17,10 +17,11 @@ import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { BlockDuringMaintenanceGuard } from '../site-status/guards/block-during-maintenance.guard';
 
 @Controller('cart')
 @Public()
-@UseGuards(OptionalJwtAuthGuard)
+@UseGuards(OptionalJwtAuthGuard, BlockDuringMaintenanceGuard)
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 

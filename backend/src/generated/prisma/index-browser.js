@@ -451,6 +451,13 @@ exports.Prisma.CompanyDocumentScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.SiteSettingScalarFieldEnum = {
+  id: 'id',
+  isMaintenance: 'isMaintenance',
+  message: 'message',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -572,7 +579,8 @@ exports.Prisma.ModelName = {
   ShippingSlab: 'ShippingSlab',
   AuditLog: 'AuditLog',
   CompanyProfile: 'CompanyProfile',
-  CompanyDocument: 'CompanyDocument'
+  CompanyDocument: 'CompanyDocument',
+  SiteSetting: 'SiteSetting'
 };
 
 /**

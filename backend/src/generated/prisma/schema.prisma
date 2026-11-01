@@ -554,3 +554,12 @@ model CompanyDocument {
   @@index([companyProfileId])
   @@map("company_documents")
 }
+
+model SiteSetting {
+  id            String   @id @default("default") @db.VarChar(50)
+  isMaintenance Boolean  @default(false) @map("is_maintenance")
+  message       String?  @db.VarChar(500)
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}

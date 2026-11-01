@@ -41,6 +41,8 @@ import {
   Loader2,
   Sparkles,
   Shield,
+  Power,
+  AlertTriangle,
 } from 'lucide-react'
 
 const ICON_MAP = {
@@ -58,13 +60,29 @@ const ICON_MAP = {
   Shield,
   Building2,
   Sparkles,
+  Power,
 }
 
 export default function DashboardLayout({ children }) {
   const router = useRouter()
   const pathname = usePathname()
+  useEffect(() => {
+    async function checkSiteStatus() {
+      try {
+        const res = await fetch('http://localhost:5000/site-status');
+        if (res.ok) {
+          const data = await res.json();
+          setIsSiteOffline(Boolean(data?.isMaintenance));
+        }
+      } catch {}
+    }
+    checkSiteStatus();
+    const interval = setInterval(checkSiteStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
   const { user, isAuthenticated, loading, logout } = useAuth()
   const [authorized, setAuthorized] = useState(false)
+  const [isSiteOffline, setIsSiteOffline] = useState(false)
 
   useEffect(() => {
     // If still reading session from local storage, wait
@@ -261,6 +279,22 @@ export default function DashboardLayout({ children }) {
         </Sidebar>
 
         <SidebarInset className="flex-1 flex flex-col min-w-0 bg-slate-50">
+          {isSiteOffline && (
+            <div className="bg-amber-600 text-white px-5 py-2.5 text-xs sm:text-sm font-medium flex items-center justify-between shadow-sm sticky top-0 z-40">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={18} className="animate-pulse text-amber-100" />
+                <span>
+                  <strong>STORE IS OFFLINE</strong>: Storefront is currently in Maintenance Mode. Customers cannot place orders.
+                </span>
+              </div>
+              <Link
+                href="/site-status"
+                className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded text-xs transition-colors shrink-0 font-semibold"
+              >
+                Manage Status &rarr;
+              </Link>
+            </div>
+          )}
           <header className="h-14 border-b border-stone-200 bg-white sticky top-0 z-30 flex items-center justify-between px-5 shadow-xs">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="text-stone-600 hover:text-stone-900" />

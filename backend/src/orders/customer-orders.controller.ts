@@ -19,6 +19,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES, ROLE_RANKS } from '../auth/roles.constants';
 import { Public } from '../auth/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { BlockDuringMaintenanceGuard } from '../site-status/guards/block-during-maintenance.guard';
 
 @Controller('orders')
 export class CustomerOrdersController {
@@ -38,7 +39,7 @@ export class CustomerOrdersController {
 
   @Post()
   @Public()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard, BlockDuringMaintenanceGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   createOrder(
     @Body() dto: CreateOrderDto,

@@ -48,6 +48,7 @@ export const ROLE_NAV_ITEMS = {
     { label: 'Staff and Admin', href: '/users', icon: 'Shield', group: 'Management' },
     { label: 'Company Profile', href: '/company-profile', icon: 'Building2', group: 'Management' },
     { label: 'Email', href: '/email', icon: 'Mail', group: 'Management' },
+    { label: 'Site Maintenance', href: '/site-status', icon: 'Power', group: 'Management' },
     { label: 'Audit Logs', href: '/audit-logs', icon: 'ScrollText', group: 'Management' },
   ],
   editor: [

@@ -26,6 +26,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { CompanyProfileModule } from './company-profile/company-profile.module';
 import { AccountingModule } from './accounting/accounting.module';
+import { SiteStatusModule } from './site-status/site-status.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -62,6 +63,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ShippingModule,
     CompanyProfileModule,
     AccountingModule,
+    SiteStatusModule,
   ],
   controllers: [AppController],
   providers: [
